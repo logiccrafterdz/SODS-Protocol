@@ -1173,7 +1173,7 @@ Feedback and suggestions for improvement are welcome via:
 LogicCrafter  
 Chlef, Algeria  
 Email: logiccrafterdz@gmail.com  
-GitHub: https://github.com/logiccrafter
+GitHub: https://github.com/logiccrafterdz
 
 ---
 
