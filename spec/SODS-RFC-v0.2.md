@@ -4,7 +4,7 @@
 **Status**: Experimental  
 **Author**: LogicCrafter (logiccrafterdz@gmail.com)  
 **Date**: January 7, 2026  
-**Repository**: https://github.com/logiccrafter/sods-protocol  
+**Repository**: https://github.com/logiccrafterdz/sods-protocol  
 
 ---
 
@@ -1162,7 +1162,7 @@ leaf_Tf  leaf_Tf
 ## Contributors
 
 Feedback and suggestions for improvement are welcome via:
-- GitHub Issues: https://github.com/logiccrafter/sods-protocol/issues
+- GitHub Issues: https://github.com/logiccrafterdz/sods-protocol/issues
 - Email: logiccrafterdz@gmail.com
 - Community: Ethereum Research (ethereum-magicians.org), r/ethdev (Reddit)
 
