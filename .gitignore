@@ -6,6 +6,11 @@ __pycache__/
 .Python
 *.so
 
+# Rust/Cargo
+target/
+Cargo.lock
+**/*.rs.bk
+
 # Environment
 .env
 .venv/
