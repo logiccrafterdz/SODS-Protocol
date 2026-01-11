@@ -1,0 +1,211 @@
+//! SODS Peer - server side node that serves proofs.
+
+use futures::StreamExt;
+use libp2p::{
+    identity::Keypair,
+    request_response,
+    swarm::{Swarm, SwarmEvent},
+    Multiaddr, PeerId,
+};
+use tracing::{debug, info, warn};
+
+use sods_core::BehavioralMerkleTree;
+use sods_verifier::BlockVerifier;
+
+use crate::behavior::{SodsBehaviour, SodsBehaviourEvent};
+use crate::cache::{BlockCache, CachedBlock};
+use crate::error::{Result, SodsP2pError};
+use crate::protocol::{ProofRequest, ProofResponse};
+
+/// A SODS peer that serves behavioral proofs to the network.
+pub struct SodsPeer {
+    swarm: Swarm<SodsBehaviour>,
+    verifier: BlockVerifier,
+    cache: BlockCache,
+    local_peer_id: PeerId,
+}
+
+impl SodsPeer {
+    /// Create a new SODS peer.
+    ///
+    /// # Arguments
+    ///
+    /// * `rpc_url` - RPC endpoint for fetching block data
+    pub fn new(rpc_url: &str) -> Result<Self> {
+        let verifier = BlockVerifier::new(rpc_url)?;
+        let keypair = Keypair::generate_ed25519();
+        let local_peer_id = PeerId::from(keypair.public());
+
+        let swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
+            .with_tokio()
+            .with_tcp(
+                libp2p::tcp::Config::default(),
+                libp2p::noise::Config::new,
+                libp2p::yamux::Config::default,
+            )
+            .map_err(|e| SodsP2pError::NetworkError(format!("TCP error: {}", e)))?
+            .with_behaviour(|key| SodsBehaviour::new(key.public().to_peer_id()))
+            .map_err(|e| SodsP2pError::NetworkError(format!("Behaviour error: {}", e)))?
+            .build();
+
+        info!("Created SODS peer with ID: {}", local_peer_id);
+
+        Ok(Self {
+            swarm,
+            verifier,
+            cache: BlockCache::new(),
+            local_peer_id,
+        })
+    }
+
+    /// Get the local peer ID.
+    pub fn peer_id(&self) -> &PeerId {
+        &self.local_peer_id
+    }
+
+    /// Start listening on the specified address.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - Multiaddr to listen on (e.g., "/ip4/0.0.0.0/tcp/0")
+    pub async fn listen(&mut self, addr: &str) -> Result<()> {
+        let addr: Multiaddr = addr
+            .parse()
+            .map_err(|e| SodsP2pError::NetworkError(format!("Invalid address: {}", e)))?;
+
+        self.swarm
+            .listen_on(addr)
+            .map_err(|e| SodsP2pError::NetworkError(format!("Listen error: {}", e)))?;
+
+        info!("Peer {} listening...", self.local_peer_id);
+
+        // Event loop
+        loop {
+            match self.swarm.select_next_some().await {
+                SwarmEvent::NewListenAddr { address, .. } => {
+                    info!("Listening on {}", address);
+                }
+                SwarmEvent::Behaviour(SodsBehaviourEvent::Mdns(event)) => {
+                    self.handle_mdns_event(event);
+                }
+                SwarmEvent::Behaviour(SodsBehaviourEvent::RequestResponse(event)) => {
+                    self.handle_request_response_event(event).await;
+                }
+                SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                    debug!("Connected to peer: {}", peer_id);
+                }
+                SwarmEvent::ConnectionClosed { peer_id, .. } => {
+                    debug!("Disconnected from peer: {}", peer_id);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Handle mDNS discovery events.
+    fn handle_mdns_event(&mut self, event: libp2p::mdns::Event) {
+        use libp2p::mdns::Event;
+        
+        match event {
+            Event::Discovered(peers) => {
+                for (peer_id, addr) in peers {
+                    debug!("Discovered peer: {} at {}", peer_id, addr);
+                    self.swarm.add_peer_address(peer_id, addr);
+                }
+            }
+            Event::Expired(peers) => {
+                for (peer_id, _) in peers {
+                    debug!("Peer expired: {}", peer_id);
+                }
+            }
+        }
+    }
+
+    /// Handle request-response events.
+    async fn handle_request_response_event(
+        &mut self,
+        event: request_response::Event<ProofRequest, ProofResponse>,
+    ) {
+        use request_response::Event;
+
+        match event {
+            Event::Message { peer, message } => {
+                match message {
+                    request_response::Message::Request { request, channel, .. } => {
+                        info!("Received request from {}: {:?}", peer, request);
+                        let response = self.handle_proof_request(request).await;
+                        
+                        if let Err(e) = self.swarm.behaviour_mut()
+                            .request_response
+                            .send_response(channel, response)
+                        {
+                            warn!("Failed to send response: {:?}", e);
+                        }
+                    }
+                    request_response::Message::Response { .. } => {
+                        // Peers don't receive responses
+                    }
+                }
+            }
+            Event::OutboundFailure { peer, error, .. } => {
+                warn!("Outbound failure to {}: {:?}", peer, error);
+            }
+            Event::InboundFailure { peer, error, .. } => {
+                warn!("Inbound failure from {}: {:?}", peer, error);
+            }
+            Event::ResponseSent { peer, .. } => {
+                debug!("Response sent to {}", peer);
+            }
+        }
+    }
+
+    /// Handle an incoming proof request.
+    async fn handle_proof_request(&mut self, request: ProofRequest) -> ProofResponse {
+        let ProofRequest { symbol, block_number } = request;
+
+        // Check cache first (clone to avoid borrow issues)
+        if let Some(cached) = self.cache.get(block_number).cloned() {
+            debug!("Cache hit for block {}", block_number);
+            return self.generate_proof_from_cache(&cached, &symbol);
+        }
+
+        // Fetch and verify via Layer 1
+        match self.verifier.verify_symbol_in_block(&symbol, block_number).await {
+            Ok(result) => {
+                if result.is_verified {
+                    let root = result.merkle_root
+                        .map(|v| {
+                            let mut arr = [0u8; 32];
+                            arr.copy_from_slice(&v);
+                            arr
+                        })
+                        .unwrap_or([0u8; 32]);
+
+                    ProofResponse::success(vec![], root, result.occurrences)
+                } else {
+                    ProofResponse::error(result.error.unwrap_or_else(|| "Symbol not found".into()))
+                }
+            }
+            Err(e) => ProofResponse::error(e.to_string()),
+        }
+    }
+
+    /// Generate proof from cached block data.
+    fn generate_proof_from_cache(&self, cached: &CachedBlock, symbol: &str) -> ProofResponse {
+        if !cached.has_symbol(symbol) {
+            return ProofResponse::error(format!("Symbol '{}' not in cached block", symbol));
+        }
+
+        let occurrences = cached.count_symbol(symbol);
+        let bmt = BehavioralMerkleTree::new(cached.symbols.clone());
+        
+        if let Some(sym) = cached.symbols.iter().find(|s| s.symbol() == symbol) {
+            if let Some(proof) = bmt.generate_proof(symbol, sym.log_index()) {
+                let proof_bytes = proof.serialize();
+                return ProofResponse::success(proof_bytes, cached.bmt_root, occurrences);
+            }
+        }
+
+        ProofResponse::error("Failed to generate proof")
+    }
+}

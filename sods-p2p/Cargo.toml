@@ -1,0 +1,52 @@
+[package]
+name = "sods-p2p"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["LogicCrafter <logiccrafterdz@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "SODS Protocol Layer 2: P2P Proof Exchange Network"
+repository = "https://github.com/logiccrafterdz/sods-protocol"
+keywords = ["ethereum", "p2p", "libp2p", "blockchain", "verification"]
+categories = ["network-programming", "cryptography"]
+
+[dependencies]
+# SODS dependencies
+sods-core = { path = "../sods-core" }
+sods-verifier = { path = "../sods-verifier" }
+
+# P2P networking
+libp2p = { version = "0.54", features = [
+    "tokio",
+    "mdns",
+    "request-response",
+    "cbor",
+    "noise",
+    "tcp",
+    "yamux",
+    "macros"
+] }
+
+# Async runtime
+tokio = { version = "1.36", features = ["rt-multi-thread", "macros", "sync", "time"] }
+futures = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+
+# Async trait support
+async-trait = "0.1"
+
+# Caching
+lru = "0.12"
+
+# Logging
+tracing = "0.1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tracing-subscriber = "0.3"
