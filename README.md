@@ -26,6 +26,54 @@ We've built a minimal PoC that verifies behavioral patterns in Sepolia blocks �
 
 ---
 
+## Rust Implementation
+
+The protocol is being implemented as a set of Rust crates:
+
+### sods-core (Layer 0)
+
+The symbolic core for Behavioral Merkle Trees. Handles:
+
+- EVM log parsing to behavioral symbols
+- Merkle tree construction
+- Proof generation and verification
+
+```rust
+use sods_core::{SymbolDictionary, BehavioralMerkleTree, BehavioralSymbol};
+
+let symbols = vec![
+    BehavioralSymbol::new("Tf", 0, vec![]),
+    BehavioralSymbol::new("Dep", 1, vec![]),
+];
+
+let bmt = BehavioralMerkleTree::new(symbols);
+let proof = bmt.generate_proof("Tf", 0).unwrap();
+assert!(proof.verify(&bmt.root()));
+```
+
+### sods-verifier (Layer 1)
+
+Local verification using public RPC endpoints. Handles:
+
+- RPC data fetching with retry logic
+- Symbol validation
+- End-to-end verification with timing metrics
+
+```rust
+use sods_verifier::BlockVerifier;
+
+let verifier = BlockVerifier::new("https://sepolia.infura.io/v3/YOUR_KEY")?;
+
+let result = verifier
+    .verify_symbol_in_block("Dep", 10002322)
+    .await?;
+
+println!("Verified: {}", result.is_verified);
+println!("Proof size: {} bytes", result.proof_size_bytes);
+```
+
+---
+
 ## What SODS is NOT
 
 - Not an indexer
@@ -37,6 +85,8 @@ We've built a minimal PoC that verifies behavioral patterns in Sepolia blocks �
 
 - Specification: **Draft v0.2**
 - PoC: **v0.1** (Sepolia testnet)
+- sods-core: **v0.1.0** (Rust crate)
+- sods-verifier: **v0.1.0** (Rust crate)
 - Stage: Experimental / Research
 - Seeking: Technical feedback, threat analysis, edge cases
 
@@ -52,14 +102,32 @@ sods-protocol/
 ├── LICENSE             <- CC0 1.0
 ├── spec/
 │   └── SODS-RFC-v0.2.md
-└── poc/
-    ├── README.md       <- PoC results & usage
-    ├── bmt_builder.py  <- BMT construction
-    ├── verifier.py     <- Proof verification CLI
-    ├── merkle.py       <- Merkle tree implementation
-    ├── config.py       <- Configuration
-    ├── proofs/         <- Generated proofs
-    └── screenshots/    <- Visual results
+├── sods-core/          <- Layer 0: Symbolic Core (Rust)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── symbol.rs
+│       ├── dictionary.rs
+│       ├── tree.rs
+│       ├── proof.rs
+│       └── error.rs
+├── sods-verifier/      <- Layer 1: Local Verifier (Rust)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── error.rs
+│       ├── query.rs
+│       ├── result.rs
+│       ├── rpc.rs
+│       └── verifier.rs
+└── poc/                <- Python PoC
+    ├── README.md
+    ├── bmt_builder.py
+    ├── verifier.py
+    ├── merkle.py
+    ├── config.py
+    ├── proofs/
+    └── screenshots/
 ```
 
 ## Disclaimer
