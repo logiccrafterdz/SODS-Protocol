@@ -95,6 +95,28 @@ println!("Verified: {}", result.is_verified);
 println!("Agreeing peers: {}", result.agreeing_peers);
 ```
 
+### sods-cli (Layer 3)
+
+Command-line interface for SODS Protocol. Provides:
+
+- Terminal-first verification commands
+- Human-readable and JSON output modes
+- Multi-chain support with smart defaults
+
+```bash
+# Verify a symbol in a block
+sods verify Dep --block 10002322 --chain sepolia
+
+# List supported symbols
+sods symbols
+
+# List supported chains
+sods chains
+
+# JSON output for scripting
+sods verify Tf --block 10002322 --json
+```
+
 ---
 
 ## What SODS is NOT
@@ -111,6 +133,7 @@ println!("Agreeing peers: {}", result.agreeing_peers);
 - sods-core: **v0.1.0** (Rust crate)
 - sods-verifier: **v0.1.0** (Rust crate)
 - sods-p2p: **v0.1.0** (Rust crate)
+- sods-cli: **v0.1.0** (Rust binary)
 - Stage: Experimental / Research
 - Seeking: Technical feedback, threat analysis, edge cases
 
@@ -154,6 +177,16 @@ sods-protocol/
 │       ├── protocol.rs
 │       ├── consensus.rs
 │       └── ...
+├── sods-cli/           <- Layer 3: CLI Interface (Rust)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── main.rs
+│       ├── config.rs
+│       ├── output.rs
+│       └── commands/
+│           ├── verify.rs
+│           ├── chains.rs
+│           └── symbols.rs
 └── poc/                <- Python PoC
     ├── README.md
     ├── bmt_builder.py
