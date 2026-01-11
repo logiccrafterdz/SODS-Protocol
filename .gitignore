@@ -8,8 +8,16 @@ __pycache__/
 
 # Rust/Cargo
 target/
+**/target/
 Cargo.lock
 **/*.rs.bk
+*.rlib
+*.rmeta
+
+# Build artifacts
+*.log
+build_output.txt
+errors.log
 
 # Environment
 .env
@@ -22,10 +30,12 @@ venv/
 .idea/
 *.swp
 *.swo
+*.sublime-*
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Keep these files (don't ignore)
 # !poc/proofs/*.proof

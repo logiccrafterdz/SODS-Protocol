@@ -1,0 +1,35 @@
+[package]
+name = "sods-verifier"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["LogicCrafter <logiccrafterdz@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "SODS Protocol Layer 1: Local Verifier for Behavioral Merkle Trees"
+repository = "https://github.com/logiccrafterdz/sods-protocol"
+keywords = ["ethereum", "evm", "merkle", "blockchain", "verification"]
+categories = ["cryptography", "network-programming"]
+
+[dependencies]
+# SODS Core for symbolic encoding and BMT construction
+sods-core = { path = "../sods-core" }
+
+# Ethereum RPC client
+ethers-providers = "2.0"
+ethers-core = "2.0"
+
+# Async runtime
+tokio = { version = "1.36", features = ["rt-multi-thread", "macros", "time"] }
+
+# Error handling
+thiserror = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+# Hex encoding for test vectors
+hex = "0.4"
+
+# For timing assertions
+tokio-test = "0.4"
