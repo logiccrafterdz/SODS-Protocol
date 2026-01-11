@@ -72,6 +72,29 @@ println!("Verified: {}", result.is_verified);
 println!("Proof size: {} bytes", result.proof_size_bytes);
 ```
 
+### sods-p2p (Layer 2)
+
+P2P proof exchange and social consensus using libp2p. Handles:
+
+- Decentralized peer discovery (mDNS)
+- Proof exchange via request-response protocol
+- Social consensus verification (2/3 majority)
+- Peer reputation tracking
+
+```rust
+use sods_p2p::{SodsClient, SodsPeer};
+
+// Client P2P verification with RPC fallback
+let mut client = SodsClient::with_fallback("https://sepolia.infura.io/v3/KEY")?;
+
+let result = client
+    .verify_via_p2p("Dep", 10002322)
+    .await?;
+
+println!("Verified: {}", result.is_verified);
+println!("Agreeing peers: {}", result.agreeing_peers);
+```
+
 ---
 
 ## What SODS is NOT
@@ -87,6 +110,7 @@ println!("Proof size: {} bytes", result.proof_size_bytes);
 - PoC: **v0.1** (Sepolia testnet)
 - sods-core: **v0.1.0** (Rust crate)
 - sods-verifier: **v0.1.0** (Rust crate)
+- sods-p2p: **v0.1.0** (Rust crate)
 - Stage: Experimental / Research
 - Seeking: Technical feedback, threat analysis, edge cases
 
@@ -120,14 +144,21 @@ sods-protocol/
 │       ├── result.rs
 │       ├── rpc.rs
 │       └── verifier.rs
+├── sods-p2p/           <- Layer 2: P2P Network (Rust)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── peer.rs
+│       ├── client.rs
+│       ├── behavior.rs
+│       ├── protocol.rs
+│       ├── consensus.rs
+│       └── ...
 └── poc/                <- Python PoC
     ├── README.md
     ├── bmt_builder.py
     ├── verifier.py
-    ├── merkle.py
-    ├── config.py
-    ├── proofs/
-    └── screenshots/
+    └── ...
 ```
 
 ## Disclaimer
