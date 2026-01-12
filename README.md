@@ -55,7 +55,8 @@ assert!(proof.verify(&bmt.root()));
 
 Local verification using public RPC endpoints. Handles:
 
-- RPC data fetching with retry logic
+- RPC data fetching with LRU caching (100 blocks)
+- Exponential backoff retry (500ms, 1.5s, 4s)
 - Symbol validation
 - End-to-end verification with timing metrics
 
@@ -76,7 +77,8 @@ println!("Proof size: {} bytes", result.proof_size_bytes);
 
 P2P proof exchange and social consensus using libp2p. Handles:
 
-- Decentralized peer discovery (mDNS)
+- Peer discovery via identify protocol
+- Cryptographically signed proof responses (secp256k1)
 - Proof exchange via request-response protocol
 - Social consensus verification (2/3 majority)
 - Peer reputation tracking
@@ -131,11 +133,15 @@ sods verify Tf --block 10002322 --json
 - Specification: **Draft v0.2**
 - PoC: **v0.1** (Sepolia testnet)
 - sods-core: **v0.1.0** (Rust crate)
-- sods-verifier: **v0.1.0** (Rust crate)
-- sods-p2p: **v0.1.0** (Rust crate)
-- sods-cli: **v0.1.0** (Rust binary)
-- Stage: Experimental / Research
+- sods-verifier: **v0.2.0** (Rust crate)
+- sods-p2p: **v0.2.0** (Rust crate)
+- sods-cli: **v0.2.0** (Rust binary)
+- Stage: **v1.0-beta** / Production-Ready
 - Seeking: Technical feedback, threat analysis, edge cases
+
+## Architecture
+
+[SODS Architecture — Trust Model and Data Flow](ARCHITECTURE.md)
 
 ## Specification
 
@@ -146,6 +152,7 @@ sods verify Tf --block 10002322 --json
 ```
 sods-protocol/
 ├── README.md           <- You are here
+├── ARCHITECTURE.md     <- Trust model and data flow
 ├── LICENSE             <- CC0 1.0
 ├── spec/
 │   └── SODS-RFC-v0.2.md
