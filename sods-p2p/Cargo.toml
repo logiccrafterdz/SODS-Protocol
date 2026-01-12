@@ -1,6 +1,6 @@
 [package]
 name = "sods-p2p"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.70"
 authors = ["LogicCrafter <logiccrafterdz@gmail.com>"]
@@ -18,7 +18,7 @@ sods-verifier = { path = "../sods-verifier" }
 # P2P networking
 libp2p = { version = "0.54", features = [
     "tokio",
-    "mdns",
+    "identify",
     "request-response",
     "cbor",
     "noise",
@@ -46,6 +46,11 @@ lru = "0.12"
 
 # Logging
 tracing = "0.1"
+
+# Cryptographic signing (secp256k1)
+k256 = { version = "0.13", features = ["ecdsa"] }
+sha2 = "0.10"
+rand = "0.8"
 
 [dev-dependencies]
 tokio-test = "0.4"

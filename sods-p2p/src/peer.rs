@@ -1,12 +1,15 @@
 //! SODS Peer - server side node that serves proofs.
 
 use futures::StreamExt;
+use k256::ecdsa::SigningKey;
 use libp2p::{
+    identify,
     identity::Keypair,
     request_response,
     swarm::{Swarm, SwarmEvent},
     Multiaddr, PeerId,
 };
+use rand::rngs::OsRng;
 use tracing::{debug, info, warn};
 
 use sods_core::BehavioralMerkleTree;
@@ -23,6 +26,7 @@ pub struct SodsPeer {
     verifier: BlockVerifier,
     cache: BlockCache,
     local_peer_id: PeerId,
+    signing_key: SigningKey,
 }
 
 impl SodsPeer {
@@ -36,7 +40,10 @@ impl SodsPeer {
         let keypair = Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(keypair.public());
 
-        let swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
+        // Generate secp256k1 signing key for message signing
+        let signing_key = SigningKey::random(&mut OsRng);
+
+        let swarm = libp2p::SwarmBuilder::with_existing_identity(keypair.clone())
             .with_tokio()
             .with_tcp(
                 libp2p::tcp::Config::default(),
@@ -44,7 +51,7 @@ impl SodsPeer {
                 libp2p::yamux::Config::default,
             )
             .map_err(|e| SodsP2pError::NetworkError(format!("TCP error: {}", e)))?
-            .with_behaviour(|key| SodsBehaviour::new(key.public().to_peer_id()))
+            .with_behaviour(|_key| SodsBehaviour::new(&keypair))
             .map_err(|e| SodsP2pError::NetworkError(format!("Behaviour error: {}", e)))?
             .build();
 
@@ -55,12 +62,24 @@ impl SodsPeer {
             verifier,
             cache: BlockCache::new(),
             local_peer_id,
+            signing_key,
         })
     }
 
     /// Get the local peer ID.
     pub fn peer_id(&self) -> &PeerId {
         &self.local_peer_id
+    }
+
+    /// Connect to bootstrap nodes.
+    pub async fn connect_bootstrap(&mut self, addrs: &[Multiaddr]) -> Result<()> {
+        for addr in addrs {
+            info!("Dialing bootstrap node: {}", addr);
+            self.swarm
+                .dial(addr.clone())
+                .map_err(|e| SodsP2pError::NetworkError(format!("Dial error: {}", e)))?;
+        }
+        Ok(())
     }
 
     /// Start listening on the specified address.
@@ -85,8 +104,8 @@ impl SodsPeer {
                 SwarmEvent::NewListenAddr { address, .. } => {
                     info!("Listening on {}", address);
                 }
-                SwarmEvent::Behaviour(SodsBehaviourEvent::Mdns(event)) => {
-                    self.handle_mdns_event(event);
+                SwarmEvent::Behaviour(SodsBehaviourEvent::Identify(event)) => {
+                    self.handle_identify_event(event);
                 }
                 SwarmEvent::Behaviour(SodsBehaviourEvent::RequestResponse(event)) => {
                     self.handle_request_response_event(event).await;
@@ -102,21 +121,29 @@ impl SodsPeer {
         }
     }
 
-    /// Handle mDNS discovery events.
-    fn handle_mdns_event(&mut self, event: libp2p::mdns::Event) {
-        use libp2p::mdns::Event;
-        
+    /// Handle identify protocol events.
+    fn handle_identify_event(&mut self, event: identify::Event) {
         match event {
-            Event::Discovered(peers) => {
-                for (peer_id, addr) in peers {
-                    debug!("Discovered peer: {} at {}", peer_id, addr);
+            identify::Event::Received { peer_id, info, .. } => {
+                debug!(
+                    "Identified peer {} running {} with {} addresses",
+                    peer_id,
+                    info.agent_version,
+                    info.listen_addrs.len()
+                );
+                // Add peer addresses
+                for addr in info.listen_addrs {
                     self.swarm.add_peer_address(peer_id, addr);
                 }
             }
-            Event::Expired(peers) => {
-                for (peer_id, _) in peers {
-                    debug!("Peer expired: {}", peer_id);
-                }
+            identify::Event::Sent { peer_id, .. } => {
+                debug!("Sent identify info to {}", peer_id);
+            }
+            identify::Event::Pushed { peer_id, .. } => {
+                debug!("Pushed identify info to {}", peer_id);
+            }
+            identify::Event::Error { peer_id, error, .. } => {
+                warn!("Identify error with {}: {:?}", peer_id, error);
             }
         }
     }
@@ -129,24 +156,26 @@ impl SodsPeer {
         use request_response::Event;
 
         match event {
-            Event::Message { peer, message } => {
-                match message {
-                    request_response::Message::Request { request, channel, .. } => {
-                        info!("Received request from {}: {:?}", peer, request);
-                        let response = self.handle_proof_request(request).await;
-                        
-                        if let Err(e) = self.swarm.behaviour_mut()
-                            .request_response
-                            .send_response(channel, response)
-                        {
-                            warn!("Failed to send response: {:?}", e);
-                        }
-                    }
-                    request_response::Message::Response { .. } => {
-                        // Peers don't receive responses
+            Event::Message { peer, message } => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    info!("Received request from {}: {:?}", peer, request);
+                    let response = self.handle_proof_request(request).await;
+
+                    if let Err(e) = self
+                        .swarm
+                        .behaviour_mut()
+                        .request_response
+                        .send_response(channel, response)
+                    {
+                        warn!("Failed to send response: {:?}", e);
                     }
                 }
-            }
+                request_response::Message::Response { .. } => {
+                    // Peers don't receive responses
+                }
+            },
             Event::OutboundFailure { peer, error, .. } => {
                 warn!("Outbound failure to {}: {:?}", peer, error);
             }
@@ -161,7 +190,10 @@ impl SodsPeer {
 
     /// Handle an incoming proof request.
     async fn handle_proof_request(&mut self, request: ProofRequest) -> ProofResponse {
-        let ProofRequest { symbol, block_number } = request;
+        let ProofRequest {
+            symbol,
+            block_number,
+        } = request;
 
         // Check cache first (clone to avoid borrow issues)
         if let Some(cached) = self.cache.get(block_number).cloned() {
@@ -170,10 +202,15 @@ impl SodsPeer {
         }
 
         // Fetch and verify via Layer 1
-        match self.verifier.verify_symbol_in_block(&symbol, block_number).await {
+        match self
+            .verifier
+            .verify_symbol_in_block(&symbol, block_number)
+            .await
+        {
             Ok(result) => {
                 if result.is_verified {
-                    let root = result.merkle_root
+                    let root = result
+                        .merkle_root
                         .map(|v| {
                             let mut arr = [0u8; 32];
                             arr.copy_from_slice(&v);
@@ -181,31 +218,42 @@ impl SodsPeer {
                         })
                         .unwrap_or([0u8; 32]);
 
-                    ProofResponse::success(vec![], root, result.occurrences)
+                    ProofResponse::success_signed(vec![], root, result.occurrences, &self.signing_key)
                 } else {
-                    ProofResponse::error(result.error.unwrap_or_else(|| "Symbol not found".into()))
+                    ProofResponse::error_signed(
+                        result.error.unwrap_or_else(|| "Symbol not found".into()),
+                        &self.signing_key,
+                    )
                 }
             }
-            Err(e) => ProofResponse::error(e.to_string()),
+            Err(e) => ProofResponse::error_signed(e.to_string(), &self.signing_key),
         }
     }
 
     /// Generate proof from cached block data.
     fn generate_proof_from_cache(&self, cached: &CachedBlock, symbol: &str) -> ProofResponse {
         if !cached.has_symbol(symbol) {
-            return ProofResponse::error(format!("Symbol '{}' not in cached block", symbol));
+            return ProofResponse::error_signed(
+                format!("Symbol '{}' not in cached block", symbol),
+                &self.signing_key,
+            );
         }
 
         let occurrences = cached.count_symbol(symbol);
         let bmt = BehavioralMerkleTree::new(cached.symbols.clone());
-        
+
         if let Some(sym) = cached.symbols.iter().find(|s| s.symbol() == symbol) {
             if let Some(proof) = bmt.generate_proof(symbol, sym.log_index()) {
                 let proof_bytes = proof.serialize();
-                return ProofResponse::success(proof_bytes, cached.bmt_root, occurrences);
+                return ProofResponse::success_signed(
+                    proof_bytes,
+                    cached.bmt_root,
+                    occurrences,
+                    &self.signing_key,
+                );
             }
         }
 
-        ProofResponse::error("Failed to generate proof")
+        ProofResponse::error_signed("Failed to generate proof", &self.signing_key)
     }
 }

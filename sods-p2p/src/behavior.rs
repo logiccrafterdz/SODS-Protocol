@@ -1,7 +1,7 @@
-//! Libp2p network behavior combining mDNS and request-response.
+//! Libp2p network behavior combining identify and request-response.
 
 use libp2p::{
-    mdns, request_response,
+    identify, request_response,
     swarm::NetworkBehaviour,
     StreamProtocol,
 };
@@ -17,8 +17,8 @@ pub fn sods_protocol() -> StreamProtocol {
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "SodsBehaviourEvent")]
 pub struct SodsBehaviour {
-    /// mDNS for local peer discovery
-    pub mdns: mdns::tokio::Behaviour,
+    /// Identify protocol for peer discovery
+    pub identify: identify::Behaviour,
     /// Request-response for proof exchange
     pub request_response: request_response::cbor::Behaviour<ProofRequest, ProofResponse>,
 }
@@ -26,15 +26,15 @@ pub struct SodsBehaviour {
 /// Events emitted by the SODS behavior.
 #[derive(Debug)]
 pub enum SodsBehaviourEvent {
-    /// mDNS discovery event
-    Mdns(mdns::Event),
+    /// Identify event (peer info exchange)
+    Identify(identify::Event),
     /// Request-response event
     RequestResponse(request_response::Event<ProofRequest, ProofResponse>),
 }
 
-impl From<mdns::Event> for SodsBehaviourEvent {
-    fn from(event: mdns::Event) -> Self {
-        SodsBehaviourEvent::Mdns(event)
+impl From<identify::Event> for SodsBehaviourEvent {
+    fn from(event: identify::Event) -> Self {
+        SodsBehaviourEvent::Identify(event)
     }
 }
 
@@ -45,14 +45,16 @@ impl From<request_response::Event<ProofRequest, ProofResponse>> for SodsBehaviou
 }
 
 impl SodsBehaviour {
-    /// Create a new SODS behavior with the given peer ID.
-    pub fn new(local_peer_id: libp2p::PeerId) -> Self {
-        // mDNS config
-        let mdns = mdns::tokio::Behaviour::new(
-            mdns::Config::default(),
-            local_peer_id,
-        )
-        .expect("Failed to create mDNS behaviour");
+    /// Create a new SODS behavior with the given keypair.
+    pub fn new(keypair: &libp2p::identity::Keypair) -> Self {
+        // Identify config
+        let identify = identify::Behaviour::new(
+            identify::Config::new(
+                "/sods/1.0.0".to_string(),
+                keypair.public(),
+            )
+            .with_agent_version("sods/0.2.0".to_string()),
+        );
 
         // Request-response config using CBOR codec
         let request_response = request_response::cbor::Behaviour::new(
@@ -61,7 +63,7 @@ impl SodsBehaviour {
         );
 
         Self {
-            mdns,
+            identify,
             request_response,
         }
     }
