@@ -137,8 +137,8 @@ sods trend --pattern "LP+ -> Sw" --chain base --window 10
 # Autonomous monitoring (Continuous watchdog)
 sods monitor --pattern "Sw{3,}" --chain base --interval 30s
 
-# Run as background daemon with webhook alerts
-sods daemon start --pattern "Tf{2,}" --chain base --webhook-url "https://ntfy.sh/my_alerts" --autostart
+# Run as background daemon with community threat feed (and webhooks)
+sods daemon start --threat-feed "https://raw.githubusercontent.com/sods/threats/main/base.json" --chain base --webhook-url "https://ntfy.sh/my_alerts" --autostart
 
 
 
@@ -169,6 +169,7 @@ sods verify Tf --block 10002322 --json
 - **Discovery Engine**: New `sods discover` command to find behavioral hotspots in recent blocks.
 - **System Service**: Run as a daemon with `sods daemon` (Linux/macOS).
 - **Secure Webhooks**: Forward alerts to ntfy.sh, Discord, or Telegram with privacy guarantees.
+- **Threat Intelligence**: Subscribe to decentralized, community-maintained behavioral blocklists.
 - **Regression Testing**: Automated CI integration tests for multi-chain support.
 
 ## Status

@@ -1,5 +1,6 @@
 use clap::{Args, Subcommand};
 use colored::Colorize;
+use serde::Deserialize;
 
 #[cfg(unix)]
 use std::fs;
@@ -8,15 +9,16 @@ use std::path::{Path, PathBuf};
 #[cfg(unix)]
 use sysinfo::{System, Pid};
 #[cfg(unix)]
-use dirs; // dirs is mainly used for home dir path on unix for PID file
+use dirs;
 #[cfg(unix)]
-use crate::commands::monitor::{self, MonitorArgs}; 
+use crate::commands::monitor::MonitorArgs; 
 
 #[cfg(unix)]
 use daemonize::Daemonize;
 #[cfg(unix)]
 use std::fs::File;
 
+#[cfg(unix)]
 use crate::config::get_chain;
 use crate::output;
 #[cfg(unix)]
@@ -35,7 +37,7 @@ pub enum DaemonCommands {
     Start {
         /// Behavioral pattern to monitor
         #[arg(short, long)]
-        pattern: String,
+        pattern: Option<String>,
 
         /// Blockchain chain
         #[arg(short, long, default_value = "sepolia")]
@@ -56,11 +58,34 @@ pub enum DaemonCommands {
         /// Forward alerts to a secure HTTPS webhook (e.g., ntfy.sh)
         #[arg(long)]
         webhook_url: Option<String>,
+        
+        /// Load behavioral threat patterns from a public feed (optional)
+        #[arg(long)]
+        threat_feed: Option<String>,
     },
     /// Stop the running daemon
     Stop,
     /// Check daemon status
     Status,
+}
+
+#[cfg(unix)]
+#[derive(Deserialize, Debug, Clone)]
+pub struct ThreatFeedItem {
+    pub name: String,
+    pub pattern: String,
+    pub chain: String,
+    pub severity: String,
+    pub description: Option<String>,
+}
+
+#[cfg(unix)]
+struct MonitoringTarget {
+    pattern: sods_core::pattern::BehavioralPattern,
+    name: String,
+    severity: String,
+    pattern_str: String,
+    chain: String,
 }
 
 #[cfg(unix)]
@@ -85,7 +110,15 @@ fn get_log_file() -> PathBuf {
 // -----------------------------------------------------------------------------
 
 #[cfg(unix)]
-async fn start_daemon(pattern: String, chain: String, interval: String, rpc_url: Option<String>, autostart: bool, webhook_url: Option<String>) -> i32 {
+async fn start_daemon(
+    pattern: Option<String>, 
+    chain: String, 
+    interval: String, 
+    rpc_url: Option<String>, 
+    autostart: bool, 
+    webhook_url: Option<String>,
+    threat_feed: Option<String>
+) -> i32 {
     let sods_dir = get_sods_dir();
     if !sods_dir.exists() {
         fs::create_dir_all(&sods_dir).expect("Failed to create .sods dir");
@@ -102,20 +135,77 @@ async fn start_daemon(pattern: String, chain: String, interval: String, rpc_url:
 
     if autostart {
         println!("Genering systemd service file...");
-        // TODO: Implement actual generation logic or print helpful instructions
         println!("Save the following to ~/.config/systemd/user/sods.service:");
         println!("[Unit]\nDescription=SODS Monitor\n[Service]\nExecStart={}", std::env::current_exe().unwrap().display());
         println!("Restart=always\n[Install]\nWantedBy=default.target");
         return 0;
     }
 
+    // Fetch threat feed *before* daemonizing (to report errors clearly)
+    let mut targets = Vec::new();
+    
+    // Add manual pattern if provided
+    if let Some(p) = pattern {
+        match sods_core::pattern::BehavioralPattern::parse(&p) {
+            Ok(parsed) => {
+                targets.push(MonitoringTarget {
+                    pattern: parsed,
+                    name: "Manual Pattern".to_string(),
+                    severity: "manual".to_string(),
+                    pattern_str: p,
+                    chain: chain.clone(),
+                });
+            },
+            Err(e) => {
+                output::error(&format!("Invalid manual pattern: {}", e));
+                return 1;
+            }
+        }
+    }
+    
+    // Fetch threat feed
+    if let Some(feed_url) = threat_feed {
+        println!("Fetching threat feed from {}...", feed_url);
+        match fetch_threat_feed(&feed_url).await {
+            Ok(items) => {
+                println!("Loaded {} patterns from threat feed.", items.len());
+                for item in items {
+                     if item.chain != chain {
+                         continue; // Skip patterns for other chains
+                     }
+                     match sods_core::pattern::BehavioralPattern::parse(&item.pattern) {
+                         Ok(parsed) => {
+                             targets.push(MonitoringTarget {
+                                 pattern: parsed,
+                                 name: item.name,
+                                 severity: item.severity,
+                                 pattern_str: item.pattern,
+                                 chain: item.chain,
+                             });
+                         },
+                         Err(e) => eprintln!("⚠️ Skipping invalid pattern '{}': {}", item.name, e),
+                     }
+                }
+            },
+            Err(e) => {
+                output::error(&format!("Failed to fetch threat feed: {}", e));
+                if targets.is_empty() {
+                    return 1; // Exit if no patterns at all
+                }
+            }
+        }
+    }
+    
+    if targets.is_empty() {
+        output::error("No valid patterns to monitor. Provide --pattern or a valid --threat-feed.");
+        return 1;
+    }
+
     println!("Starting SODS daemon...");
+    println!("Monitoring {} targets.", targets.len());
     println!("Logs: {}", log_file.display());
     println!("PID:  {}", pid_file.display());
 
-    let stdout = File::create(&log_file).unwrap();
-    let stderr = File::create(&log_file).unwrap(); // Same log file for now or separate? Appending?
-    // Proper logging usually requires OpenOptions::append()
     let stdout = std::fs::OpenOptions::new().create(true).append(true).open(&log_file).unwrap();
     let stderr = std::fs::OpenOptions::new().create(true).append(true).open(&log_file).unwrap();
 
@@ -128,26 +218,8 @@ async fn start_daemon(pattern: String, chain: String, interval: String, rpc_url:
 
     match daemonize.start() {
         Ok(_) => {
-            // We are now in the daemon process
-            let args = MonitorArgs {
-                pattern,
-                chain,
-                interval,
-                rpc_url,
-            };
-            
-            // Run the monitor logic
-            // Note: monitor::run prints to stdout/stderr, which are now redirected to log file.
-            // We need to inject notification logic. monitor::run doesn't support generic callback yet.
-            // For MVP, we'll just run monitor::run. The notification part requires modifying monitor.rs 
-            // OR reimplementing the loop here. 
-            // Reusing is better. Let's assume monitor::run is enough for "logging alerts". 
-            // DESKTOP NOTIFICATION is a key requirement.
-            // We can modify monitor.rs to emit a notification if a feature flag is on, or simply copy the loop logic here since it's short.
-            // Copying is safer to modify output behavior (we don't want ANSI colors in log file ideally, but it's ok).
-            
-            // Re-implementing simplified loop with notification:
-            run_daemon_loop(args, webhook_url).await;
+            // In daemon process
+            run_daemon_loop(targets, chain, interval, rpc_url, webhook_url).await;
             0 
         }
         Err(e) => {
@@ -158,31 +230,54 @@ async fn start_daemon(pattern: String, chain: String, interval: String, rpc_url:
 }
 
 #[cfg(unix)]
-async fn run_daemon_loop(args: MonitorArgs, webhook_url: Option<String>) {
-    use sods_core::pattern::BehavioralPattern;
+async fn fetch_threat_feed(url: &str) -> Result<Vec<ThreatFeedItem>, String> {
+    if !url.starts_with("https://") {
+        return Err("URL must be HTTPS".to_string());
+    }
+    
+    let client = reqwest::Client::new();
+    let res = client.get(url)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+        
+    if !res.status().is_success() {
+        return Err(format!("HTTP {}", res.status()));
+    }
+    
+    let items: Vec<ThreatFeedItem> = res.json()
+        .await
+        .map_err(|e| format!("Invalid JSON: {}", e))?;
+        
+    Ok(items)
+}
+
+#[cfg(unix)]
+async fn run_daemon_loop(
+    targets: Vec<MonitoringTarget>, 
+    chain: String, 
+    interval_str: String, 
+    rpc_url_opt: Option<String>,
+    webhook_url: Option<String>
+) {
     use sods_verifier::BlockVerifier;
     use crate::config::get_chain;
     use std::time::Duration;
     use tokio::time::sleep;
     use notify_rust::Notification;
 
-    // ... (Simplified parsing logic from monitor.rs) ...
-    // Assuming args are valid since checked before daemonizing? No, need to re-parse.
-    
-    let interval_secs = if args.interval.ends_with("s") {
-        args.interval.trim_end_matches("s").parse::<u64>().unwrap_or(30)
+    let interval_secs = if interval_str.ends_with("s") {
+        interval_str.trim_end_matches("s").parse::<u64>().unwrap_or(30)
     } else { 30 };
     let interval = Duration::from_secs(interval_secs);
     
-    let pattern = BehavioralPattern::parse(&args.pattern).unwrap();
-    let chain_config = get_chain(&args.chain).unwrap();
-    let rpc_url = args.rpc_url.as_deref().unwrap_or(chain_config.default_rpc);
-    let chain_name = args.chain.clone();
-    let pattern_str = args.pattern.clone();
+    let chain_config = get_chain(&chain).unwrap();
+    let rpc_url = rpc_url_opt.as_deref().unwrap_or(chain_config.default_rpc);
     
-    println!("Daemon started. Monitoring {} on {}", args.pattern, args.chain);
+    println!("Daemon loop started. Monitoring {} targets on {}", targets.len(), chain);
     if let Some(ref url) = webhook_url {
-        println!("Webhook enabled: {}", url); // OK to log here as it's the daemon log
+        println!("Webhook enabled: {}", url);
     }
     
     let verifier = BlockVerifier::new(rpc_url).unwrap();
@@ -195,32 +290,40 @@ async fn run_daemon_loop(args: MonitorArgs, webhook_url: Option<String>) {
             Ok(current_head) => {
                 if current_head > last_scanned_block {
                      for block_num in (last_scanned_block + 1)..=current_head {
-                         if let Ok(symbols) = verifier.fetch_block_symbols(block_num).await {
-                             if pattern.matches(&symbols).is_some() {
-                                 let msg = format!("Pattern {} detected on Block #{}", pattern_str, block_num);
-                                 println!("{}", msg);
-                                 
-                                 // Desktop Notification
-                                 let _ = Notification::new()
-                                     .summary("SODS Alert 🚨")
-                                     .body(&msg)
-                                     .show();
+                         // Fetch symbols ONCE per block
+                         match verifier.fetch_block_symbols(block_num).await {
+                             Ok(symbols) => {
+                                 // Check all targets against these symbols
+                                 for target in &targets {
+                                     if target.pattern.matches(&symbols).is_some() {
+                                         let msg = format!("🚨 {} ({}) detected on Block #{}", target.name, target.severity, block_num);
+                                         println!("{}", msg);
+                                         
+                                         // Desktop Notification
+                                         let _ = Notification::new()
+                                             .summary("SODS Threat Alert 🚨")
+                                             .body(&msg)
+                                             .show();
 
-                                 // Webhook
-                                 if let Some(ref url) = webhook_url {
-                                     let payload = json!({
-                                         "alert": "Behavioral pattern detected",
-                                         "chain": chain_name,
-                                         "block_number": block_num,
-                                         "pattern": pattern_str,
-                                         "timestamp": chrono::Utc::now().to_rfc3339(),
-                                         "confidence": "High"
-                                     });
-                                     
-                                     // Spawn webhook task
-                                     tokio::spawn(send_webhook(url.clone(), payload));
+                                         // Webhook
+                                         if let Some(ref url) = webhook_url {
+                                             let payload = json!({
+                                                 "alert": "Behavioral pattern detected",
+                                                 "chain": chain,
+                                                 "block_number": block_num,
+                                                 "pattern": target.pattern_str,
+                                                 "threat_name": target.name,
+                                                 "severity": target.severity,
+                                                 "timestamp": chrono::Utc::now().to_rfc3339(),
+                                                 "confidence": "High"
+                                             });
+                                             
+                                             tokio::spawn(send_webhook(url.clone(), payload));
+                                         }
+                                     }
                                  }
-                             }
+                             },
+                             Err(e) => eprintln!("Error fetching block #{}: {}", block_num, e),
                          }
                      }
                      last_scanned_block = current_head;
@@ -234,27 +337,15 @@ async fn run_daemon_loop(args: MonitorArgs, webhook_url: Option<String>) {
 #[cfg(unix)]
 async fn send_webhook(url: String, payload: serde_json::Value) {
     if !url.starts_with("https://") {
-        eprintln!("Webhook Error: URL must be HTTPS");
         return;
     }
-
     let client = reqwest::Client::new();
-    match client.post(&url)
+    let _ = client.post(&url)
         .json(&payload)
         .header("User-Agent", "SODS/1.2 (privacy-first behavioral monitor)")
-        .timeout(Duration::from_secs(5))
+        .timeout(std::time::Duration::from_secs(5))
         .send()
-        .await 
-    {
-        Ok(res) => {
-            if !res.status().is_success() {
-                eprintln!("Webhook failed with status: {}", res.status());
-            }
-        },
-        Err(_) => {
-            eprintln!("Webhook delivery failed");
-        }
-    }
+        .await;
 }
 
 
@@ -267,14 +358,11 @@ fn stop_daemon() -> i32 {
     }
 
     let pid_str = fs::read_to_string(&pid_file).unwrap();
-    let pid = pid_str.trim().parse::<i32>().unwrap(); // sysinfo uses Pid, which wraps usize/i32 depending on platform
+    let pid = pid_str.trim().parse::<i32>().unwrap();
 
-    // kill process
-    // Using libc or Command kill
     use std::process::Command;
     let _ = Command::new("kill").arg(pid.to_string()).output();
     
-    // Clean up
     let _ = fs::remove_file(pid_file);
     println!("Daemon stopped.");
     0
@@ -292,7 +380,7 @@ fn check_status() -> bool {
         Err(_) => return false,
     };
     
-    let pid_val = match pid_str.trim().parse::<usize>() { // Sysinfo uses usize for Pid on some platforms
+    let pid_val = match pid_str.trim().parse::<usize>() {
          Ok(p) => p,
          Err(_) => return false,
     };
@@ -301,7 +389,6 @@ fn check_status() -> bool {
     if let Some(_) = s.process(Pid::from(pid_val)) {
         true
     } else {
-        // Stale pid file
         false
     }
 }
@@ -311,7 +398,15 @@ fn check_status() -> bool {
 // -----------------------------------------------------------------------------
 
 #[cfg(not(unix))]
-async fn start_daemon(_pattern: String, _chain: String, _interval: String, _rpc_url: Option<String>, _autostart: bool, _webhook_url: Option<String>) -> i32 {
+async fn start_daemon(
+    _pattern: Option<String>, 
+    _chain: String, 
+    _interval: String, 
+    _rpc_url: Option<String>, 
+    _autostart: bool, 
+    _webhook_url: Option<String>,
+    _threat_feed: Option<String>
+) -> i32 {
     output::error("Daemon mode is currently only supported on Linux/macOS.");
     println!("👉 Use 'sods monitor' for foreground monitoring on Windows.");
     1
@@ -335,8 +430,8 @@ fn check_status() -> bool {
 
 pub async fn run(args: DaemonArgs) -> i32 {
     match args.command {
-        DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart, webhook_url } => {
-            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url).await
+        DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed } => {
+            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed).await
         },
         DaemonCommands::Stop => {
             stop_daemon()
@@ -344,7 +439,6 @@ pub async fn run(args: DaemonArgs) -> i32 {
         DaemonCommands::Status => {
             if check_status() {
                 println!("{}", "✅ SODS daemon is running".green().bold());
-                // Ideally read config from somewhere to say WHAT is running
             } else {
                  println!("SODS daemon is not running.");
             }

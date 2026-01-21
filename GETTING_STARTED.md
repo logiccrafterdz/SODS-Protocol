@@ -75,6 +75,18 @@ sods daemon start --pattern "Tf{2,}" --chain base --webhook-url "https://ntfy.sh
 sods daemon start --pattern "Sw" --chain base --webhook-url "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN"
 ```
 
+# Example: Send alerts to Discord Webhook
+sods daemon start --pattern "Sw" --chain base --webhook-url "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN"
+```
+
+## Monitor Community Threat Feeds
+Protect yourself by subscribing to public behavioral blocklists (e.g., known rug pull patterns).
+
+```bash
+# Start daemon with community threat feed
+sods daemon start --threat-feed "https://raw.githubusercontent.com/sods/threats/main/base.json" --chain base --webhook-url "https://ntfy.sh/my_alerts"
+```
+
 ### Discover Active Blocks
 Find blocks with high activity for a specific symbol:
 
