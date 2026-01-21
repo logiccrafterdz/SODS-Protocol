@@ -133,7 +133,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
     // Create verifier and run
     let start = std::time::Instant::now();
     
-    let verifier = match sods_verifier::BlockVerifier::new(rpc_url) {
+    let verifier: sods_verifier::BlockVerifier = match sods_verifier::BlockVerifier::new(rpc_url) {
         Ok(v) => v,
         Err(e) => {
             if args.json {
@@ -197,6 +197,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
         }
         Err(e) => {
             if args.json {
+                let error_string: String = e.to_string();
                 let output = JsonOutput {
                     success: false,
                     symbol: args.symbol.clone(),
@@ -207,7 +208,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     proof_size_bytes: 0,
                     time_ms: start.elapsed().as_millis() as u64,
                     method: "rpc".into(),
-                    error: Some(e.to_string()),
+                    error: Some(error_string),
                 };
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
             } else {

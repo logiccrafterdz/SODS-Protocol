@@ -104,10 +104,17 @@ Command-line interface for SODS Protocol. Provides:
 - Terminal-first verification commands
 - Human-readable and JSON output modes
 - Multi-chain support with smart defaults
+  - **Ethereum Source**: Mainnet, Sepolia
+  - **L2 Support**: Arbitrum, Base, Optimism, Polygon zkEVM, Scroll
 
 ```bash
 # Verify a symbol in a block
 sods verify Dep --block 10002322 --chain sepolia
+
+# Verify on L2s (Arbitrum, Base, Optimism, Polygon zkEVM, Scroll)
+sods verify Tf --block 170000000 --chain arbitrum
+sods verify Tf --block 9000000 --chain base
+
 
 # List supported symbols
 sods symbols

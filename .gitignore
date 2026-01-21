@@ -13,6 +13,8 @@ Cargo.lock
 **/*.rs.bk
 *.rlib
 *.rmeta
+*.exe
+*.pdb
 
 # Build artifacts
 *.log

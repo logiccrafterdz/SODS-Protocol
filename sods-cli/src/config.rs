@@ -26,14 +26,32 @@ pub const CHAINS: &[ChainConfig] = &[
     ChainConfig {
         name: "base",
         chain_id: 8453,
-        default_rpc: "https://mainnet.base.org",
+        default_rpc: "https://base.publicnode.com",
         description: "Base Mainnet (Coinbase L2)",
     },
     ChainConfig {
         name: "arbitrum",
         chain_id: 42161,
-        default_rpc: "https://arb1.arbitrum.io/rpc",
+        default_rpc: "https://arbitrum.publicnode.com",
         description: "Arbitrum One",
+    },
+    ChainConfig {
+        name: "optimism",
+        chain_id: 10,
+        default_rpc: "https://optimism.publicnode.com",
+        description: "Optimism Mainnet",
+    },
+    ChainConfig {
+        name: "polygon-zkevm",
+        chain_id: 1101,
+        default_rpc: "https://zkevm-rpc.com",
+        description: "Polygon zkEVM",
+    },
+    ChainConfig {
+        name: "scroll",
+        chain_id: 534352,
+        default_rpc: "https://rpc.scroll.io",
+        description: "Scroll zkEVM",
     },
 ];
 
