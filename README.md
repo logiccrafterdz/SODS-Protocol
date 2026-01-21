@@ -10,6 +10,10 @@ without relying on centralized indexers or archive nodes.
 
 ---
 
+## Getting Started
+
+**[📖 Read the Full Getting Started Guide](GETTING_STARTED.md)**
+
 ## Proof of Concept (PoC)
 
 We've built a minimal PoC that verifies behavioral patterns in Sepolia blocks — with **202-byte proofs** and **$0 cost**.
@@ -127,6 +131,10 @@ sods verify Tf --block 9000000 --chain base
 # Discover behavioral hotspots (Find active blocks)
 sods discover --symbol Sw --chain base --last 20
 
+# Detect behavioral trends (New in v1.1)
+sods trend --pattern "LP+ -> Sw" --chain base --window 10
+
+
 
 
 # List supported symbols
@@ -178,6 +186,7 @@ sods verify Tf --block 10002322 --json
 ```
 sods-protocol/
 ├── README.md           <- You are here
+├── GETTING_STARTED.md  <- Usage guide
 ├── ARCHITECTURE.md     <- Trust model and data flow
 ├── LICENSE             <- CC0 1.0
 ├── spec/
@@ -220,7 +229,9 @@ sods-protocol/
 │       └── commands/
 │           ├── verify.rs
 │           ├── chains.rs
-│           └── symbols.rs
+│           ├── symbols.rs
+│           ├── discover.rs
+│           └── trend.rs
 └── poc/                <- Python PoC
     ├── README.md
     ├── bmt_builder.py

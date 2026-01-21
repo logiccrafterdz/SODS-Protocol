@@ -32,6 +32,9 @@ enum Commands {
 
     /// Discover behavioral hotspots in recent blocks
     Discover(commands::discover::DiscoverArgs),
+
+    /// Detect behavioral trends
+    Trend(commands::trend::TrendArgs),
 }
 
 #[tokio::main]
@@ -43,6 +46,7 @@ async fn main() {
         Commands::Chains => commands::chains::run(),
         Commands::Symbols => commands::symbols::run(),
         Commands::Discover(args) => commands::discover::run(args).await,
+        Commands::Trend(args) => commands::trend::run(args).await,
     };
 
     std::process::exit(exit_code);
