@@ -32,3 +32,12 @@ serde_json = "1.0"
 # Terminal colors
 colored = "2.1"
 chrono = "0.4.43"
+
+# Daemon dependencies
+regex = "1.10"
+dirs = "5.0" # Using dirs instead of directories for simplicity
+sysinfo = "0.30"
+notify-rust = "4.10"
+
+[target.'cfg(unix)'.dependencies]
+daemonize = "0.5"

@@ -45,6 +45,21 @@ Continuously monitor the chain for emerging patterns:
 sods monitor --pattern "Sw{3,}" --chain base --interval 30s
 ```
 
+
+### Run as a System Daemon (Linux/macOS)
+Run SODS as a background service with desktop notifications.
+
+```bash
+# Start daemon
+sods daemon start --pattern "Tf{2,}" --chain base --autostart
+
+# Check status
+sods daemon status
+
+# Stop daemon
+sods daemon stop
+```
+
 ### Discover Active Blocks
 Find blocks with high activity for a specific symbol:
 

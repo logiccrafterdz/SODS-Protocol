@@ -6,3 +6,4 @@ pub mod verify;
 pub mod discover;
 pub mod trend;
 pub mod monitor;
+pub mod daemon;

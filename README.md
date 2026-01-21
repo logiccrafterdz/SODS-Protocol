@@ -137,6 +137,10 @@ sods trend --pattern "LP+ -> Sw" --chain base --window 10
 # Autonomous monitoring (Continuous watchdog)
 sods monitor --pattern "Sw{3,}" --chain base --interval 30s
 
+# Run as background daemon (Linux/macOS)
+sods daemon start --pattern "Tf{2,}" --chain base --autostart
+
+
 
 
 
@@ -235,7 +239,8 @@ sods-protocol/
 │           ├── symbols.rs
 │           ├── discover.rs
 │           ├── trend.rs
-│           └── monitor.rs
+│           ├── monitor.rs
+│           └── daemon.rs
 └── poc/                <- Python PoC
     ├── README.md
     ├── bmt_builder.py

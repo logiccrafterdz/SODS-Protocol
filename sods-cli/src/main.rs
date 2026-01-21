@@ -38,6 +38,9 @@ enum Commands {
 
     /// Autonomous behavioral monitoring
     Monitor(commands::monitor::MonitorArgs),
+
+    /// System daemon management
+    Daemon(commands::daemon::DaemonArgs),
 }
 
 #[tokio::main]
@@ -51,6 +54,7 @@ async fn main() {
         Commands::Discover(args) => commands::discover::run(args).await,
         Commands::Trend(args) => commands::trend::run(args).await,
         Commands::Monitor(args) => commands::monitor::run(args).await,
+        Commands::Daemon(args) => commands::daemon::run(args).await,
     };
 
     std::process::exit(exit_code);
