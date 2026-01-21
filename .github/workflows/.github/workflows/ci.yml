@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
+
+    - name: Cache Cargo
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build
+      run: cargo build --release
+
+    - name: Run Unit Tests
+      run: cargo test --lib
+
+    - name: Run Integration Tests (Optional)
+      run: cargo test test_discover_on_all_chains
+      env:
+        SODS_RUN_INTEGRATION_TESTS: "1"
+      continue-on-error: true  # Allow failure without breaking CI
+
+    - name: Clippy Check
+      run: cargo clippy -- -D warnings
