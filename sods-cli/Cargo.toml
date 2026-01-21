@@ -31,3 +31,4 @@ serde_json = "1.0"
 
 # Terminal colors
 colored = "2.1"
+chrono = "0.4.43"

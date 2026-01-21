@@ -134,6 +134,9 @@ sods discover --symbol Sw --chain base --last 20
 # Detect behavioral trends (New in v1.1)
 sods trend --pattern "LP+ -> Sw" --chain base --window 10
 
+# Autonomous monitoring (Continuous watchdog)
+sods monitor --pattern "Sw{3,}" --chain base --interval 30s
+
 
 
 
@@ -231,7 +234,8 @@ sods-protocol/
 │           ├── chains.rs
 │           ├── symbols.rs
 │           ├── discover.rs
-│           └── trend.rs
+│           ├── trend.rs
+│           └── monitor.rs
 └── poc/                <- Python PoC
     ├── README.md
     ├── bmt_builder.py

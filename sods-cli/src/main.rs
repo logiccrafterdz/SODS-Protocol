@@ -35,6 +35,9 @@ enum Commands {
 
     /// Detect behavioral trends
     Trend(commands::trend::TrendArgs),
+
+    /// Autonomous behavioral monitoring
+    Monitor(commands::monitor::MonitorArgs),
 }
 
 #[tokio::main]
@@ -47,6 +50,7 @@ async fn main() {
         Commands::Symbols => commands::symbols::run(),
         Commands::Discover(args) => commands::discover::run(args).await,
         Commands::Trend(args) => commands::trend::run(args).await,
+        Commands::Monitor(args) => commands::monitor::run(args).await,
     };
 
     std::process::exit(exit_code);

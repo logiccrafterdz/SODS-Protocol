@@ -37,6 +37,14 @@ sods trend --pattern "LP+ -> Sw" --chain base --window 10
 sods trend --pattern "Tf{5,}" --chain arbitrum --window 50
 ```
 
+### Autonomous Monitoring
+Continuously monitor the chain for emerging patterns:
+
+```bash
+# Alert when 3 or more swaps occur in a sequence
+sods monitor --pattern "Sw{3,}" --chain base --interval 30s
+```
+
 ### Discover Active Blocks
 Find blocks with high activity for a specific symbol:
 

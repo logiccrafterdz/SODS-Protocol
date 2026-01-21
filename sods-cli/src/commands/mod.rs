@@ -5,3 +5,4 @@ pub mod symbols;
 pub mod verify;
 pub mod discover;
 pub mod trend;
+pub mod monitor;
