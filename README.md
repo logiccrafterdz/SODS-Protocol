@@ -12,7 +12,7 @@ without relying on centralized indexers or archive nodes.
 
 ## Getting Started
 
-**[📖 Read the Full Getting Started Guide](GETTING_STARTED.md)**
+**[ Read the Full Getting Started Guide](GETTING_STARTED.md)**
 
 ## Proof of Concept (PoC)
 
