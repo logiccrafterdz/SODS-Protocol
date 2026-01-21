@@ -139,15 +139,21 @@ sods verify Tf --block 10002322 --json
 - Not a replacement for archive nodes
 - Not a finalized standard
 
+## What's New in v1.1 🚀
+
+- **L2 Native Support**: Direct verification on Arbitrum, Base, Optimism, Scroll, and Polygon zkEVM.
+- **Discovery Engine**: New `sods discover` command to find behavioral hotspots in recent blocks.
+- **Regression Testing**: Automated CI integration tests for multi-chain support.
+
 ## Status
 
 - Specification: **Draft v0.2**
 - PoC: **v0.1** (Sepolia testnet)
-- sods-core: **v0.1.0** (Rust crate)
+- sods-core: **v0.2.0** (Rust crate)
 - sods-verifier: **v0.2.0** (Rust crate)
 - sods-p2p: **v0.2.0** (Rust crate)
-- sods-cli: **v0.2.0** (Rust binary)
-- Stage: **v1.0-beta** / Production-Ready
+- sods-cli: **v1.1.0** (Rust binary)
+- Stage: **v1.1** / Production-Ready L2 Support
 - Seeking: Technical feedback, threat analysis, edge cases
 
 ## Architecture
