@@ -90,6 +90,15 @@ impl RpcClient {
         })
     }
 
+    /// Fetch the latest block number.
+    pub async fn get_latest_block(&self) -> Result<u64> {
+        self.provider
+            .get_block_number()
+            .await
+            .map(|n| n.as_u64())
+            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))
+    }
+
     /// Fetch all logs for a specific block.
     ///
     /// Returns cached data if available, otherwise fetches from RPC

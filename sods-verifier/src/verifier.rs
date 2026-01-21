@@ -209,6 +209,10 @@ impl BlockVerifier {
     pub fn dictionary(&self) -> &SymbolDictionary {
         &self.dictionary
     }
+    /// Get the latest verified block number from the chain.
+    pub async fn get_latest_block(&self) -> Result<u64> {
+        self.rpc_client.get_latest_block().await
+    }
 }
 
 #[cfg(test)]

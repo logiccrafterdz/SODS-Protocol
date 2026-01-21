@@ -14,7 +14,7 @@ pub const CHAINS: &[ChainConfig] = &[
     ChainConfig {
         name: "sepolia",
         chain_id: 11155111,
-        default_rpc: "https://rpc.sepolia.org",
+        default_rpc: "https://ethereum-sepolia.publicnode.com",
         description: "Ethereum Sepolia Testnet",
     },
     ChainConfig {

@@ -115,6 +115,10 @@ sods verify Dep --block 10002322 --chain sepolia
 sods verify Tf --block 170000000 --chain arbitrum
 sods verify Tf --block 9000000 --chain base
 
+# Discover behavioral hotspots (Find active blocks)
+sods discover --symbol Sw --chain base --last 20
+
+
 
 # List supported symbols
 sods symbols

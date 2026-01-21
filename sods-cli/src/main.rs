@@ -29,6 +29,9 @@ enum Commands {
     
     /// List supported behavioral symbols
     Symbols,
+
+    /// Discover behavioral hotspots in recent blocks
+    Discover(commands::discover::DiscoverArgs),
 }
 
 #[tokio::main]
@@ -39,6 +42,7 @@ async fn main() {
         Commands::Verify(args) => commands::verify::run(args).await,
         Commands::Chains => commands::chains::run(),
         Commands::Symbols => commands::symbols::run(),
+        Commands::Discover(args) => commands::discover::run(args).await,
     };
 
     std::process::exit(exit_code);
