@@ -63,10 +63,23 @@ struct JsonOutput {
     method: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    matched_sequence: Option<Vec<MatchedSymbol>>,
+}
+
+#[derive(Serialize)]
+struct MatchedSymbol {
+    symbol: String,
+    log_index: u32,
 }
 
 /// Run the verify command.
 pub async fn run(args: VerifyArgs) -> i32 {
+    // 0. Check for Pattern
+    if args.symbol.contains("->") || args.symbol.contains('→') || args.symbol.contains('{') {
+        return run_pattern_verification(args).await;
+    }
+
     // Validate symbol
     if !is_symbol_supported(&args.symbol) {
         if args.json {
@@ -81,6 +94,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
                 time_ms: 0,
                 method: "none".into(),
                 error: Some(format!("Unsupported symbol: '{}'", args.symbol)),
+                matched_sequence: None,
             };
             println!("{}", serde_json::to_string_pretty(&output).unwrap());
         } else {
@@ -108,8 +122,9 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     occurrences: 0,
                     proof_size_bytes: 0,
                     time_ms: 0,
-                    method: "none".into(),
+                method: "none".into(),
                     error: Some(format!("Unknown chain: '{}'", args.chain)),
+                    matched_sequence: None,
                 };
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
             } else {
@@ -148,6 +163,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     time_ms: start.elapsed().as_millis() as u64,
                     method: "rpc".into(),
                     error: Some(format!("Failed to create verifier: {}", e)),
+                    matched_sequence: None,
                 };
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
             } else {
@@ -174,6 +190,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     time_ms: elapsed,
                     method: "rpc".into(),
                     error: result.error,
+                    matched_sequence: None,
                 };
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
             } else {
@@ -209,6 +226,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     time_ms: start.elapsed().as_millis() as u64,
                     method: "rpc".into(),
                     error: Some(error_string),
+                    matched_sequence: None,
                 };
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
             } else {
@@ -217,5 +235,132 @@ pub async fn run(args: VerifyArgs) -> i32 {
             }
             1
         }
+    }
+}
+
+use sods_core::pattern::BehavioralPattern;
+
+async fn run_pattern_verification(args: VerifyArgs) -> i32 {
+    let start = std::time::Instant::now();
+
+    // 1. Parse Pattern
+    let pattern = match BehavioralPattern::parse(&args.symbol) {
+        Ok(p) => p,
+        Err(e) => {
+             if args.json {
+                // Return simple error json
+                // We're reusing JsonOutput, though semantic match is loose
+                let output = JsonOutput {
+                    success: false,
+                    symbol: args.symbol.clone(),
+                    block: args.block,
+                    chain: args.chain.clone(),
+                    verified: false,
+                    occurrences: 0,
+                    proof_size_bytes: 0,
+                    time_ms: 0,
+                    method: "pattern".into(),
+                    error: Some(format!("Invalid pattern: {}", e)),
+                    matched_sequence: None,
+                };
+                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+             } else {
+                 output::error(&format!("Invalid pattern: {}", e));
+             }
+             return 1;
+        }
+    };
+
+    // 2. Resolve Chain
+    let chain_config = match get_chain(&args.chain) {
+        Some(c) => c,
+        None => {
+             if args.json {
+                 // ... json error ...
+                 println!("{{ \"error\": \"Unknown chain\" }}"); // simplify
+             } else {
+                 output::error(&format!("Chain '{}' not supported.", args.chain));
+             }
+             return 1;
+        }
+    };
+
+    if !args.json {
+        output::info(&format!("🔍 Verifying pattern '{}' in block {} ({})...", args.symbol, args.block, chain_config.description));
+    }
+
+    let verifier = match sods_verifier::BlockVerifier::new(chain_config.default_rpc) {
+        Ok(v) => v,
+        Err(e) => {
+            if !args.json { output::error(&format!("Failed to connect to RPC: {}", e)); }
+            return 1;
+        }
+    };
+
+    // 3. Fetch all symbols in block
+    let symbols = match verifier.fetch_block_symbols(args.block).await {
+        Ok(s) => s,
+        Err(e) => {
+            if args.json {
+                // ...
+            } else {
+                 output::error(&format!("Failed to fetch block symbols: {}", e));
+            }
+            return 1;
+        }
+    };
+
+    // 4. Match Pattern
+    if let Some(matched_seq) = pattern.matches(&symbols) {
+        let elapsed = start.elapsed().as_millis() as u64;
+         if args.json {
+             // Extended JSON for pattern? reusing JsonOutput for now with verified=true
+                let matched_seq_json: Vec<MatchedSymbol> = matched_seq.iter().map(|s| MatchedSymbol {
+                    symbol: s.symbol.clone(),
+                    log_index: s.log_index,
+                }).collect();
+
+                 let output = JsonOutput {
+                    success: true,
+                    symbol: args.symbol.clone(),
+                    block: args.block,
+                    chain: args.chain.clone(),
+                    verified: true,
+                    occurrences: matched_seq.len(),
+                    proof_size_bytes: 0, // No specific proof for pattern yet (could aggregate)
+                    time_ms: elapsed,
+                    method: "pattern".into(),
+                    error: None,
+                    matched_sequence: Some(matched_seq_json),
+                };
+                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+         } else {
+             println!("✅ Pattern matched in block {} ({})", args.block, chain_config.name);
+             println!("   Matched sequence:");
+             for sym in matched_seq {
+                 println!("     {} @ idx={}", sym.symbol, sym.log_index);
+             }
+         }
+         return 0;
+    } else {
+        if args.json {
+             let output = JsonOutput {
+                success: true, // Verification ran successfully, result is negative
+                symbol: args.symbol.clone(),
+                block: args.block,
+                chain: args.chain.clone(),
+                verified: false,
+                occurrences: 0,
+                proof_size_bytes: 0,
+                time_ms: start.elapsed().as_millis() as u64,
+                method: "pattern".into(),
+                error: Some("Pattern not found".into()),
+                matched_sequence: None,
+            };
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        } else {
+            output::error("Pattern not found in block.");
+        }
+        return 1;
     }
 }

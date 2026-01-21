@@ -42,6 +42,7 @@ pub mod error;
 pub mod proof;
 pub mod symbol;
 pub mod tree;
+pub mod pattern;
 
 // Re-export main types for convenience
 pub use dictionary::SymbolDictionary;

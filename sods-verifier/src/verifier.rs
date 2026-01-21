@@ -213,6 +213,14 @@ impl BlockVerifier {
     pub async fn get_latest_block(&self) -> Result<u64> {
         self.rpc_client.get_latest_block().await
     }
+
+    /// Fetch all behavioral symbols for a block.
+    /// 
+    /// Useful for pattern matching or manual inspection.
+    pub async fn fetch_block_symbols(&self, block_number: u64) -> Result<Vec<BehavioralSymbol>> {
+        let logs = self.rpc_client.fetch_logs_for_block(block_number).await?;
+        Ok(self.parse_logs_to_symbols(&logs))
+    }
 }
 
 #[cfg(test)]

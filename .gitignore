@@ -9,7 +9,6 @@ __pycache__/
 # Rust/Cargo
 target/
 **/target/
-Cargo.lock
 **/*.rs.bk
 *.rlib
 *.rmeta

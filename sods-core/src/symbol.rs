@@ -32,14 +32,14 @@ use std::cmp::Ordering;
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BehavioralSymbol {
     /// The symbolic code (e.g., "Tf", "Sw", "Dep", "Wdw")
-    symbol: String,
+    pub symbol: String,
 
     /// Position of this event in the block (0-indexed)
-    log_index: u32,
+    pub log_index: u32,
 
     /// Optional contextual data (addresses, amounts, etc.)
     /// In minimal mode, this is empty. In full mode, contains CBOR-encoded metadata.
-    metadata: Vec<u8>,
+    pub metadata: Vec<u8>,
 }
 
 impl BehavioralSymbol {

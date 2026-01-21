@@ -111,6 +111,15 @@ Command-line interface for SODS Protocol. Provides:
 # Verify a symbol in a block
 sods verify Dep --block 10002322 --chain sepolia
 
+# Verify Behavioral Patterns (Sequences)
+# Check for "Liquidity Add -> Swap -> Liquidity Remove"
+sods verify "LP+ -> Sw -> LP-" --block 12345678 --chain base
+
+# Verify Patterns with Quantifiers
+# Check for "At least 2 Transfers" or "1 to 3 Approvals" (DSL: {n}, {n,}, {n,m})
+sods verify "Tf{2,}" --block 12345678 --chain arbitrum
+sods verify "Appr{1,3} -> Tf" --block 12345678 --chain optimism
+
 # Verify on L2s (Arbitrum, Base, Optimism, Polygon zkEVM, Scroll)
 sods verify Tf --block 170000000 --chain arbitrum
 sods verify Tf --block 9000000 --chain base
@@ -181,6 +190,7 @@ sods-protocol/
 │       ├── dictionary.rs
 │       ├── tree.rs
 │       ├── proof.rs
+│       ├── pattern.rs
 │       └── error.rs
 ├── sods-verifier/      <- Layer 1: Local Verifier (Rust)
 │   ├── Cargo.toml

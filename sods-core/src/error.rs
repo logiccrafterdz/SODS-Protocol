@@ -32,6 +32,10 @@ pub enum SodsError {
     /// Unknown event topic (not in symbol registry).
     #[error("Unknown event topic: {0}")]
     UnknownTopic(String),
+
+    /// Invalid pattern sequence.
+    #[error("Pattern error: {0}")]
+    PatternError(String),
 }
 
 /// Result type alias for SODS operations.
