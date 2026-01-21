@@ -60,6 +60,21 @@ sods daemon status
 sods daemon stop
 ```
 
+# Stop daemon
+sods daemon stop
+```
+
+## Forward Alerts to Your Phone / Discord / Telegram
+Forward alerts to any service by providing a secure HTTPS webhook URL:
+
+```bash
+# Example: Send alerts to ntfy.sh (receive on phone)
+sods daemon start --pattern "Tf{2,}" --chain base --webhook-url "https://ntfy.sh/my_sods_alerts"
+
+# Example: Send alerts to Discord Webhook
+sods daemon start --pattern "Sw" --chain base --webhook-url "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN"
+```
+
 ### Discover Active Blocks
 Find blocks with high activity for a specific symbol:
 

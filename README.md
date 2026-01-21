@@ -137,8 +137,8 @@ sods trend --pattern "LP+ -> Sw" --chain base --window 10
 # Autonomous monitoring (Continuous watchdog)
 sods monitor --pattern "Sw{3,}" --chain base --interval 30s
 
-# Run as background daemon (Linux/macOS)
-sods daemon start --pattern "Tf{2,}" --chain base --autostart
+# Run as background daemon with webhook alerts
+sods daemon start --pattern "Tf{2,}" --chain base --webhook-url "https://ntfy.sh/my_alerts" --autostart
 
 
 
@@ -167,6 +167,8 @@ sods verify Tf --block 10002322 --json
 
 - **L2 Native Support**: Direct verification on Arbitrum, Base, Optimism, Scroll, and Polygon zkEVM.
 - **Discovery Engine**: New `sods discover` command to find behavioral hotspots in recent blocks.
+- **System Service**: Run as a daemon with `sods daemon` (Linux/macOS).
+- **Secure Webhooks**: Forward alerts to ntfy.sh, Discord, or Telegram with privacy guarantees.
 - **Regression Testing**: Automated CI integration tests for multi-chain support.
 
 ## Status

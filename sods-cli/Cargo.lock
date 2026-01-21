@@ -2591,6 +2591,7 @@ dependencies = [
  "dirs",
  "notify-rust",
  "regex",
+ "reqwest",
  "serde",
  "serde_json",
  "sods-core",

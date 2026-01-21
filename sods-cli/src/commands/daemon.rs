@@ -19,6 +19,8 @@ use std::fs::File;
 
 use crate::config::get_chain;
 use crate::output;
+#[cfg(unix)]
+use serde_json::json;
 
 /// Arguments for the daemon command.
 #[derive(Args)]
@@ -50,6 +52,10 @@ pub enum DaemonCommands {
         /// Generate auto-start script (systemd/launchd)
         #[arg(long)]
         autostart: bool,
+
+        /// Forward alerts to a secure HTTPS webhook (e.g., ntfy.sh)
+        #[arg(long)]
+        webhook_url: Option<String>,
     },
     /// Stop the running daemon
     Stop,
@@ -79,7 +85,7 @@ fn get_log_file() -> PathBuf {
 // -----------------------------------------------------------------------------
 
 #[cfg(unix)]
-async fn start_daemon(pattern: String, chain: String, interval: String, rpc_url: Option<String>, autostart: bool) -> i32 {
+async fn start_daemon(pattern: String, chain: String, interval: String, rpc_url: Option<String>, autostart: bool, webhook_url: Option<String>) -> i32 {
     let sods_dir = get_sods_dir();
     if !sods_dir.exists() {
         fs::create_dir_all(&sods_dir).expect("Failed to create .sods dir");
@@ -141,7 +147,7 @@ async fn start_daemon(pattern: String, chain: String, interval: String, rpc_url:
             // Copying is safer to modify output behavior (we don't want ANSI colors in log file ideally, but it's ok).
             
             // Re-implementing simplified loop with notification:
-            run_daemon_loop(args).await;
+            run_daemon_loop(args, webhook_url).await;
             0 
         }
         Err(e) => {
@@ -152,7 +158,7 @@ async fn start_daemon(pattern: String, chain: String, interval: String, rpc_url:
 }
 
 #[cfg(unix)]
-async fn run_daemon_loop(args: MonitorArgs) {
+async fn run_daemon_loop(args: MonitorArgs, webhook_url: Option<String>) {
     use sods_core::pattern::BehavioralPattern;
     use sods_verifier::BlockVerifier;
     use crate::config::get_chain;
@@ -171,8 +177,13 @@ async fn run_daemon_loop(args: MonitorArgs) {
     let pattern = BehavioralPattern::parse(&args.pattern).unwrap();
     let chain_config = get_chain(&args.chain).unwrap();
     let rpc_url = args.rpc_url.as_deref().unwrap_or(chain_config.default_rpc);
+    let chain_name = args.chain.clone();
+    let pattern_str = args.pattern.clone();
     
     println!("Daemon started. Monitoring {} on {}", args.pattern, args.chain);
+    if let Some(ref url) = webhook_url {
+        println!("Webhook enabled: {}", url); // OK to log here as it's the daemon log
+    }
     
     let verifier = BlockVerifier::new(rpc_url).unwrap();
     let mut last_scanned_block = verifier.get_latest_block().await.unwrap_or(0);
@@ -186,7 +197,7 @@ async fn run_daemon_loop(args: MonitorArgs) {
                      for block_num in (last_scanned_block + 1)..=current_head {
                          if let Ok(symbols) = verifier.fetch_block_symbols(block_num).await {
                              if pattern.matches(&symbols).is_some() {
-                                 let msg = format!("Pattern {} detected on Block #{}", args.pattern, block_num);
+                                 let msg = format!("Pattern {} detected on Block #{}", pattern_str, block_num);
                                  println!("{}", msg);
                                  
                                  // Desktop Notification
@@ -194,6 +205,21 @@ async fn run_daemon_loop(args: MonitorArgs) {
                                      .summary("SODS Alert 🚨")
                                      .body(&msg)
                                      .show();
+
+                                 // Webhook
+                                 if let Some(ref url) = webhook_url {
+                                     let payload = json!({
+                                         "alert": "Behavioral pattern detected",
+                                         "chain": chain_name,
+                                         "block_number": block_num,
+                                         "pattern": pattern_str,
+                                         "timestamp": chrono::Utc::now().to_rfc3339(),
+                                         "confidence": "High"
+                                     });
+                                     
+                                     // Spawn webhook task
+                                     tokio::spawn(send_webhook(url.clone(), payload));
+                                 }
                              }
                          }
                      }
@@ -201,6 +227,32 @@ async fn run_daemon_loop(args: MonitorArgs) {
                 }
             },
             Err(e) => println!("RPC Error: {}", e),
+        }
+    }
+}
+
+#[cfg(unix)]
+async fn send_webhook(url: String, payload: serde_json::Value) {
+    if !url.starts_with("https://") {
+        eprintln!("Webhook Error: URL must be HTTPS");
+        return;
+    }
+
+    let client = reqwest::Client::new();
+    match client.post(&url)
+        .json(&payload)
+        .header("User-Agent", "SODS/1.2 (privacy-first behavioral monitor)")
+        .timeout(Duration::from_secs(5))
+        .send()
+        .await 
+    {
+        Ok(res) => {
+            if !res.status().is_success() {
+                eprintln!("Webhook failed with status: {}", res.status());
+            }
+        },
+        Err(_) => {
+            eprintln!("Webhook delivery failed");
         }
     }
 }
@@ -259,7 +311,7 @@ fn check_status() -> bool {
 // -----------------------------------------------------------------------------
 
 #[cfg(not(unix))]
-async fn start_daemon(_pattern: String, _chain: String, _interval: String, _rpc_url: Option<String>, _autostart: bool) -> i32 {
+async fn start_daemon(_pattern: String, _chain: String, _interval: String, _rpc_url: Option<String>, _autostart: bool, _webhook_url: Option<String>) -> i32 {
     output::error("Daemon mode is currently only supported on Linux/macOS.");
     println!("👉 Use 'sods monitor' for foreground monitoring on Windows.");
     1
@@ -283,8 +335,8 @@ fn check_status() -> bool {
 
 pub async fn run(args: DaemonArgs) -> i32 {
     match args.command {
-        DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart } => {
-            start_daemon(pattern, chain, interval, rpc_url, autostart).await
+        DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart, webhook_url } => {
+            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url).await
         },
         DaemonCommands::Stop => {
             stop_daemon()
