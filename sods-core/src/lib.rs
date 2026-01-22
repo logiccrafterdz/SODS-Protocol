@@ -52,3 +52,5 @@ pub use proof::Proof;
 pub use symbol::BehavioralSymbol;
 pub use tree::BehavioralMerkleTree;
 pub use causal_tree::CausalMerkleTree;
+pub mod shadow;
+pub use shadow::BehavioralShadow;

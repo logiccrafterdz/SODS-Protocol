@@ -45,6 +45,14 @@ Continuously monitor the chain for emerging patterns:
 sods monitor --pattern "Sw{3,}" --chain base --interval 30s
 ```
 
+### Predictive Behavioral Shadowing (Proactive)
+Enable proactive shadowing to detect pattern initiations (e.g., `LP+`) and receive alerts if the expected sequence (e.g., `LP+ -> Sw`) deviates or times out before completion.
+
+```bash
+# Monitor for rug pulls with predictive alerts (WARN if LP+ happens but LP- is missing)
+sods monitor --pattern "LP+ -> Sw -> LP-" --chain base --enable-shadows
+```
+
 ### Real-Time Mempool Monitoring (New!)
 Monitor **pending transactions** in real-time to detect threats before they are even mined:
 

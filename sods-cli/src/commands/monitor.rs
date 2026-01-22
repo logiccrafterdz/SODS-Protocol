@@ -42,6 +42,10 @@ pub struct MonitorArgs {
     /// Custom RPC URL (overrides chain default)
     #[arg(long)]
     pub rpc_url: Option<String>,
+
+    /// Enable predictive behavioral shadowing
+    #[arg(long)]
+    pub enable_shadows: bool,
 }
 
 fn parse_duration(input: &str) -> Result<Duration, String> {
@@ -133,6 +137,9 @@ pub async fn run(args: MonitorArgs) -> i32 {
         }
     };
     
+    // Shadow State
+    let mut active_shadows: Vec<sods_core::BehavioralShadow> = Vec::new();
+    
     println!("{}", "Waiting for new blocks... (Ctrl+C to stop)".dimmed());
 
     // 6. Polling Loop
@@ -161,6 +168,7 @@ pub async fn run(args: MonitorArgs) -> i32 {
 
                 match verifier.fetch_block_symbols(block_num).await {
                     Ok(symbols) => {
+                        // A. Check for Full Pattern Matches (Reactive)
                         if let Some(matched_seq) = pattern.matches(&symbols) {
                             let timestamp = chrono::Utc::now().to_rfc3339();
                             println!();
@@ -169,6 +177,69 @@ pub async fn run(args: MonitorArgs) -> i32 {
                             println!("   Pattern: {}", args.pattern.yellow());
                             println!("   Matched: {} events", matched_seq.len());
                             println!();
+                        }
+
+                        // B. Shadowing Logic (Proactive)
+                        if args.enable_shadows {
+                            // 1. Update Active Shadows
+                            let mut resolved_indices = Vec::new();
+                            let mut expired_indices = Vec::new();
+                            
+                            for (i, shadow) in active_shadows.iter_mut().enumerate() {
+                                let status = shadow.check_block(block_num, &symbols);
+                                match status {
+                                    sods_core::shadow::ShadowStatus::Resolved => {
+                                        println!("✅ Shadow Resolved: Actor {:?} completed pattern.", shadow.actor);
+                                        resolved_indices.push(i);
+                                    },
+                                    sods_core::shadow::ShadowStatus::Deviation(reason) => {
+                                        println!("⚠️  {} Deviation detected for actor {:?}", "PREDICTIVE ALERT:".magenta().bold(), shadow.actor);
+                                        println!("    Reason: {}", reason);
+                                        resolved_indices.push(i);
+                                    },
+                                    sods_core::shadow::ShadowStatus::Expired => {
+                                        // Silent expiration or debug log
+                                        expired_indices.push(i);
+                                    },
+                                    sods_core::shadow::ShadowStatus::Active => {
+                                        // Still waiting
+                                    }
+                                }
+                            }
+                            
+                            // Cleanup
+                            let mut to_remove = [resolved_indices, expired_indices].concat();
+                            to_remove.sort();
+                            to_remove.dedup();
+                            for i in to_remove.iter().rev() {
+                                active_shadows.remove(*i);
+                            }
+                            
+                            // 2. Spawn New Shadows
+                            // Spawn if we see the FIRST step of the pattern
+                            if let Some(first_step) = pattern.steps().first() {
+                                if let sods_core::pattern::PatternStep::Exact(target, _) = first_step {
+                                    for sym in &symbols {
+                                        if sym.symbol == *target {
+                                            if !active_shadows.iter().any(|s| s.actor == sym.from) {
+                                                println!("🕵️  Spawning Shadow for actor {:?} (saw {})", sym.from, sym.symbol);
+                                                let mut shadow = sods_core::BehavioralShadow::from_pattern(
+                                                    &pattern, 
+                                                    sym.from, 
+                                                    sym.nonce,
+                                                    block_num
+                                                );
+                                                shadow.current_step_index = 1; // Advance past first step
+                                                active_shadows.push(shadow);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if !active_shadows.is_empty() {
+                                println!("   Active Shadows: {}", active_shadows.len());
+                            }
                         }
                     },
                     Err(e) => {

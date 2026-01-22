@@ -20,6 +20,10 @@ pub struct BehavioralPattern {
 }
 
 impl BehavioralPattern {
+    pub fn steps(&self) -> &[PatternStep] {
+        &self.steps
+    }
+
     /// Parse a pattern string into a BehavioralPattern.
     /// 
     /// Syntax:
