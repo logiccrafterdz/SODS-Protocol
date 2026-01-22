@@ -43,6 +43,31 @@ pub enum SodsVerifierError {
     /// Error from sods-core library.
     #[error("Core error: {0}")]
     Core(#[from] sods_core::SodsError),
+
+    /// Receipt trie root does not match block header.
+    #[error("Receipt proof invalid: computed root {computed} != header root {expected}")]
+    InvalidReceiptProof {
+        /// The computed receipts root from local trie
+        computed: String,
+        /// The expected receipts root from block header
+        expected: String,
+    },
+
+    /// Block header logsBloom doesn't contain expected topic.
+    #[error("LogsBloom filter indicates no relevant logs in block")]
+    BloomFilterMismatch,
+
+    /// RPC doesn't support header-anchored verification.
+    #[error("RPC does not support receipt data required for trustless verification. Use --no-header-proof or switch providers")]
+    ProofUnsupported,
+
+    /// Failed to fetch block header.
+    #[error("Failed to fetch block header for block {0}")]
+    HeaderFetchFailed(u64),
+
+    /// Failed to fetch receipts.
+    #[error("Failed to fetch receipts for block {0}")]
+    ReceiptFetchFailed(u64),
 }
 
 /// Result type alias for verifier operations.

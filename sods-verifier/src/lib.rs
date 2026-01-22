@@ -34,6 +34,7 @@
 //! ```
 
 pub mod error;
+pub mod header_anchor;
 pub mod query;
 pub mod result;
 pub mod rpc;
@@ -42,6 +43,7 @@ pub mod mempool;
 
 // Re-export main types for convenience
 pub use error::SodsVerifierError;
+pub use header_anchor::{VerificationMode, BlockHeader, AnchorValidation};
 pub use query::QueryParser;
 pub use result::VerificationResult;
 pub use rpc::RpcClient;

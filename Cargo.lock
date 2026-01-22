@@ -4077,6 +4077,7 @@ dependencies = [
  "lru",
  "rand 0.8.5",
  "serde",
+ "sha3",
  "sods-core",
  "thiserror 1.0.69",
  "tokio",

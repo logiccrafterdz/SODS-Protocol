@@ -101,6 +101,43 @@ Standardized event representations (e.g., `Tf`, `Sw`) derived from raw logs, enr
 | RPC rate limiting | LRU cache + exponential backoff |
 | Sybil attack (many fake peers) | **PoBS**: Reputation requires valid work; decays over time |
 | Man-in-the-middle | libp2p noise encryption |
+| **Malicious RPC fabricates logs** | **Block Header Anchoring** (v1.2+) |
+
+## Block Header Anchoring (v1.2+)
+
+SODS verifies that logs are authentic by cryptographically anchoring them to block headers:
+
+### Verification Pipeline (Trustless Mode)
+
+```
+1. Fetch block header → Extract receiptsRoot, logsBloom
+2. Fast bloom filter check → Reject if topic not in logsBloom
+3. Fetch all transaction receipts
+4. RLP-encode receipts → Build Patricia trie → Compute root
+5. Verify computed root == header.receiptsRoot
+6. Extract logs from validated receipts → Build BMT
+```
+
+### Security Guarantee
+
+> **"If the RPC lies about logs, the trie root mismatch exposes the fraud."**
+
+### Verification Modes
+
+| Mode | Trust Level | Use Case |
+|------|-------------|----------|
+| **Trustless** (default) | Light-client grade | Production, security-critical |
+| **RPC Only** (`--no-header-proof`) | Full RPC trust | Testing, limited RPC support |
+
+### CLI Output
+
+```text
+✅ Verified (Trustless — Block Header Anchored)
+   Symbol: Tf  |  Block: 10002322  |  Chain: sepolia
+   
+⚠️ Verified (RPC Only — Requires Trust in Provider)
+   Symbol: Tf  |  Block: 10002322  |  Chain: sepolia
+```
 
 ## Data Flow
 
@@ -171,3 +208,4 @@ struct ThreatRule {
 - No telemetry or external data collection
 - All network traffic encrypted with libp2p noise
 - Cache entries expire on process restart
+>

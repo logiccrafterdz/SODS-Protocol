@@ -4,6 +4,8 @@
 //! timing metrics, proof data, and error information.
 
 use serde::{Deserialize, Serialize};
+
+use crate::header_anchor::VerificationMode;
 use std::time::Duration;
 
 /// Result of a symbol verification attempt.
@@ -70,6 +72,9 @@ pub struct VerificationResult {
     /// Confidence score (0.0 - 1.0) indicating reliability of the detection.
     pub confidence_score: f32,
 
+    /// Verification mode indicating trust level.
+    pub verification_mode: VerificationMode,
+
     /// Error message if verification failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -85,6 +90,7 @@ impl VerificationResult {
         merkle_root: [u8; 32],
         occurrences: usize,
         confidence_score: f32,
+        verification_mode: VerificationMode,
         verification_time: Duration,
         rpc_fetch_time: Duration,
         total_time: Duration,
@@ -97,6 +103,7 @@ impl VerificationResult {
             merkle_root: Some(merkle_root.to_vec()),
             occurrences,
             confidence_score,
+            verification_mode,
             verification_time,
             rpc_fetch_time,
             total_time,
@@ -109,6 +116,7 @@ impl VerificationResult {
         symbol: String,
         block_number: u64,
         merkle_root: Option<[u8; 32]>,
+        verification_mode: VerificationMode,
         rpc_fetch_time: Duration,
         total_time: Duration,
     ) -> Self {
@@ -120,6 +128,7 @@ impl VerificationResult {
             merkle_root: merkle_root.map(|r| r.to_vec()),
             occurrences: 0,
             confidence_score: 0.0,
+            verification_mode,
             verification_time: Duration::ZERO,
             rpc_fetch_time,
             total_time,
@@ -132,6 +141,7 @@ impl VerificationResult {
         symbol: String,
         block_number: u64,
         error: String,
+        verification_mode: VerificationMode,
         rpc_fetch_time: Duration,
         total_time: Duration,
     ) -> Self {
@@ -143,6 +153,7 @@ impl VerificationResult {
             merkle_root: None,
             occurrences: 0,
             confidence_score: 0.0,
+            verification_mode,
             verification_time: Duration::ZERO,
             rpc_fetch_time,
             total_time,
@@ -205,6 +216,7 @@ mod tests {
             [0u8; 32],
             2,
             0.85,
+            VerificationMode::Trustless,
             Duration::from_micros(500),
             Duration::from_millis(100),
             Duration::from_millis(150),
@@ -222,6 +234,7 @@ mod tests {
             "Wdw".to_string(),
             12345,
             Some([0u8; 32]),
+            VerificationMode::Trustless,
             Duration::from_millis(100),
             Duration::from_millis(150),
         );
@@ -239,6 +252,7 @@ mod tests {
             [0u8; 32],
             5,
             0.9,
+            VerificationMode::Trustless,
             Duration::from_micros(500),
             Duration::from_millis(100),
             Duration::from_millis(150),

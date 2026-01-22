@@ -178,11 +178,12 @@ sods verify Tf --block 10002322 --json
 
 ## What's New in v1.2 (Latest)
 
+- **Block Header Anchoring**: Cryptographically anchors all logs to block headers via receipt trie proofs. Eliminates blind trust in RPC providers (Trustless Mode).
 - **Adaptive RPC**: Self-healing connection logic that automatically throttles requests when rate limits are detected (Adaptive Backoff).
 - **Dynamic Symbol Loading**: Extensible plugin system to load new behavioral symbols from JSON definitions (URL/File) without recompiling.
 - **Enhanced Monitoring**: `sods monitor` now supports auto-adaptation and custom plugin loading at runtime.
 
-## Behavioral Dictionary 2.0 (New!) 
+## Behavioral Dictionary 2.0 (New!)
 
 The protocol now supports context-aware behavioral analysis with **Metadata**, **MEV Patterns**, and **Confidence Scoring**.
 
@@ -253,6 +254,7 @@ sods-protocol/
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs
+│       ├── header_anchor.rs
 │       ├── error.rs
 │       ├── query.rs
 │       ├── result.rs

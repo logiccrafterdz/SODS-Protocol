@@ -131,6 +131,54 @@ impl RpcClient {
         Ok(block.transactions)
     }
 
+    /// Fetch block header containing receiptsRoot and logsBloom.
+    pub async fn fetch_block_header(&self, block_number: u64) -> Result<crate::header_anchor::BlockHeader> {
+        let block = self.provider
+            .get_block(block_number)
+            .await
+            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?
+            .ok_or(SodsVerifierError::HeaderFetchFailed(block_number))?;
+
+        Ok(crate::header_anchor::BlockHeader {
+            number: block.number.map(|n| n.as_u64()).unwrap_or(block_number),
+            hash: block.hash.unwrap_or_default(),
+            receipts_root: block.receipts_root,
+            logs_bloom: block.logs_bloom.unwrap_or_default(),
+        })
+    }
+
+    /// Fetch all transaction receipts for a block.
+    pub async fn fetch_block_receipts(&self, block_number: u64) -> Result<Vec<ethers_core::types::TransactionReceipt>> {
+        // First get all transactions in the block
+        let block = self.provider
+            .get_block(block_number)
+            .await
+            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?
+            .ok_or(SodsVerifierError::BlockOutOfRange(block_number))?;
+
+        let tx_hashes = block.transactions;
+        if tx_hashes.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Fetch all receipts
+        let mut receipts = Vec::with_capacity(tx_hashes.len());
+        for tx_hash in tx_hashes {
+            let receipt = self.provider
+                .get_transaction_receipt(tx_hash)
+                .await
+                .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?
+                .ok_or(SodsVerifierError::ReceiptFetchFailed(block_number))?;
+            receipts.push(receipt);
+        }
+
+        // Sort by transaction index to ensure correct order
+        receipts.sort_by_key(|r| r.transaction_index);
+
+        self.update_adaptive_delay(true, None);
+        Ok(receipts)
+    }
+
     async fn fetch_with_backoff(&self, block_number: u64) -> Result<Vec<Log>> {
         let filter = Filter::new()
             .from_block(BlockNumber::Number(block_number.into()))

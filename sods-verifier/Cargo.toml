@@ -35,6 +35,9 @@ rand = "0.8"
 # Hex encoding
 hex = "0.4"
 
+# Keccak256 for trie hashing
+sha3 = "0.10"
+
 [dev-dependencies]
 
 # For timing assertions

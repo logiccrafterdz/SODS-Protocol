@@ -20,6 +20,7 @@ target/
 *.log
 build_output.txt
 errors.log
+*.bin
 
 # Environment
 .env
@@ -43,8 +44,9 @@ desktop.ini
 # Node needed if web app components added
 node_modules/
 
-# !poc/proofs/*.proof
-# !poc/bmr.bin
+# PoC Artifacts
+poc/proofs/*.proof
+poc/bmr.bin
 
 # Local configurations
 .sods/

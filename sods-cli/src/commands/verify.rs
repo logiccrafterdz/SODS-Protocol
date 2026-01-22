@@ -51,6 +51,10 @@ pub struct VerifyArgs {
     /// Reputation threshold for P2P consensus (0.0 - 1.0)
     #[arg(long, default_value = "0.1")]
     pub reputation_threshold: f32,
+
+    /// Skip header-anchored verification (not recommended for production)
+    #[arg(long)]
+    pub no_header_proof: bool,
 }
 
 /// JSON output structure.
@@ -65,6 +69,7 @@ struct JsonOutput {
     proof_size_bytes: usize,
     time_ms: u64,
     method: String,
+    verification_mode: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -97,6 +102,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
                 proof_size_bytes: 0,
                 time_ms: 0,
                 method: "none".into(),
+                verification_mode: "n/a".into(),
                 error: Some(format!("Unsupported symbol: '{}'", args.symbol)),
                 matched_sequence: None,
             };
@@ -127,6 +133,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     proof_size_bytes: 0,
                     time_ms: 0,
                 method: "none".into(),
+                    verification_mode: "n/a".into(),
                     error: Some(format!("Unknown chain: '{}'", args.chain)),
                     matched_sequence: None,
                 };
@@ -152,29 +159,60 @@ pub async fn run(args: VerifyArgs) -> i32 {
     // Create verifier and run
     let start = std::time::Instant::now();
     
-    let verifier: sods_verifier::BlockVerifier = match sods_verifier::BlockVerifier::new(rpc_url) {
-        Ok(v) => v,
-        Err(e) => {
-            if args.json {
-                let output = JsonOutput {
-                    success: false,
-                    symbol: args.symbol.clone(),
-                    block: args.block,
-                    chain: args.chain.clone(),
-                    verified: false,
-                    occurrences: 0,
-                    proof_size_bytes: 0,
-                    time_ms: start.elapsed().as_millis() as u64,
-                    method: "rpc".into(),
-                    error: Some(format!("Failed to create verifier: {}", e)),
-                    matched_sequence: None,
-                };
-                println!("{}", serde_json::to_string_pretty(&output).unwrap());
-            } else {
-                output::error(&format!("Failed to connect to RPC: {}", e));
-                output::hint("Check your network connection or try a different RPC URL.");
+    // Choose verifier based on --no-header-proof flag
+    let verifier: sods_verifier::BlockVerifier = if args.no_header_proof {
+        match sods_verifier::BlockVerifier::new_rpc_only(rpc_url) {
+            Ok(v) => v,
+            Err(e) => {
+                if args.json {
+                    let output = JsonOutput {
+                        success: false,
+                        symbol: args.symbol.clone(),
+                        block: args.block,
+                        chain: args.chain.clone(),
+                        verified: false,
+                        occurrences: 0,
+                        proof_size_bytes: 0,
+                        time_ms: start.elapsed().as_millis() as u64,
+                        method: "rpc".into(),
+                        verification_mode: "rpc_only".into(),
+                        error: Some(format!("Failed to create verifier: {}", e)),
+                        matched_sequence: None,
+                    };
+                    println!("{}", serde_json::to_string_pretty(&output).unwrap());
+                } else {
+                    output::error(&format!("Failed to connect to RPC: {}", e));
+                    output::hint("Check your network connection or try a different RPC URL.");
+                }
+                return 1;
             }
-            return 1;
+        }
+    } else {
+        match sods_verifier::BlockVerifier::new(rpc_url) {
+            Ok(v) => v,
+            Err(e) => {
+                if args.json {
+                    let output = JsonOutput {
+                        success: false,
+                        symbol: args.symbol.clone(),
+                        block: args.block,
+                        chain: args.chain.clone(),
+                        verified: false,
+                        occurrences: 0,
+                        proof_size_bytes: 0,
+                        time_ms: start.elapsed().as_millis() as u64,
+                        method: "rpc".into(),
+                        verification_mode: "trustless".into(),
+                        error: Some(format!("Failed to create verifier: {}", e)),
+                        matched_sequence: None,
+                    };
+                    println!("{}", serde_json::to_string_pretty(&output).unwrap());
+                } else {
+                    output::error(&format!("Failed to connect to RPC: {}", e));
+                    output::hint("Check your network connection or try a different RPC URL.");
+                }
+                return 1;
+            }
         }
     };
 
@@ -193,6 +231,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     proof_size_bytes: result.proof_size_bytes,
                     time_ms: elapsed,
                     method: "rpc".into(),
+                    verification_mode: result.verification_mode.to_string(),
                     error: result.error,
                     matched_sequence: None,
                 };
@@ -229,6 +268,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     proof_size_bytes: 0,
                     time_ms: start.elapsed().as_millis() as u64,
                     method: "rpc".into(),
+                    verification_mode: if args.no_header_proof { "rpc_only".into() } else { "trustless".into() },
                     error: Some(error_string),
                     matched_sequence: None,
                 };
@@ -264,6 +304,7 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
                     proof_size_bytes: 0,
                     time_ms: 0,
                     method: "pattern".into(),
+                    verification_mode: "n/a".into(),
                     error: Some(format!("Invalid pattern: {}", e)),
                     matched_sequence: None,
                 };
@@ -366,6 +407,7 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
                     proof_size_bytes: flow_symbols.len() * 300, // Approx
                     time_ms: elapsed,
                     method: "causal_pattern".into(),
+                    verification_mode: "rpc_only".into(), // Pattern verification uses RPC path
                     error: if causal_verified { None } else { Some("Causal verification failed".into()) },
                     matched_sequence: Some(matched_seq_json),
                 };
@@ -402,6 +444,7 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
                 proof_size_bytes: 0,
                 time_ms: start.elapsed().as_millis() as u64,
                 method: "pattern".into(),
+                verification_mode: "rpc_only".into(),
                 error: Some("Pattern not found".into()),
                 matched_sequence: None,
             };
