@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = [
+    "sods-core",
+    "sods-verifier",
+    "sods-p2p",
+    "sods-cli",
+]

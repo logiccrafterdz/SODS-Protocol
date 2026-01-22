@@ -182,6 +182,29 @@ impl BlockVerifier {
                 block_number,
             })?;
 
+        // Calculate Confidence Score
+        // Base score for valid Merkle proof: 0.5
+        let mut score = 0.5;
+        
+        // Enrichment factors
+        // 1. Signed Transaction (from != 0x0): +0.2
+        if first_match.from != ethers_core::types::Address::zero() {
+            score += 0.2;
+        }
+        
+        // 2. From Deployer (Rug Pull risk factor): +0.3
+        if first_match.is_from_deployer {
+            score += 0.3;
+        }
+        
+        // 3. Significant Value > 0: +0.1 (optional heuristic)
+        if !first_match.value.is_zero() {
+             score += 0.1; // Bonus for value transfer
+        }
+        
+        // Cap at 1.0
+        if score > 1.0 { score = 1.0; }
+
         let verification_time = verify_start.elapsed();
         let total_time = total_start.elapsed();
 
@@ -192,6 +215,7 @@ impl BlockVerifier {
             proof.size(),
             root,
             occurrences,
+            score,
             verification_time,
             rpc_fetch_time,
             total_time,

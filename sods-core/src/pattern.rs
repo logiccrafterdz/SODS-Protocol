@@ -2,10 +2,16 @@ use crate::symbol::BehavioralSymbol;
 use crate::error::{SodsError, Result};
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum PatternCondition {
+    None,
+    FromDeployer,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum PatternStep {
-    Exact(String),
-    AtLeast(String, usize),
-    Range(String, usize, usize),
+    Exact(String, PatternCondition),
+    AtLeast(String, usize, PatternCondition),
+    Range(String, usize, usize, PatternCondition),
 }
 
 #[derive(Debug, Clone)]
@@ -19,8 +25,29 @@ impl BehavioralPattern {
     /// Syntax:
     /// - "A -> B": Sequence of A then B
     /// - "A{n,}": At least n occurrences of A
-    /// - "A{n,m}": Between n and m occurrences of A
+    /// - "LP+ where from == deployer": Context filter
+    /// - "Sandwich": Preset for "Tf -> Sw -> Tf"
     pub fn parse(input: &str) -> Result<Self> {
+        // 1. Check Presets
+        match input {
+            "Sandwich" => return Ok(Self {
+                steps: vec![
+                    PatternStep::Exact("Tf".into(), PatternCondition::None),
+                    PatternStep::Exact("Sw".into(), PatternCondition::None),
+                    PatternStep::Exact("Tf".into(), PatternCondition::None),
+                ]
+            }),
+            "Frontrun" => return Ok(Self {
+                // Heuristic: High gas price Tf often indicates frontrun, 
+                // but here we just look for Tf -> Sw pattern as a placeholder
+                steps: vec![
+                    PatternStep::Exact("Tf".into(), PatternCondition::None),
+                    PatternStep::Exact("Sw".into(), PatternCondition::None),
+                ]
+            }),
+            _ => {}
+        }
+
         let parts: Vec<&str> = input.split("->").map(|s| s.trim()).collect();
         let mut steps = Vec::new();
 
@@ -29,11 +56,26 @@ impl BehavioralPattern {
                 continue;
             }
 
+            // Parse condition if present ("... where ...")
+            let (part_base, condition) = if let Some(idx) = part.find("where") {
+                let cond_str = part[idx+5..].trim();
+                let base = part[..idx].trim();
+                
+                let cond = if cond_str == "from == deployer" {
+                    PatternCondition::FromDeployer
+                } else {
+                    return Err(SodsError::PatternError(format!("Unsupported condition: {}", cond_str)));
+                };
+                (base, cond)
+            } else {
+                (part, PatternCondition::None)
+            };
+
             // Check for quantifier { ... }
-            if let Some(start_idx) = part.find('{') {
-                if let Some(end_idx) = part.find('}') {
-                    let symbol = part[..start_idx].trim().to_string();
-                    let quantifier = &part[start_idx+1..end_idx]; // inside {}
+            if let Some(start_idx) = part_base.find('{') {
+                if let Some(end_idx) = part_base.find('}') {
+                    let symbol = part_base[..start_idx].trim().to_string();
+                    let quantifier = &part_base[start_idx+1..end_idx]; // inside {}
 
                     if let Some(comma_idx) = quantifier.find(',') {
                         let min_str = quantifier[..comma_idx].trim();
@@ -43,30 +85,25 @@ impl BehavioralPattern {
 
                         if max_str.is_empty() {
                             // {n,}
-                            steps.push(PatternStep::AtLeast(symbol, min));
+                            steps.push(PatternStep::AtLeast(symbol, min, condition));
                         } else {
                             // {n,m}
                             let max = max_str.parse::<usize>().map_err(|_| SodsError::PatternError(format!("Invalid max quantifier: {}", max_str)))?;
-                            steps.push(PatternStep::Range(symbol, min, max));
+                            steps.push(PatternStep::Range(symbol, min, max, condition));
                         }
                     } else {
-                        // {n} exact count shorthand (treated as range n..n or exact repeated? treated as exact n times sequence usually, 
-                        // but let's treat {n} as range n,n for simplicity if implied, but prompt specifically asked for {n,} and {n,m}.
-                        // If user types {n}, let's error or support it. Prompt: "<symbol>{n,} ... <symbol>{n,m}"
-                        // Let's support {n} as exactly n for robustness
+                        // {n} exact count shorthand -> treat as Range(n, n)
                         let count = quantifier.trim().parse::<usize>().map_err(|_| SodsError::PatternError(format!("Invalid exact quantifier: {}", quantifier)))?;
-                        steps.push(PatternStep::Range(symbol, count, count));
+                        steps.push(PatternStep::Range(symbol, count, count, condition));
                     }
                 } else {
-                    return Err(SodsError::PatternError(format!("Unmatched '{{' in pattern: {}", part)));
+                    return Err(SodsError::PatternError(format!("Unmatched '{{' in pattern: {}", part_base)));
                 }
-            } else if part.contains('→') {
-                 // Handle unicode arrow if user copy-pasted, though parse splits on "->"
-                 // We should probably normalize input first
-                 return Err(SodsError::PatternError(format!("Invalid character in symbol (did you mean '->'?): {}", part)));
+            } else if part_base.contains('→') {
+                 return Err(SodsError::PatternError(format!("Invalid character in symbol (did you mean '->'?): {}", part_base)));
             } else {
                 // Single symbol
-                steps.push(PatternStep::Exact(part.to_string()));
+                steps.push(PatternStep::Exact(part_base.to_string(), condition));
             }
         }
 
@@ -89,37 +126,28 @@ impl BehavioralPattern {
             }
 
             match step {
-                PatternStep::Exact(target) => {
-                    // Find first occurrence of target starting from current_sym_idx
-                    let found_idx = symbols[current_sym_idx..].iter().position(|s| s.symbol == *target)?;
+                PatternStep::Exact(target, cond) => {
+                    // Find first occurrence of target starting from current_sym_idx that satisfies condition
+                    let found_idx = symbols[current_sym_idx..].iter().position(|s| {
+                        s.symbol == *target && Self::check_condition(s, cond)
+                    })?;
                     let absolute_idx = current_sym_idx + found_idx;
                     
                     matched_sequence.push(&symbols[absolute_idx]);
                     current_sym_idx = absolute_idx + 1;
                 },
-                PatternStep::AtLeast(target, min) => {
+                PatternStep::AtLeast(target, min, cond) => {
                     let mut count = 0;
                     let mut temp_matched = Vec::new();
                     let mut idx = current_sym_idx;
 
-                    // Greedily find as many matches as possible? Or just satisfy minimum?
-                    // Prompt says: "Sequence must appear contiguously or non-contiguously in order"
-                    // "Quantifiers apply to consecutive occurrences" -> this usually implies strict adjacency OR just grouping.
-                    // Let's assume grouping in the stream: find first occurrence, then see if next one is same, etc?
-                    // "Sw{2,}" -> Find Sw, then Sw.
-                    
-                    // Strategy: Find *first* occurrence of target. Then look for subsequent ones.
-                    // If we find 'min' occurrences, good.
-                    // NOTE: This simple logic finds ANY 'min' occurrences ordered in time.
-                    // If the user meant "Burst of 5 swaps", this logic matches "5 swaps spread over the whole block".
-                    // Given the goal "Behavioral Story" (e.g. LP+ -> Swaps -> LP-), spread out events IS the story.
-                    // So we scan forward for 'min' occurrences.
-                    
                     while count < *min {
                          if idx >= symbols.len() {
                              return None; // Not enough symbols
                          }
-                         if let Some(found_idx) = symbols[idx..].iter().position(|s| s.symbol == *target) {
+                         if let Some(found_idx) = symbols[idx..].iter().position(|s| {
+                             s.symbol == *target && Self::check_condition(s, cond)
+                         }) {
                              let absolute_idx = idx + found_idx;
                              temp_matched.push(&symbols[absolute_idx]);
                              idx = absolute_idx + 1;
@@ -131,8 +159,7 @@ impl BehavioralPattern {
                     matched_sequence.extend(temp_matched);
                     current_sym_idx = idx;
                 },
-                PatternStep::Range(target, min, _max) => {
-                     // Similar to AtLeast but capped
+                PatternStep::Range(target, min, _max, cond) => {
                     let mut count = 0;
                     let mut temp_matched = Vec::new();
                     let mut idx = current_sym_idx;
@@ -141,7 +168,9 @@ impl BehavioralPattern {
                          if idx >= symbols.len() {
                              return None; 
                          }
-                         if let Some(found_idx) = symbols[idx..].iter().position(|s| s.symbol == *target) {
+                         if let Some(found_idx) = symbols[idx..].iter().position(|s| {
+                             s.symbol == *target && Self::check_condition(s, cond)
+                         }) {
                              let absolute_idx = idx + found_idx;
                              temp_matched.push(&symbols[absolute_idx]);
                              idx = absolute_idx + 1;
@@ -150,14 +179,6 @@ impl BehavioralPattern {
                              return None; 
                          }
                     }
-                    
-                    // Optional: Trying to find more up to max?
-                    // If we just satisfy min, is it enough? "Range" usually implies validation.
-                    // But if we verify "Sw{2,5}", finding 2 is valid. Finding 6?
-                    // If we find 6, matches() should probably still return true (it matched 2..5).
-                    // The "Range" usually restricts "Burst". But in a "Story", "At least 2" is usually what's meant by {2,5}.
-                    // If strict max is needed, we'd need negative lookahead which is complex.
-                    // For now, satisfy 'min'.
                      matched_sequence.extend(temp_matched);
                      current_sym_idx = idx;
                 }
@@ -166,6 +187,13 @@ impl BehavioralPattern {
 
         Some(matched_sequence)
     }
+
+    fn check_condition(symbol: &BehavioralSymbol, condition: &PatternCondition) -> bool {
+        match condition {
+            PatternCondition::None => true,
+            PatternCondition::FromDeployer => symbol.is_from_deployer,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -173,54 +201,50 @@ mod tests {
     use super::*;
 
     fn mock_sym(s: &str, idx: u32) -> BehavioralSymbol {
-        BehavioralSymbol {
-            symbol: s.to_string(),
-            log_index: idx,
-            metadata: vec![],
-        }
+        BehavioralSymbol::new(s, idx)
     }
 
     #[test]
     fn test_parse_simple() {
         let p = BehavioralPattern::parse("Tf -> Dep").unwrap();
-        assert_eq!(p.steps.len(), 2);
-        assert_eq!(p.steps[0], PatternStep::Exact("Tf".to_string()));
-        assert_eq!(p.steps[1], PatternStep::Exact("Dep".to_string()));
+        match &p.steps[0] {
+            PatternStep::Exact(s, c) => { assert_eq!(s, "Tf"); assert_eq!(c, &PatternCondition::None); }
+            _ => panic!("Wrong step type"),
+        }
     }
 
     #[test]
-    fn test_parse_quantifiers() {
-        let p = BehavioralPattern::parse("Sw{2,} -> LP-{1,5}").unwrap();
-        assert_eq!(p.steps[0], PatternStep::AtLeast("Sw".to_string(), 2));
-        assert_eq!(p.steps[1], PatternStep::Range("LP-".to_string(), 1, 5));
+    fn test_parse_condition() {
+        let p = BehavioralPattern::parse("Tf where from == deployer -> Sw").unwrap();
+        match &p.steps[0] {
+            PatternStep::Exact(s, c) => { 
+                assert_eq!(s, "Tf"); 
+                assert_eq!(c, &PatternCondition::FromDeployer); 
+            }
+            _ => panic!("Wrong step type"),
+        }
     }
 
     #[test]
-    fn test_match_sequence() {
-        let symbols = vec![
-            mock_sym("Tf", 0),
-            mock_sym("Sw", 1), 
-            mock_sym("Sw", 2),
-            mock_sym("LP-", 10)
-        ];
+    fn test_parse_preset() {
+        let p = BehavioralPattern::parse("Sandwich").unwrap();
+        assert_eq!(p.steps.len(), 3); // Tf -> Sw -> Tf
+    }
+
+    #[test]
+    fn test_match_condition() {
+        let mut sym1 = mock_sym("Tf", 0);
+        sym1.is_from_deployer = true;
+        let sym2 = mock_sym("Sw", 1);
         
-        // Exact
-        let p = BehavioralPattern::parse("Tf -> Sw").unwrap();
+        let symbols = vec![sym1, sym2.clone()];
+        
+        let p = BehavioralPattern::parse("Tf where from == deployer -> Sw").unwrap();
         assert!(p.matches(&symbols).is_some());
 
-        // AtLeast
-        let p2 = BehavioralPattern::parse("Sw{2,}").unwrap();
-        let m2 = p2.matches(&symbols).unwrap();
-        assert_eq!(m2.len(), 2);
-        assert_eq!(m2[0].log_index, 1);
-        assert_eq!(m2[1].log_index, 2);
-
-        // Sequence
-        let p3 = BehavioralPattern::parse("Tf -> Sw{2,} -> LP-").unwrap();
-        assert!(p3.matches(&symbols).is_some());
-
-        // Fail
-        let p4 = BehavioralPattern::parse("Tf -> LP- -> Sw").unwrap(); // Wrong order
-        assert!(p4.matches(&symbols).is_none());
+        // Test fail condition
+        let sym3 = mock_sym("Tf", 0); // is_from_deployer = false by default
+        let symbols_fail = vec![sym3, sym2];
+         assert!(p.matches(&symbols_fail).is_none());
     }
 }

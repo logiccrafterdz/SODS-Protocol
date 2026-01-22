@@ -19,7 +19,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let verifier = BlockVerifier::new("https://sepolia.infura.io/v3/YOUR_KEY");
+//!     let verifier = BlockVerifier::new("https://sepolia.infura.io/v3/YOUR_KEY")?;
 //!     
 //!     let result = verifier
 //!         .verify_symbol_in_block("Dep", 10002322)

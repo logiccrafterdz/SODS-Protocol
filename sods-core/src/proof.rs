@@ -33,8 +33,8 @@ use crate::error::{Result, SodsError};
 /// use sods_core::{BehavioralMerkleTree, BehavioralSymbol};
 ///
 /// let symbols = vec![
-///     BehavioralSymbol::new("Tf", 0, vec![]),
-///     BehavioralSymbol::new("Dep", 1, vec![]),
+///     BehavioralSymbol::new("Tf", 0),
+///     BehavioralSymbol::new("Dep", 1),
 /// ];
 /// let bmt = BehavioralMerkleTree::new(symbols);
 ///
@@ -80,7 +80,7 @@ impl Proof {
     /// ```rust
     /// use sods_core::{BehavioralMerkleTree, BehavioralSymbol};
     ///
-    /// let symbols = vec![BehavioralSymbol::new("Tf", 0, vec![])];
+    /// let symbols = vec![BehavioralSymbol::new("Tf", 0)];
     /// let bmt = BehavioralMerkleTree::new(symbols);
     /// let proof = bmt.generate_proof("Tf", 0).unwrap();
     ///
@@ -149,10 +149,10 @@ mod tests {
 
     fn create_test_tree() -> BehavioralMerkleTree {
         let symbols = vec![
-            BehavioralSymbol::new("Tf", 0, vec![]),
-            BehavioralSymbol::new("Dep", 1, vec![]),
-            BehavioralSymbol::new("Wdw", 2, vec![]),
-            BehavioralSymbol::new("Sw", 3, vec![]),
+            BehavioralSymbol::new("Tf", 0),
+            BehavioralSymbol::new("Dep", 1),
+            BehavioralSymbol::new("Wdw", 2),
+            BehavioralSymbol::new("Sw", 3),
         ];
         BehavioralMerkleTree::new(symbols)
     }
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_single_leaf_proof() {
-        let symbols = vec![BehavioralSymbol::new("Tf", 0, vec![])];
+        let symbols = vec![BehavioralSymbol::new("Tf", 0)];
         let bmt = BehavioralMerkleTree::new(symbols);
         let root = bmt.root();
 

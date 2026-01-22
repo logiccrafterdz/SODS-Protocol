@@ -24,6 +24,7 @@ use std::time::Duration;
 ///     proof_size_bytes: 202,
 ///     merkle_root: Some(vec![0u8; 32]),
 ///     occurrences: 2,
+///     confidence_score: 0.95,
 ///     verification_time: Duration::from_micros(500),
 ///     rpc_fetch_time: Duration::from_millis(150),
 ///     total_time: Duration::from_millis(200),
@@ -66,6 +67,9 @@ pub struct VerificationResult {
     #[serde(with = "duration_millis")]
     pub total_time: Duration,
 
+    /// Confidence score (0.0 - 1.0) indicating reliability of the detection.
+    pub confidence_score: f32,
+
     /// Error message if verification failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -73,12 +77,14 @@ pub struct VerificationResult {
 
 impl VerificationResult {
     /// Create a new result indicating successful verification.
+    #[allow(clippy::too_many_arguments)]
     pub fn success(
         symbol: String,
         block_number: u64,
         proof_size_bytes: usize,
         merkle_root: [u8; 32],
         occurrences: usize,
+        confidence_score: f32,
         verification_time: Duration,
         rpc_fetch_time: Duration,
         total_time: Duration,
@@ -90,6 +96,7 @@ impl VerificationResult {
             proof_size_bytes,
             merkle_root: Some(merkle_root.to_vec()),
             occurrences,
+            confidence_score,
             verification_time,
             rpc_fetch_time,
             total_time,
@@ -112,6 +119,7 @@ impl VerificationResult {
             proof_size_bytes: 0,
             merkle_root: merkle_root.map(|r| r.to_vec()),
             occurrences: 0,
+            confidence_score: 0.0,
             verification_time: Duration::ZERO,
             rpc_fetch_time,
             total_time,
@@ -134,6 +142,7 @@ impl VerificationResult {
             proof_size_bytes: 0,
             merkle_root: None,
             occurrences: 0,
+            confidence_score: 0.0,
             verification_time: Duration::ZERO,
             rpc_fetch_time,
             total_time,
@@ -168,8 +177,8 @@ impl std::fmt::Display for VerificationResult {
         if self.is_verified {
             write!(
                 f,
-                "Symbol '{}' VERIFIED in block {} ({} occurrences, {} bytes proof, {:?} total)",
-                self.symbol, self.block_number, self.occurrences, self.proof_size_bytes, self.total_time
+                "Symbol '{}' VERIFIED in block {} (score: {:.2}, {} occurrences, {} bytes proof, {:?} total)",
+                self.symbol, self.block_number, self.confidence_score, self.occurrences, self.proof_size_bytes, self.total_time
             )
         } else {
             write!(
@@ -195,6 +204,7 @@ mod tests {
             202,
             [0u8; 32],
             2,
+            0.85,
             Duration::from_micros(500),
             Duration::from_millis(100),
             Duration::from_millis(150),
@@ -202,6 +212,7 @@ mod tests {
 
         assert!(result.is_verified);
         assert_eq!(result.occurrences, 2);
+        assert_eq!(result.confidence_score, 0.85);
         assert!(result.error.is_none());
     }
 
@@ -227,6 +238,7 @@ mod tests {
             202,
             [0u8; 32],
             5,
+            0.9,
             Duration::from_micros(500),
             Duration::from_millis(100),
             Duration::from_millis(150),
@@ -235,5 +247,6 @@ mod tests {
         let display = result.to_string();
         assert!(display.contains("VERIFIED"));
         assert!(display.contains("Tf"));
+        assert!(display.contains("score: 0.90"));
     }
 }

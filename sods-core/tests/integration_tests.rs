@@ -33,11 +33,11 @@ fn test_bmt_root_matches_python_poc_block_10002322() {
     // Test: verify that duplicate symbols at different indices are handled correctly
     let symbols: Vec<BehavioralSymbol> = vec![
         // Simulate multiple Tf symbols at different log indices
-        BehavioralSymbol::new("Tf", 0, vec![]),
-        BehavioralSymbol::new("Tf", 1, vec![]),
-        BehavioralSymbol::new("Dep", 2, vec![]),
-        BehavioralSymbol::new("Tf", 3, vec![]),
-        BehavioralSymbol::new("Wdw", 4, vec![]),
+        BehavioralSymbol::new("Tf", 0),
+        BehavioralSymbol::new("Tf", 1),
+        BehavioralSymbol::new("Dep", 2),
+        BehavioralSymbol::new("Tf", 3),
+        BehavioralSymbol::new("Wdw", 4),
     ];
 
     let bmt = BehavioralMerkleTree::new(symbols);
@@ -45,11 +45,11 @@ fn test_bmt_root_matches_python_poc_block_10002322() {
 
     // Verify the root is deterministic
     let symbols2: Vec<BehavioralSymbol> = vec![
-        BehavioralSymbol::new("Tf", 0, vec![]),
-        BehavioralSymbol::new("Tf", 1, vec![]),
-        BehavioralSymbol::new("Dep", 2, vec![]),
-        BehavioralSymbol::new("Tf", 3, vec![]),
-        BehavioralSymbol::new("Wdw", 4, vec![]),
+        BehavioralSymbol::new("Tf", 0),
+        BehavioralSymbol::new("Tf", 1),
+        BehavioralSymbol::new("Dep", 2),
+        BehavioralSymbol::new("Tf", 3),
+        BehavioralSymbol::new("Wdw", 4),
     ];
     let bmt2 = BehavioralMerkleTree::new(symbols2);
 
@@ -68,7 +68,7 @@ fn test_known_root_format() {
     assert_eq!(expected.len(), 32);
 
     // Verify our root format matches
-    let symbols = vec![BehavioralSymbol::new("Tf", 0, vec![])];
+    let symbols = vec![BehavioralSymbol::new("Tf", 0)];
     let bmt = BehavioralMerkleTree::new(symbols);
     let root = bmt.root();
     assert_eq!(root.len(), 32);
@@ -81,10 +81,10 @@ fn test_canonical_ordering_rfc_compliant() {
     // log_index is primary, symbol is tie-breaker
 
     let symbols = vec![
-        BehavioralSymbol::new("Wdw", 5, vec![]),  // Will be last (highest log_index)
-        BehavioralSymbol::new("Tf", 2, vec![]),   // Will be at index 2
-        BehavioralSymbol::new("Dep", 2, vec![]),  // Will be at index 1 (Dep < Tf)
-        BehavioralSymbol::new("Tf", 0, vec![]),   // Will be first (lowest log_index)
+        BehavioralSymbol::new("Wdw", 5),  // Will be last (highest log_index)
+        BehavioralSymbol::new("Tf", 2),   // Will be at index 2
+        BehavioralSymbol::new("Dep", 2),  // Will be at index 1 (Dep < Tf)
+        BehavioralSymbol::new("Tf", 0),   // Will be first (lowest log_index)
     ];
 
     let bmt = BehavioralMerkleTree::new(symbols);
@@ -111,15 +111,15 @@ fn test_all_proofs_verify() {
 
     // 20 Tf events
     for i in 0..20u32 {
-        symbols.push(BehavioralSymbol::new("Tf", i * 3, vec![]));
+        symbols.push(BehavioralSymbol::new("Tf", i * 3));
     }
 
     // 2 Dep events
-    symbols.push(BehavioralSymbol::new("Dep", 60, vec![]));
-    symbols.push(BehavioralSymbol::new("Dep", 61, vec![]));
+    symbols.push(BehavioralSymbol::new("Dep", 60));
+    symbols.push(BehavioralSymbol::new("Dep", 61));
 
     // 1 Wdw event
-    symbols.push(BehavioralSymbol::new("Wdw", 62, vec![]));
+    symbols.push(BehavioralSymbol::new("Wdw", 62));
 
     let bmt = BehavioralMerkleTree::new(symbols);
     let root = bmt.root();
@@ -146,7 +146,7 @@ fn test_proof_verification_performance() {
 
     // Create a reasonably sized tree
     let symbols: Vec<_> = (0..100)
-        .map(|i| BehavioralSymbol::new("Tf", i, vec![]))
+        .map(|i| BehavioralSymbol::new("Tf", i))
         .collect();
 
     let bmt = BehavioralMerkleTree::new(symbols);
@@ -190,7 +190,7 @@ fn test_empty_tree_root_matches_sha256_empty() {
 #[test]
 fn test_proof_serialization_compact() {
     let symbols: Vec<_> = (0..32)
-        .map(|i| BehavioralSymbol::new("Tf", i, vec![]))
+        .map(|i| BehavioralSymbol::new("Tf", i))
         .collect();
 
     let bmt = BehavioralMerkleTree::new(symbols);

@@ -163,7 +163,7 @@ sods verify Tf --block 10002322 --json
 - Not a replacement for archive nodes
 - Not a finalized standard
 
-## What's New in v1.1 🚀
+## What's New in v1.1 
 
 - **L2 Native Support**: Direct verification on Arbitrum, Base, Optimism, Scroll, and Polygon zkEVM.
 - **Discovery Engine**: New `sods discover` command to find behavioral hotspots in recent blocks.
@@ -171,6 +171,34 @@ sods verify Tf --block 10002322 --json
 - **Secure Webhooks**: Forward alerts to ntfy.sh, Discord, or Telegram with privacy guarantees.
 - **Threat Intelligence**: Subscribe to decentralized, community-maintained behavioral blocklists.
 - **Regression Testing**: Automated CI integration tests for multi-chain support.
+
+## Behavioral Dictionary 2.0 (New!) 
+
+The protocol now supports context-aware behavioral analysis with **Metadata**, **MEV Patterns**, and **Confidence Scoring**.
+
+### 1. Context-Aware Symbols
+Symbols now carry rich metadata to enable deeper analysis:
+- `Tf` (Transfer): `from`, `to`, `value`
+- `MintNFT` / `BuyNFT`: NFT Market activity
+- `BridgeIn`: Cross-chain bridge deposits
+
+### 2. MEV Pattern DSL
+Detect complex MEV strategies using the new pattern language:
+
+```bash
+# Detect Sandwich Attacks (Heuristic: Transfer -> Swap -> Transfer)
+sods verify "Sandwich" --block 123456
+
+# Detect Deployer Rug Pulls (Context condition)
+sods verify "Tf where from == deployer" --block 123456
+```
+
+### 3. Confidence Scoring Engine
+The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection, rewarding:
+-  Valid Merkle Proofs (Base)
+-  Signed Transactions (+0.2)
+-  Deployer Actions (+0.3)
+-  Value Transfers (+0.1)
 
 ## Status
 

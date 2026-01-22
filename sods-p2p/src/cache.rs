@@ -123,8 +123,8 @@ mod tests {
     #[test]
     fn test_cached_block_has_symbol() {
         let symbols = vec![
-            BehavioralSymbol::new("Tf", 0, vec![]),
-            BehavioralSymbol::new("Dep", 1, vec![]),
+            BehavioralSymbol::new("Tf", 0),
+            BehavioralSymbol::new("Dep", 1),
         ];
         let block = CachedBlock::new([0; 32], symbols);
         

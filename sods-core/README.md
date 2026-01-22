@@ -30,8 +30,8 @@ let dict = SymbolDictionary::default();
 
 // Parse logs into behavioral symbols
 let symbols = vec![
-    BehavioralSymbol::new("Tf", 0, vec![]),
-    BehavioralSymbol::new("Dep", 1, vec![]),
+    BehavioralSymbol::new("Tf", 0),
+    BehavioralSymbol::new("Dep", 1),
 ];
 
 // Build Behavioral Merkle Tree

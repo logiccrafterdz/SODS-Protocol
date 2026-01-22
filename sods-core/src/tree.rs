@@ -27,8 +27,8 @@ use crate::symbol::BehavioralSymbol;
 /// use sods_core::{BehavioralMerkleTree, BehavioralSymbol};
 ///
 /// let symbols = vec![
-///     BehavioralSymbol::new("Tf", 0, vec![]),
-///     BehavioralSymbol::new("Dep", 1, vec![]),
+///     BehavioralSymbol::new("Tf", 0),
+///     BehavioralSymbol::new("Dep", 1),
 /// ];
 ///
 /// let bmt = BehavioralMerkleTree::new(symbols);
@@ -169,8 +169,8 @@ impl BehavioralMerkleTree {
     /// use sods_core::{BehavioralMerkleTree, BehavioralSymbol};
     ///
     /// let symbols = vec![
-    ///     BehavioralSymbol::new("Tf", 0, vec![]),
-    ///     BehavioralSymbol::new("Dep", 1, vec![]),
+    ///     BehavioralSymbol::new("Tf", 0),
+    ///     BehavioralSymbol::new("Dep", 1),
     /// ];
     ///
     /// let bmt = BehavioralMerkleTree::new(symbols);
@@ -252,11 +252,11 @@ mod tests {
 
     #[test]
     fn test_single_leaf() {
-        let symbols = vec![BehavioralSymbol::new("Tf", 0, vec![])];
+        let symbols = vec![BehavioralSymbol::new("Tf", 0)];
         let bmt = BehavioralMerkleTree::new(symbols);
 
         // Single leaf: root = leaf_hash
-        let expected = BehavioralSymbol::new("Tf", 0, vec![]).leaf_hash();
+        let expected = BehavioralSymbol::new("Tf", 0).leaf_hash();
         assert_eq!(bmt.root(), expected);
         assert_eq!(bmt.len(), 1);
     }
@@ -264,14 +264,14 @@ mod tests {
     #[test]
     fn test_two_leaves() {
         let symbols = vec![
-            BehavioralSymbol::new("Tf", 0, vec![]),
-            BehavioralSymbol::new("Dep", 1, vec![]),
+            BehavioralSymbol::new("Tf", 0),
+            BehavioralSymbol::new("Dep", 1),
         ];
         let bmt = BehavioralMerkleTree::new(symbols);
 
         // Root = H(leaf0 || leaf1)
-        let leaf0 = BehavioralSymbol::new("Tf", 0, vec![]).leaf_hash();
-        let leaf1 = BehavioralSymbol::new("Dep", 1, vec![]).leaf_hash();
+        let leaf0 = BehavioralSymbol::new("Tf", 0).leaf_hash();
+        let leaf1 = BehavioralSymbol::new("Dep", 1).leaf_hash();
 
         let mut hasher = Sha256::new();
         hasher.update(leaf0);
@@ -285,9 +285,9 @@ mod tests {
     fn test_canonical_sorting() {
         // Input out of order
         let symbols = vec![
-            BehavioralSymbol::new("Wdw", 10, vec![]),
-            BehavioralSymbol::new("Tf", 0, vec![]),
-            BehavioralSymbol::new("Dep", 5, vec![]),
+            BehavioralSymbol::new("Wdw", 10),
+            BehavioralSymbol::new("Tf", 0),
+            BehavioralSymbol::new("Dep", 5),
         ];
         let bmt = BehavioralMerkleTree::new(symbols);
 
@@ -300,9 +300,9 @@ mod tests {
     #[test]
     fn test_proof_generation() {
         let symbols = vec![
-            BehavioralSymbol::new("Tf", 0, vec![]),
-            BehavioralSymbol::new("Dep", 1, vec![]),
-            BehavioralSymbol::new("Wdw", 2, vec![]),
+            BehavioralSymbol::new("Tf", 0),
+            BehavioralSymbol::new("Dep", 1),
+            BehavioralSymbol::new("Wdw", 2),
         ];
         let bmt = BehavioralMerkleTree::new(symbols);
 
@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn test_proof_not_found() {
-        let symbols = vec![BehavioralSymbol::new("Tf", 0, vec![])];
+        let symbols = vec![BehavioralSymbol::new("Tf", 0)];
         let bmt = BehavioralMerkleTree::new(symbols);
 
         assert!(bmt.generate_proof("Dep", 0).is_none());
@@ -324,9 +324,9 @@ mod tests {
     #[test]
     fn test_odd_number_of_leaves() {
         let symbols = vec![
-            BehavioralSymbol::new("Tf", 0, vec![]),
-            BehavioralSymbol::new("Dep", 1, vec![]),
-            BehavioralSymbol::new("Wdw", 2, vec![]),
+            BehavioralSymbol::new("Tf", 0),
+            BehavioralSymbol::new("Dep", 1),
+            BehavioralSymbol::new("Wdw", 2),
         ];
         let bmt = BehavioralMerkleTree::new(symbols);
 
