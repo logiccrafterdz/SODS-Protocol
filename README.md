@@ -176,6 +176,12 @@ sods verify Tf --block 10002322 --json
 - **Real-Time Mempool Monitoring**: Intercept pending transactions and detect threats before they are mined.
 - **Regression Testing**: Automated CI integration tests for multi-chain support.
 
+## What's New in v1.2 (Latest)
+
+- **Adaptive RPC**: Self-healing connection logic that automatically throttles requests when rate limits are detected (Adaptive Backoff).
+- **Dynamic Symbol Loading**: Extensible plugin system to load new behavioral symbols from JSON definitions (URL/File) without recompiling.
+- **Enhanced Monitoring**: `sods monitor` now supports auto-adaptation and custom plugin loading at runtime.
+
 ## Behavioral Dictionary 2.0 (New!) 
 
 The protocol now supports context-aware behavioral analysis with **Metadata**, **MEV Patterns**, and **Confidence Scoring**.

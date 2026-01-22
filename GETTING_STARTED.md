@@ -37,12 +37,23 @@ sods trend --pattern "LP+ -> Sw" --chain base --window 10
 sods trend --pattern "Tf{5,}" --chain arbitrum --window 50
 ```
 
-### Autonomous Monitoring
-Continuously monitor the chain for emerging patterns:
+### Autonomous Monitoring (with Adaptive RPC)
+Continuously monitor the chain for emerging patterns. Use `--auto-adapt` to automatically throttle requests if the RPC provider limits you:
 
 ```bash
-# Alert when 3 or more swaps occur in a sequence
-sods monitor --pattern "Sw{3,}" --chain base --interval 30s
+# Monitor with self-healing RPC logic (auto-throttles on 429 errors)
+sods monitor --pattern "Sw{3,}" --chain base --interval 10s --auto-adapt
+```
+
+### Dynamic Symbol Loading (New!)
+Load custom behavioral symbols from external JSON plugins (e.g., from IPFS or GitHub) without updating the binary.
+
+```bash
+# Load Uniswap V3 Swap symbol from a plugin
+sods symbols load https://raw.githubusercontent.com/sods/plugins/main/uniswap-v3.json
+
+# Now verify using the new symbol "SwV3"
+sods verify "SwV3" --block 123456 --chain ethereum
 ```
 
 ### Predictive Behavioral Shadowing (Proactive)

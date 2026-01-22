@@ -5,8 +5,7 @@
 //! causal order within the same context (EOA or Contract Trace), rather than just appearing
 //! in the block in that order.
 
-use std::collections::HashMap;
-use ethers_core::types::Address;
+
 use sha2::{Digest, Sha256};
 
 use crate::symbol::BehavioralSymbol;

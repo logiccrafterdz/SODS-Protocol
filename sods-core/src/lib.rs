@@ -54,3 +54,5 @@ pub use tree::BehavioralMerkleTree;
 pub use causal_tree::CausalMerkleTree;
 pub mod shadow;
 pub use shadow::BehavioralShadow;
+pub mod plugins;
+pub use plugins::SymbolPlugin;

@@ -256,6 +256,17 @@ impl BlockVerifier {
     pub fn dictionary(&self) -> &SymbolDictionary {
         &self.dictionary
     }
+
+    /// Register a dynamic symbol plugin.
+    pub fn register_plugin(&mut self, plugin: sods_core::plugins::SymbolPlugin) {
+        self.dictionary.register_plugin(plugin);
+    }
+
+    /// Get the current RPC adaptive delay in milliseconds.
+    pub fn current_rpc_delay(&self) -> u64 {
+        self.rpc_client.current_delay()
+    }
+
     /// Get the latest verified block number from the chain.
     pub async fn get_latest_block(&self) -> Result<u64> {
         self.rpc_client.get_latest_block().await

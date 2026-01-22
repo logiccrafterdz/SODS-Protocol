@@ -43,6 +43,10 @@ desktop.ini
 # Node needed if web app components added
 node_modules/
 
-# Keep these files (don't ignore)
 # !poc/proofs/*.proof
 # !poc/bmr.bin
+
+# Local configurations
+.sods/
+plugins/
+*.json.bk

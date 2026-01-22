@@ -16,59 +16,24 @@ use crate::error::{Result, SodsVerifierError};
 /// Default cache size (number of blocks).
 const DEFAULT_CACHE_SIZE: usize = 100;
 
-/// Exponential backoff delays in milliseconds.
-const BACKOFF_DELAYS_MS: [u64; 3] = [500, 1500, 4000];
+/// Base backoff delays in milliseconds (adaptive).
+const MIN_ADAPTIVE_DELAY_MS: u64 = 100;
+const MAX_ADAPTIVE_DELAY_MS: u64 = 5000;
 
 /// Jitter percentage for backoff (±10%).
 const JITTER_PERCENT: f64 = 0.1;
 
-/// RPC client for fetching blockchain data.
-///
-/// Features:
-/// - LRU cache for fetched logs (configurable via `SODS_RPC_CACHE_SIZE` env var)
-/// - Exponential backoff with jitter for retries
-/// - Smart error classification
-///
-/// # Example
-///
-/// ```rust,no_run
-/// use sods_verifier::RpcClient;
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let client = RpcClient::new("https://sepolia.infura.io/v3/YOUR_KEY")?;
-///     
-///     // First call fetches from RPC
-///     let logs1 = client.fetch_logs_for_block(10002322).await?;
-///     
-///     // Second call returns cached data
-///     let logs2 = client.fetch_logs_for_block(10002322).await?;
-///     
-///     println!("Found {} logs", logs1.len());
-///     Ok(())
-/// }
-/// ```
 #[derive(Clone)]
 pub struct RpcClient {
     provider: Arc<Provider<Http>>,
     cache: Arc<Mutex<LruCache<u64, Vec<Log>>>>,
+    /// Adaptive delay in milliseconds to be added to requests
+    adaptive_delay: Arc<std::sync::atomic::AtomicU64>,
     #[cfg(test)]
     pub(crate) fetch_count: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl RpcClient {
-    /// Create a new RPC client from a URL.
-    ///
-    /// Cache size can be configured via the `SODS_RPC_CACHE_SIZE` environment variable.
-    /// Default is 100 blocks.
-    ///
-    /// # Arguments
-    ///
-    /// * `rpc_url` - The HTTP RPC endpoint URL
-    ///
-    /// # Errors
-    ///
-    /// Returns `RpcError` if the URL is invalid.
     pub fn new(rpc_url: &str) -> Result<Self> {
         let provider = Provider::<Http>::try_from(rpc_url)
             .map_err(|e| SodsVerifierError::RpcError(format!("Invalid RPC URL: {}", e)))?;
@@ -85,40 +50,60 @@ impl RpcClient {
         Ok(Self {
             provider: Arc::new(provider),
             cache: Arc::new(Mutex::new(cache)),
+            adaptive_delay: Arc::new(std::sync::atomic::AtomicU64::new(MIN_ADAPTIVE_DELAY_MS)),
             #[cfg(test)]
             fetch_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         })
     }
 
-    /// Fetch the latest block number.
-    pub async fn get_latest_block(&self) -> Result<u64> {
-        self.provider
-            .get_block_number()
-            .await
-            .map(|n| n.as_u64())
-            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))
+    /// Update adaptive delay based on request outcome.
+    fn update_adaptive_delay(&self, success: bool, error_kind: Option<&str>) {
+        let current = self.adaptive_delay.load(std::sync::atomic::Ordering::Relaxed);
+        
+        let new_delay = if success {
+            // Decay: Reduce delay by 10% on success, down to Min
+            std::cmp::max(MIN_ADAPTIVE_DELAY_MS, (current as f64 * 0.9) as u64)
+        } else {
+            // Increase: specific errors trigger faster backoff
+            if let Some(kind) = error_kind {
+                if kind.contains("rate limit") || kind.contains("too many requests") {
+                    // Double delay on rate limit
+                     std::cmp::min(MAX_ADAPTIVE_DELAY_MS, current * 2)
+                } else if kind.contains("timeout") {
+                     std::cmp::min(MAX_ADAPTIVE_DELAY_MS, (current as f64 * 1.5) as u64)
+                } else {
+                     current // Other errors might not need throttling
+                }
+            } else {
+                current 
+            }
+        };
+
+        if new_delay != current {
+            if new_delay > current {
+                // Only log when increasing significantly to avoid noise
+                 // eprintln!("Backing off RPC: {}ms", new_delay); 
+            }
+            self.adaptive_delay.store(new_delay, std::sync::atomic::Ordering::Relaxed);
+        }
     }
 
-    /// Fetch all logs for a specific block.
-    ///
-    /// Returns cached data if available, otherwise fetches from RPC
-    /// with exponential backoff retry logic.
-    ///
-    /// # Arguments
-    ///
-    /// * `block_number` - The block number to fetch logs for
-    ///
-    /// # Returns
-    ///
-    /// A vector of logs from the block.
-    ///
-    /// # Errors
-    ///
-    /// - `RpcError` on network failure
-    /// - `RpcTimeout` after max retry attempts
-    /// - `BlockOutOfRange` if block doesn't exist
+    pub async fn get_latest_block(&self) -> Result<u64> {
+        let result = self.provider.get_block_number().await;
+        
+        match result {
+             Ok(n) => {
+                 self.update_adaptive_delay(true, None);
+                 Ok(n.as_u64())
+             },
+             Err(e) => {
+                 self.update_adaptive_delay(false, Some(&e.to_string().to_lowercase()));
+                 Err(SodsVerifierError::RpcError(e.to_string()))
+             }
+        }
+    }
+
     pub async fn fetch_logs_for_block(&self, block_number: u64) -> Result<Vec<Log>> {
-        // Check cache first
         {
             let mut cache = self.cache.lock().unwrap();
             if let Some(logs) = cache.get(&block_number) {
@@ -126,10 +111,8 @@ impl RpcClient {
             }
         }
 
-        // Fetch from RPC with exponential backoff
         let logs = self.fetch_with_backoff(block_number).await?;
 
-        // Cache the result
         {
             let mut cache = self.cache.lock().unwrap();
             cache.put(block_number, logs.clone());
@@ -138,10 +121,7 @@ impl RpcClient {
         Ok(logs)
     }
 
-    /// Fetch all transactions for a specific block.
-    /// Used for enriching symbols with causal metadata (nonce, origin).
     pub async fn fetch_block_transactions(&self, block_number: u64) -> Result<Vec<ethers_core::types::Transaction>> {
-        // Cache could be added here similar to logs if needed
         let block = self.provider
             .get_block_with_txs(block_number)
             .await
@@ -151,52 +131,70 @@ impl RpcClient {
         Ok(block.transactions)
     }
 
-    /// Fetch logs with exponential backoff retry.
     async fn fetch_with_backoff(&self, block_number: u64) -> Result<Vec<Log>> {
         let filter = Filter::new()
             .from_block(BlockNumber::Number(block_number.into()))
             .to_block(BlockNumber::Number(block_number.into()));
 
         let mut last_error = None;
+        let base_delays = [500, 1500, 4000]; // Fixed retries
 
-        for (attempt, base_delay) in BACKOFF_DELAYS_MS.iter().enumerate() {
+        for (attempt, _fixed_delay) in base_delays.iter().enumerate() {
+            // Apply Adaptive Delay BEFORE request
+            let adaptive = self.adaptive_delay.load(std::sync::atomic::Ordering::Relaxed);
+            if adaptive > MIN_ADAPTIVE_DELAY_MS {
+                sleep(Duration::from_millis(adaptive)).await;
+            }
+
             #[cfg(test)]
             {
-                self.fetch_count
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                self.fetch_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             }
 
             match self.provider.get_logs(&filter).await {
-                Ok(logs) => return Ok(logs),
+                Ok(logs) => {
+                    self.update_adaptive_delay(true, None);
+                    return Ok(logs);
+                },
                 Err(e) => {
                     let error = self.classify_error(e, block_number);
+                    
+                    // Update adaptive state ON FAILURE
+                    // Extract inner message from classification
+                    let msg = match &error {
+                        SodsVerifierError::RpcError(m) => Some(m.as_str()),
+                        _ => None,
+                    };
+                    self.update_adaptive_delay(false, msg);
 
-                    // Don't retry on non-transient errors
                     if !Self::is_transient_error(&error) {
                         return Err(error);
                     }
 
                     last_error = Some(error);
 
-                    // Apply jitter and sleep (except on last attempt)
-                    if attempt < BACKOFF_DELAYS_MS.len() - 1 {
+                    if attempt < base_delays.len() - 1 {
                         let jitter = rand::random::<f64>() * JITTER_PERCENT * 2.0 - JITTER_PERCENT;
-                        let actual_delay = (*base_delay as f64 * (1.0 + jitter)) as u64;
-                        sleep(Duration::from_millis(actual_delay)).await;
+                        let delay = (base_delays[attempt] as f64 * (1.0 + jitter)) as u64;
+                        sleep(Duration::from_millis(delay)).await;
                     }
                 }
             }
         }
 
-        // All retries exhausted
         Err(last_error.unwrap_or(SodsVerifierError::RpcTimeout {
-            attempts: BACKOFF_DELAYS_MS.len() as u32,
+            attempts: base_delays.len() as u32,
         }))
     }
 
     /// Get the current cache size (for testing/monitoring).
     pub fn cache_len(&self) -> usize {
         self.cache.lock().unwrap().len()
+    }
+
+    /// Get the current adaptive delay in milliseconds.
+    pub fn current_delay(&self) -> u64 {
+        self.adaptive_delay.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Clear the cache.

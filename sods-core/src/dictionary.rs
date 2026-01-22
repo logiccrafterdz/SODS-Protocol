@@ -58,6 +58,11 @@ use ethers_core::types::{Address, U256};
 pub struct SymbolDictionary {
     /// Mapping from topic hash to symbol code
     registry: HashMap<H256, &'static str>,
+    /// Dynamic plugins (Symbol -> ParserType)
+    /// We store String symbols because they are dynamic (not static str)
+    dynamic_registry: HashMap<H256, String>,
+    /// Parser logic map
+    plugin_parsers: HashMap<H256, crate::plugins::ParserType>,
 }
 
 impl Default for SymbolDictionary {
@@ -84,7 +89,11 @@ impl Default for SymbolDictionary {
             }
         }
 
-        Self { registry }
+        Self { 
+            registry,
+            dynamic_registry: HashMap::new(),
+            plugin_parsers: HashMap::new(),
+        }
     }
 }
 
@@ -93,18 +102,29 @@ impl SymbolDictionary {
     pub fn empty() -> Self {
         Self {
             registry: HashMap::new(),
+            dynamic_registry: HashMap::new(),
+            plugin_parsers: HashMap::new(),
         }
     }
 
     /// Look up the symbol for a given event topic.
     #[inline]
-    pub fn symbol_for_topic(&self, topic: H256) -> Option<&'static str> {
-        self.registry.get(&topic).copied()
+    pub fn symbol_for_topic(&self, topic: H256) -> Option<&str> {
+        if let Some(s) = self.registry.get(&topic) {
+            return Some(s);
+        }
+        self.dynamic_registry.get(&topic).map(|s| s.as_str())
     }
 
     /// Register a custom symbol for a topic.
     pub fn register_custom(&mut self, topic: H256, symbol: &'static str) {
         self.registry.insert(topic, symbol);
+    }
+
+    /// Register a dynamic plugin based symbol.
+    pub fn register_plugin(&mut self, plugin: crate::plugins::SymbolPlugin) {
+        self.dynamic_registry.insert(plugin.event_topic, plugin.symbol);
+        self.plugin_parsers.insert(plugin.event_topic, plugin.parser);
     }
 
     /// Parse an EVM log into a behavioral symbol.
@@ -113,7 +133,7 @@ impl SymbolDictionary {
         let topic = log.topics.first()?;
 
         // Look up symbol
-        let mut symbol_code = self.symbol_for_topic(*topic)?; 
+        let symbol_code = self.symbol_for_topic(*topic)?; 
 
         // Extract log index
         let log_index = log.log_index.map(|i| i.as_u32()).unwrap_or(0);
@@ -124,14 +144,29 @@ impl SymbolDictionary {
         let mut value = U256::zero();
         let mut token_id = None;
         
-        // * Heuristic Extraction Logic based on standard event layouts *
-        
-        // Handle Transfer (ERC20 / ERC721)
-        // Topic0: Sign
-        // Topic1: From
-        // Topic2: To
-        // Data/Topic3: Value or TokenId
-        if *topic == TRANSFER_TOPIC.parse::<H256>().unwrap() { // Standard Transfer
+        // Check for specific parser override
+        if let Some(parser) = self.plugin_parsers.get(topic) {
+            match parser {
+                crate::plugins::ParserType::Generic => {
+                    // Just basic symbol, no context extracted yet
+                },
+                crate::plugins::ParserType::Transfer => {
+                     // Generic Transfer Logic (Assuming standard topics 1=from, 2=to)
+                     if log.topics.len() >= 3 {
+                         from = Address::from(log.topics[1]);
+                         to = Address::from(log.topics[2]);
+                     }
+                },
+                crate::plugins::ParserType::Swap => {
+                    // Generic Swap (Assuming sender is first indexed topic)
+                    if log.topics.len() >= 2 {
+                        from = Address::from(log.topics[1]);
+                    }
+                }
+            }
+        } 
+        // Fallback to legacy hardcoded heuristic if no plugin or plugin is generic
+        else if *topic == TRANSFER_TOPIC.parse::<H256>().unwrap() { // Standard Transfer
              if log.topics.len() >= 3 {
                  from = Address::from(log.topics[1]);
                  to = Address::from(log.topics[2]);
@@ -141,27 +176,21 @@ impl SymbolDictionary {
                      token_id = Some(U256::from_big_endian(log.topics[3].as_bytes()));
                      
                      // Helper: Check if Mint (from 0x0)
-                     if from == Address::zero() {
-                         symbol_code = "MintNFT";
+                     if from == Address::zero() && symbol_code == "Tf" { // Only override if it's the base code
+                         return Some(BehavioralSymbol::new("MintNFT", log_index)
+                            .with_context(from, to, value, token_id));
                      }
-                 } else {
-                     // Check Data for Value (ERC20)
-                     if log.data.len() >= 32 {
-                         value = U256::from_big_endian(&log.data[0..32]);
-                     }
+                 } else if log.data.len() >= 32 {
+                     value = U256::from_big_endian(&log.data[0..32]);
                  }
              }
         } 
-        // Handle Swap V2
-        else if symbol_code == "Sw" {
-            // Context usually from args; keeping simple for now
-            // V2: sender is topic 1, to is topic 2 (or 3 depending on indexed)
-        }
         
         // Construct Symbol
         Some(BehavioralSymbol::new(symbol_code, log_index)
             .with_context(from, to, value, token_id))
     }
+
 
     /// Returns the number of registered symbols.
     #[inline]

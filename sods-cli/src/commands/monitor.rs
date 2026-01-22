@@ -46,6 +46,10 @@ pub struct MonitorArgs {
     /// Enable predictive behavioral shadowing
     #[arg(long)]
     pub enable_shadows: bool,
+
+    /// Automatically adapt polling interval based on RPC health
+    #[arg(long)]
+    pub auto_adapt: bool,
 }
 
 fn parse_duration(input: &str) -> Result<Duration, String> {
@@ -112,18 +116,31 @@ pub async fn run(args: MonitorArgs) -> i32 {
     };
 
     println!("   Interval: {}s", interval.as_secs());
+    if args.auto_adapt {
+        println!("   Adapt:    {}", "Enabled (Dynamic Throttling)".green());
+    }
     println!("   Status:   Initializing...");
 
     let rpc_url = args.rpc_url.as_deref().unwrap_or(chain_config.default_rpc);
 
     // 4. Initialize Verifier
-    let verifier = match BlockVerifier::new(rpc_url) {
+    let mut verifier = match BlockVerifier::new(rpc_url) {
         Ok(v) => v,
         Err(e) => {
             output::error(&format!("Failed to connect to RPC: {}", e));
             return 1;
         }
     };
+
+    // Load Plugins
+    if let Ok(plugins) = crate::commands::symbols::load_local_plugins() {
+        if !plugins.is_empty() {
+            println!("   Plugins:  Loaded {} custom symbols", plugins.len());
+            for p in plugins {
+                verifier.register_plugin(p);
+            }
+        }
+    }
 
     // 5. Get Initial Block
     let mut last_scanned_block = match verifier.get_latest_block().await {
@@ -145,6 +162,15 @@ pub async fn run(args: MonitorArgs) -> i32 {
     // 6. Polling Loop
     loop {
         sleep(interval).await;
+        
+        // Auto-Adapt Logic
+        if args.auto_adapt {
+            let rpc_delay = verifier.current_rpc_delay();
+            if rpc_delay > 500 { // If RPC is adding more than 500ms delay
+                // Add proportional delay to the loop to let it cool off
+                 sleep(Duration::from_millis(rpc_delay)).await;
+            }
+        }
 
         let current_head = match verifier.get_latest_block().await {
             Ok(b) => b,

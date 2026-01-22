@@ -27,8 +27,8 @@ enum Commands {
     /// List supported blockchain chains
     Chains,
     
-    /// List supported behavioral symbols
-    Symbols,
+    /// List supported behavioral symbols and load plugins
+    Symbols(commands::symbols::SymbolsArgs),
 
     /// Discover behavioral hotspots in recent blocks
     Discover(commands::discover::DiscoverArgs),
@@ -53,7 +53,7 @@ async fn main() {
     let exit_code = match cli.command {
         Commands::Verify(args) => commands::verify::run(args).await,
         Commands::Chains => commands::chains::run(),
-        Commands::Symbols => commands::symbols::run(),
+        Commands::Symbols(args) => commands::symbols::run(args).await,
         Commands::Discover(args) => commands::discover::run(args).await,
         Commands::Trend(args) => commands::trend::run(args).await,
         Commands::Monitor(args) => commands::monitor::run(args).await,

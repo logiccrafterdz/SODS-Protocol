@@ -181,7 +181,7 @@ impl CausalProof {
         let mut prev_nonce = first.nonce;
         let mut prev_seq = first.call_sequence;
 
-        for (i, sym) in self.symbols.iter().enumerate().skip(1) {
+        for (_i, sym) in self.symbols.iter().enumerate().skip(1) {
             // Must have same origin
             if sym.from != origin {
                 return false;
