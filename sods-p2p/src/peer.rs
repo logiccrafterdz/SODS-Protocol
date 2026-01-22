@@ -5,12 +5,13 @@ use k256::ecdsa::SigningKey;
 use libp2p::{
     identify,
     identity::Keypair,
-    request_response,
+    request_response, gossipsub,
     swarm::{Swarm, SwarmEvent},
     Multiaddr, PeerId,
 };
 use rand::rngs::OsRng;
 use tracing::{debug, info, warn};
+use tokio::sync::broadcast;
 
 use sods_core::BehavioralMerkleTree;
 use sods_verifier::BlockVerifier;
@@ -19,6 +20,7 @@ use crate::behavior::{SodsBehaviour, SodsBehaviourEvent};
 use crate::cache::{BlockCache, CachedBlock};
 use crate::error::{Result, SodsP2pError};
 use crate::protocol::{ProofRequest, ProofResponse};
+use crate::threats::{ThreatRule, THREATS_TOPIC};
 
 /// A SODS peer that serves behavioral proofs to the network.
 pub struct SodsPeer {
@@ -27,6 +29,7 @@ pub struct SodsPeer {
     cache: BlockCache,
     local_peer_id: PeerId,
     signing_key: SigningKey,
+    threat_tx: broadcast::Sender<ThreatRule>,
 }
 
 impl SodsPeer {
@@ -43,7 +46,10 @@ impl SodsPeer {
         // Generate secp256k1 signing key for message signing
         let signing_key = SigningKey::random(&mut OsRng);
 
-        let swarm = libp2p::SwarmBuilder::with_existing_identity(keypair.clone())
+        // Threat broadcast channel (capacity 100)
+        let (threat_tx, _) = broadcast::channel(100);
+
+        let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair.clone())
             .with_tokio()
             .with_tcp(
                 libp2p::tcp::Config::default(),
@@ -54,6 +60,11 @@ impl SodsPeer {
             .with_behaviour(|_key| SodsBehaviour::new(&keypair))
             .map_err(|e| SodsP2pError::NetworkError(format!("Behaviour error: {}", e)))?
             .build();
+        
+        // Subscribe to threats topic
+        let topic = gossipsub::IdentTopic::new(THREATS_TOPIC);
+        swarm.behaviour_mut().gossipsub.subscribe(&topic)
+            .map_err(|e| SodsP2pError::NetworkError(format!("Subscription error: {:?}", e)))?;
 
         info!("Created SODS peer with ID: {}", local_peer_id);
 
@@ -63,12 +74,31 @@ impl SodsPeer {
             cache: BlockCache::new(),
             local_peer_id,
             signing_key,
+            threat_tx,
         })
     }
 
     /// Get the local peer ID.
     pub fn peer_id(&self) -> &PeerId {
         &self.local_peer_id
+    }
+
+    /// Publish a threat rule to the network.
+    pub fn publish_threat(&mut self, rule: &ThreatRule) -> Result<()> {
+        let topic = gossipsub::IdentTopic::new(THREATS_TOPIC);
+        let data = serde_json::to_vec(rule)
+            .map_err(|e| SodsP2pError::SerializationError(e.to_string()))?;
+        
+        self.swarm.behaviour_mut().gossipsub.publish(topic, data)
+            .map_err(|e| SodsP2pError::NetworkError(format!("Publish error: {:?}", e)))?;
+        
+        info!("Published threat rule: {}", rule.id);
+        Ok(())
+    }
+
+    /// Subscribe to incoming threat rules.
+    pub fn subscribe_threats(&self) -> broadcast::Receiver<ThreatRule> {
+        self.threat_tx.subscribe()
     }
 
     /// Connect to bootstrap nodes.
@@ -110,6 +140,9 @@ impl SodsPeer {
                 SwarmEvent::Behaviour(SodsBehaviourEvent::RequestResponse(event)) => {
                     self.handle_request_response_event(event).await;
                 }
+                SwarmEvent::Behaviour(SodsBehaviourEvent::Gossipsub(event)) => {
+                    self.handle_gossip_event(event);
+                }
                 SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                     debug!("Connected to peer: {}", peer_id);
                 }
@@ -118,6 +151,28 @@ impl SodsPeer {
                 }
                 _ => {}
             }
+        }
+    }
+
+    /// Handle gossipsub events.
+    fn handle_gossip_event(&mut self, event: gossipsub::Event) {
+        match event {
+            gossipsub::Event::Message { propagation_source, message_id: _, message } => {
+                if let Ok(rule) = serde_json::from_slice::<ThreatRule>(&message.data) {
+                    info!("Received threat rule '{}' from {}", rule.id, propagation_source);
+                    
+                    // Validate rule
+                    if rule.verify() {
+                         // Forward to local listeners
+                         let _ = self.threat_tx.send(rule);
+                    } else {
+                        warn!("Received INVALID threat rule from {}", propagation_source);
+                    }
+                } else {
+                    warn!("Received malformed gossip message");
+                }
+            }
+            _ => {}
         }
     }
 

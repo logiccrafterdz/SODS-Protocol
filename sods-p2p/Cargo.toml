@@ -24,7 +24,8 @@ libp2p = { version = "0.54", features = [
     "noise",
     "tcp",
     "yamux",
-    "macros"
+    "macros",
+    "gossipsub",
 ] }
 
 # Async runtime

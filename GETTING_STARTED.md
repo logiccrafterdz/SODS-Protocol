@@ -93,3 +93,18 @@ Find blocks with high activity for a specific symbol:
 ```bash
 sods discover --symbol Sw --chain base --last 20
 ```
+
+## Decentralized Threat Intelligence (P2P)
+
+Join the global P2P network to receive real-time behavioral threat updates without centralized feeds.
+
+```bash
+# Start daemon with P2P enabled
+sods daemon start --p2p-threat-network --chain base
+
+# List active P2P rules received
+sods threats list
+
+# Trust a new researcher (add their public key)
+sods threats add-key 02a1b2c3...
+```

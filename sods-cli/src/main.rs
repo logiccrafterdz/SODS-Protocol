@@ -41,6 +41,9 @@ enum Commands {
 
     /// System daemon management
     Daemon(commands::daemon::DaemonArgs),
+
+    /// Manage decentralized threat intelligence
+    Threats(commands::threats::ThreatsArgs),
 }
 
 #[tokio::main]
@@ -55,6 +58,7 @@ async fn main() {
         Commands::Trend(args) => commands::trend::run(args).await,
         Commands::Monitor(args) => commands::monitor::run(args).await,
         Commands::Daemon(args) => commands::daemon::run(args).await,
+        Commands::Threats(args) => commands::threats::run(args).await,
     };
 
     std::process::exit(exit_code);

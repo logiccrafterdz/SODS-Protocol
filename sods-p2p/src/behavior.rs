@@ -1,7 +1,7 @@
 //! Libp2p network behavior combining identify and request-response.
 
 use libp2p::{
-    identify, request_response,
+    identify, request_response, gossipsub,
     swarm::NetworkBehaviour,
     StreamProtocol,
 };
@@ -21,6 +21,8 @@ pub struct SodsBehaviour {
     pub identify: identify::Behaviour,
     /// Request-response for proof exchange
     pub request_response: request_response::cbor::Behaviour<ProofRequest, ProofResponse>,
+    /// Gossipsub for threat intelligence
+    pub gossipsub: gossipsub::Behaviour,
 }
 
 /// Events emitted by the SODS behavior.
@@ -30,6 +32,8 @@ pub enum SodsBehaviourEvent {
     Identify(identify::Event),
     /// Request-response event
     RequestResponse(request_response::Event<ProofRequest, ProofResponse>),
+    /// Gossipsub event
+    Gossipsub(gossipsub::Event),
 }
 
 impl From<identify::Event> for SodsBehaviourEvent {
@@ -41,6 +45,12 @@ impl From<identify::Event> for SodsBehaviourEvent {
 impl From<request_response::Event<ProofRequest, ProofResponse>> for SodsBehaviourEvent {
     fn from(event: request_response::Event<ProofRequest, ProofResponse>) -> Self {
         SodsBehaviourEvent::RequestResponse(event)
+    }
+}
+
+impl From<gossipsub::Event> for SodsBehaviourEvent {
+    fn from(event: gossipsub::Event) -> Self {
+        SodsBehaviourEvent::Gossipsub(event)
     }
 }
 
@@ -62,9 +72,21 @@ impl SodsBehaviour {
             request_response::Config::default(),
         );
 
+        // Gossipsub config
+        let message_authenticity = gossipsub::MessageAuthenticity::Signed(keypair.clone());
+        let gossipsub_config = gossipsub::ConfigBuilder::default()
+            .heartbeat_interval(std::time::Duration::from_secs(1))
+            .validation_mode(gossipsub::ValidationMode::Strict)
+            .build()
+            .expect("Valid config");
+
+        let gossipsub = gossipsub::Behaviour::new(message_authenticity, gossipsub_config)
+            .expect("Correct configuration");
+
         Self {
             identify,
             request_response,
+            gossipsub,
         }
     }
 }

@@ -116,6 +116,31 @@ hash = SHA256(proof_bytes || bmt_root || success || error || occurrences)
 valid = secp256k1.verify(hash, signature, public_key)
 ```
 
+valid = secp256k1.verify(hash, signature, public_key)
+```
+
+## Decentralized Threat Intelligence Network
+
+Uses **Gossipsub** protocol (`/sods/threats/1.0.0`) to propagate signed behavioral patterns.
+
+### Security Model
+
+- **No Central Authority**: Anyone can publish, but nodes only accept rules from keys they trust.
+- **Signed Rules**: All `ThreatRule` messages must carry a valid ECDSA signature.
+- **Validation**:
+  1. **Syntax Check**: Pattern must be valid DSL.
+  2. **Signature Check**: Must match `author_pubkey`.
+  3. **Trust Check**: `author_pubkey` must carry in local `trusted_keys.json` (Managed via `sods threats add-key`).
+
+```rust
+struct ThreatRule {
+    id: String,
+    pattern: String,
+    signature: Vec<u8>,
+    author_pubkey: Vec<u8>, // Trusted?
+}
+```
+
 ## Version History
 
 | Version | Changes |

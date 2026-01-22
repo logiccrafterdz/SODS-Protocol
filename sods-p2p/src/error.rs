@@ -13,6 +13,10 @@ pub enum SodsP2pError {
     #[error("Protocol error: {0}")]
     ProtocolError(String),
 
+    /// Serialization error.
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
     /// No peers available for query.
     #[error("No available peers for verification")]
     NoAvailablePeers,
