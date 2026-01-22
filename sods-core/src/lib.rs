@@ -43,6 +43,7 @@ pub mod proof;
 pub mod symbol;
 pub mod tree;
 pub mod pattern;
+pub mod causal_tree;
 
 // Re-export main types for convenience
 pub use dictionary::SymbolDictionary;
@@ -50,3 +51,4 @@ pub use error::SodsError;
 pub use proof::Proof;
 pub use symbol::BehavioralSymbol;
 pub use tree::BehavioralMerkleTree;
+pub use causal_tree::CausalMerkleTree;

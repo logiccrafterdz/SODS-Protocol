@@ -3,7 +3,7 @@
 //! This module defines the `BehavioralSymbol` struct which represents
 //! a parsed behavioral event extracted from EVM logs.
 
-use ethers_core::types::{Address, U256};
+use ethers_core::types::{Address, U256, H256};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
@@ -54,6 +54,15 @@ pub struct BehavioralSymbol {
     /// Heuristic flag: true if `from` matches contract deployer (Rug Pull risk)
     pub is_from_deployer: bool,
 
+    /// Transaction Hash (Causality)
+    pub tx_hash: H256,
+    
+    /// Nonce of the sender (Causality - EOA)
+    pub nonce: u64,
+
+    /// Call sequence / Trace index (Causality - Contract)
+    pub call_sequence: u32,
+
     /// Optional raw contextual data (legacy/compat)
     pub metadata: Vec<u8>,
 }
@@ -69,6 +78,9 @@ impl BehavioralSymbol {
             value: U256::zero(),
             token_id: None,
             is_from_deployer: false,
+            tx_hash: H256::zero(),
+            nonce: 0,
+            call_sequence: 0,
             metadata: vec![],
         }
     }
@@ -85,6 +97,14 @@ impl BehavioralSymbol {
         self.to = to;
         self.value = value;
         self.token_id = token_id;
+        self
+    }
+
+    /// Set causality metadata (Builder pattern).
+    pub fn with_causality(mut self, tx_hash: H256, nonce: u64, call_sequence: u32) -> Self {
+        self.tx_hash = tx_hash;
+        self.nonce = nonce;
+        self.call_sequence = call_sequence;
         self
     }
 
@@ -109,7 +129,7 @@ impl BehavioralSymbol {
     /// Compute the leaf hash for this symbol.
     ///
     /// In minimal mode: `SHA256(symbol_bytes)`
-    /// In full mode: `SHA256(symbol_bytes || metadata)`
+    /// In full mode: `SHA256(symbol_bytes || metadata || causality)`
     pub fn leaf_hash(&self) -> [u8; 32] {
         use sha2::{Digest, Sha256};
 
@@ -119,6 +139,13 @@ impl BehavioralSymbol {
         // Include metadata if present (full mode)
         if !self.metadata.is_empty() {
             hasher.update(&self.metadata);
+        }
+
+        // Include causality fields if non-zero (to affect hash)
+        if self.tx_hash != H256::zero() {
+             hasher.update(self.tx_hash.as_bytes());
+             hasher.update(&self.nonce.to_be_bytes());
+             hasher.update(&self.call_sequence.to_be_bytes());
         }
 
         hasher.finalize().into()

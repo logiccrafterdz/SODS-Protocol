@@ -317,8 +317,40 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
     // 4. Match Pattern
     if let Some(matched_seq) = pattern.matches(&symbols) {
         let elapsed = start.elapsed().as_millis() as u64;
+        
+        // --- Causal Verification ---
+        // 1. Build Causal Merkle Tree
+        let cmt = sods_core::CausalMerkleTree::new(symbols.clone()); // CMT sorts by causality
+        let root = cmt.root();
+        
+        // 2. Generate Proofs for matched sequence
+        let mut proofs = Vec::new();
+        let mut proof_generation_success = true;
+        
+        // Clone owned symbols for the proof struct
+        let flow_symbols: Vec<sods_core::BehavioralSymbol> = matched_seq.iter().map(|&s| s.clone()).collect();
+        
+        for sym in &flow_symbols {
+             if let Some(p) = cmt.generate_proof(sym.symbol(), sym.log_index()) {
+                 proofs.push(p);
+             } else {
+                 proof_generation_success = false;
+                 break;
+             }
+        }
+        
+        let causal_verified = if proof_generation_success {
+            let causal_proof = sods_core::proof::CausalProof {
+                root,
+                symbols: flow_symbols.clone(),
+                proofs,
+            };
+            causal_proof.verify(&root)
+        } else {
+            false
+        };
+
          if args.json {
-             // Extended JSON for pattern? reusing JsonOutput for now with verified=true
                 let matched_seq_json: Vec<MatchedSymbol> = matched_seq.iter().map(|s| MatchedSymbol {
                     symbol: s.symbol.clone(),
                     log_index: s.log_index,
@@ -329,27 +361,39 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
                     symbol: args.symbol.clone(),
                     block: args.block,
                     chain: args.chain.clone(),
-                    verified: true,
+                    verified: causal_verified, // True only if causal check passes
                     occurrences: matched_seq.len(),
-                    proof_size_bytes: 0, // No specific proof for pattern yet (could aggregate)
+                    proof_size_bytes: flow_symbols.len() * 300, // Approx
                     time_ms: elapsed,
-                    method: "pattern".into(),
-                    error: None,
+                    method: "causal_pattern".into(),
+                    error: if causal_verified { None } else { Some("Causal verification failed".into()) },
                     matched_sequence: Some(matched_seq_json),
                 };
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
          } else {
-             println!("✅ Pattern matched in block {} ({})", args.block, chain_config.name);
-             println!("   Matched sequence:");
-             for sym in matched_seq {
-                 println!("     {} @ idx={}", sym.symbol, sym.log_index);
+             if causal_verified {
+                 println!("✅ Causal Pattern Verified!");
+                 if let Some(first) = flow_symbols.first() {
+                     println!("   Actor: {:?}", first.from);
+                     print!("   Flow:  ");
+                     for (i, sym) in flow_symbols.iter().enumerate() {
+                         if i > 0 { print!(" -> "); }
+                         if sym.is_from_deployer { print!("[Deployer] "); }
+                         print!("{} (N:{})", sym.symbol(), sym.nonce);
+                     }
+                     println!();
+                     println!("   Root:  0x{}", hex::encode(root));
+                 }
+             } else {
+                  output::error("Pattern found but failed Causal Verification.");
+                  output::hint("Events may not be contiguous or from same actor.");
              }
          }
-         return 0;
+         return if causal_verified { 0 } else { 1 };
     } else {
         if args.json {
              let output = JsonOutput {
-                success: true, // Verification ran successfully, result is negative
+                success: true,
                 symbol: args.symbol.clone(),
                 block: args.block,
                 chain: args.chain.clone(),

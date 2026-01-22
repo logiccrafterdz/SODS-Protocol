@@ -141,6 +141,71 @@ impl Proof {
     }
 }
 
+/// A proof that a sequence of symbols is causally linked.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CausalProof {
+    /// The root of the Causal Merkle Tree
+    pub root: [u8; 32],
+    /// The symbols in the causal sequence
+    pub symbols: Vec<crate::symbol::BehavioralSymbol>,
+    /// Merkle proofs for each symbol (proving inclusion in the CMT)
+    /// Optimization: Could use a MultiProof, but individual proofs are easier for MPV.
+    pub proofs: Vec<Proof>,
+}
+
+impl CausalProof {
+    /// Verify that the sequence represents a valid causal narrative.
+    pub fn verify(&self, expected_root: &[u8; 32]) -> bool {
+        // 1. Check Root
+        if &self.root != expected_root {
+            return false;
+        }
+
+        if self.symbols.is_empty() || self.symbols.len() != self.proofs.len() {
+            return false;
+        }
+
+        // 2. Verify Inclusion (Merkle Proofs)
+        for (symbol, proof) in self.symbols.iter().zip(self.proofs.iter()) {
+            if proof.leaf_hash != symbol.leaf_hash() {
+                return false;
+            }
+            if !proof.verify(expected_root) {
+                return false;
+            }
+        }
+
+        // 3. Verify Causality (Same Origin + Sequential Nonce/Trace)
+        let first = &self.symbols[0];
+        let origin = first.from;
+        let mut prev_nonce = first.nonce;
+        let mut prev_seq = first.call_sequence;
+
+        for (i, sym) in self.symbols.iter().enumerate().skip(1) {
+            // Must have same origin
+            if sym.from != origin {
+                return false;
+            }
+
+            // Must be sequential
+            // Case A: EOA (Nonce increases by 1)
+            let nonce_ok = sym.nonce == prev_nonce + 1;
+            
+            // Case B: Contrcat (Same Nonce, Sequence increases)
+            let seq_ok = sym.nonce == prev_nonce && sym.call_sequence > prev_seq;
+
+            if !nonce_ok && !seq_ok {
+                return false;
+            }
+
+            prev_nonce = sym.nonce;
+            prev_seq = sym.call_sequence;
+        }
+
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

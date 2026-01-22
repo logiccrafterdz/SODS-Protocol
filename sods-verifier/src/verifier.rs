@@ -129,14 +129,24 @@ impl BlockVerifier {
         // Step 1: Validate symbol
         self.query_parser.validate_symbol(symbol)?;
 
-        // Step 2: Fetch logs
+        // Step 2: Fetch logs AND transactions (for causality)
         let rpc_start = Instant::now();
-        let logs = self.rpc_client.fetch_logs_for_block(block_number).await?;
+        // Parallel fetch could be better but keeping simple for now
+        let logs_fut = self.rpc_client.fetch_logs_for_block(block_number);
+        let txs_fut = self.rpc_client.fetch_block_transactions(block_number);
+        
+        let (logs, txs) = tokio::try_join!(logs_fut, txs_fut)?;
         let rpc_fetch_time = rpc_start.elapsed();
+
+        // Build Tx Lookup Map: TxHash -> (Nonce, From)
+        use std::collections::HashMap;
+        let tx_map: HashMap<_, _> = txs.iter()
+            .map(|tx| (tx.hash, (tx.nonce, tx.from)))
+            .collect();
 
         // Step 3: Parse logs to symbols
         let verify_start = Instant::now();
-        let symbols = self.parse_logs_to_symbols(&logs);
+        let symbols = self.parse_logs_to_symbols(&logs, &tx_map);
 
         // Handle empty block
         if symbols.is_empty() {
@@ -149,7 +159,8 @@ impl BlockVerifier {
             ));
         }
 
-        // Step 4: Build BMT
+        // Step 4: Build BMT (standard) - Causal checking happens in pattern verification
+        // For single symbol verification, standard BMT is fine.
         let bmt = BehavioralMerkleTree::new(symbols.clone());
         let root = bmt.root();
 
@@ -183,32 +194,15 @@ impl BlockVerifier {
             })?;
 
         // Calculate Confidence Score
-        // Base score for valid Merkle proof: 0.5
         let mut score = 0.5;
-        
-        // Enrichment factors
-        // 1. Signed Transaction (from != 0x0): +0.2
-        if first_match.from != ethers_core::types::Address::zero() {
-            score += 0.2;
-        }
-        
-        // 2. From Deployer (Rug Pull risk factor): +0.3
-        if first_match.is_from_deployer {
-            score += 0.3;
-        }
-        
-        // 3. Significant Value > 0: +0.1 (optional heuristic)
-        if !first_match.value.is_zero() {
-             score += 0.1; // Bonus for value transfer
-        }
-        
-        // Cap at 1.0
+        if first_match.from != ethers_core::types::Address::zero() { score += 0.2; }
+        if first_match.is_from_deployer { score += 0.3; }
+        if !first_match.value.is_zero() { score += 0.1; }
         if score > 1.0 { score = 1.0; }
 
         let verification_time = verify_start.elapsed();
         let total_time = total_start.elapsed();
 
-        // Step 6: Return result
         Ok(VerificationResult::success(
             symbol.to_string(),
             block_number,
@@ -223,9 +217,38 @@ impl BlockVerifier {
     }
 
     /// Parse RPC logs into behavioral symbols.
-    fn parse_logs_to_symbols(&self, logs: &[ethers_core::types::Log]) -> Vec<BehavioralSymbol> {
+    fn parse_logs_to_symbols(
+        &self, 
+        logs: &[ethers_core::types::Log],
+        tx_map: &std::collections::HashMap<ethers_core::types::H256, (ethers_core::types::U256, ethers_core::types::Address)>
+    ) -> Vec<BehavioralSymbol> {
         logs.iter()
-            .filter_map(|log| self.dictionary.parse_log(log))
+            .filter_map(|log| {
+                let mut sym = self.dictionary.parse_log(log)?;
+                
+                // Enrich with causal data if tx exists
+                if let Some(tx_hash) = log.transaction_hash {
+                    if let Some((nonce, from)) = tx_map.get(&tx_hash) {
+                         // Use log_index as call_sequence for intra-tx ordering
+                         sym = sym.with_causality(
+                             tx_hash, 
+                             nonce.as_u64(), 
+                             log.log_index.map(|i| i.as_u32()).unwrap_or(0)
+                         );
+                         // If the symbol context 'from' is 0x0 (not extracted from log topics),
+                         // we can fallback to tx.origin (though semantically different, helpful for causality grouping)
+                         // But for now, let's keep 'from' as event-specific.
+                         // Actually, Causal Tree sorts by sym.from. If sym.from is 0x0, it breaks grouping.
+                         // So we should probably set sym.from to tx.from if it's empty?
+                         // The user said: "Group symbols by transaction origin (from address)"
+                         // If the event doesn't explicitly have a 'from' (like Swap), we should attr it to the tx sender.
+                         if sym.from == ethers_core::types::Address::zero() {
+                             sym.from = *from;
+                         }
+                    }
+                }
+                Some(sym)
+            })
             .collect()
     }
 
@@ -242,8 +265,16 @@ impl BlockVerifier {
     /// 
     /// Useful for pattern matching or manual inspection.
     pub async fn fetch_block_symbols(&self, block_number: u64) -> Result<Vec<BehavioralSymbol>> {
-        let logs = self.rpc_client.fetch_logs_for_block(block_number).await?;
-        Ok(self.parse_logs_to_symbols(&logs))
+        let logs_fut = self.rpc_client.fetch_logs_for_block(block_number);
+        let txs_fut = self.rpc_client.fetch_block_transactions(block_number);
+        
+        let (logs, txs) = tokio::try_join!(logs_fut, txs_fut)?;
+        
+        let tx_map: std::collections::HashMap<_, _> = txs.iter()
+            .map(|tx| (tx.hash, (tx.nonce, tx.from)))
+            .collect();
+
+        Ok(self.parse_logs_to_symbols(&logs, &tx_map))
     }
 }
 

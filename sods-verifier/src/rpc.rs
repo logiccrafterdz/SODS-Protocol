@@ -138,6 +138,19 @@ impl RpcClient {
         Ok(logs)
     }
 
+    /// Fetch all transactions for a specific block.
+    /// Used for enriching symbols with causal metadata (nonce, origin).
+    pub async fn fetch_block_transactions(&self, block_number: u64) -> Result<Vec<ethers_core::types::Transaction>> {
+        // Cache could be added here similar to logs if needed
+        let block = self.provider
+            .get_block_with_txs(block_number)
+            .await
+            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?
+            .ok_or(SodsVerifierError::BlockOutOfRange(block_number))?;
+            
+        Ok(block.transactions)
+    }
+
     /// Fetch logs with exponential backoff retry.
     async fn fetch_with_backoff(&self, block_number: u64) -> Result<Vec<Log>> {
         let filter = Filter::new()

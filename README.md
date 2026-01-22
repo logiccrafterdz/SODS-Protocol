@@ -171,6 +171,7 @@ sods verify Tf --block 10002322 --json
 - **Secure Webhooks**: Forward alerts to ntfy.sh, Discord, or Telegram with privacy guarantees.
 - **Threat Intelligence**: Subscribe to community blocklists via HTTP feeds (v1.1) or **P2P Gossipsub** (New in v1.2).
 - **Sybil Immunity**: Adaptive consensus via **Proof-of-Behavioral-Stake (PoBS)** using decaying reputation.
+- **Causal Behavioral Proofs**: Cryptographically verify that event sequences (`Tf -> Sw`) are executed by a single actor in order using **Causal Merkle Trees**.
 - **Real-Time Mempool Monitoring**: Intercept pending transactions and detect threats before they are mined.
 - **Regression Testing**: Automated CI integration tests for multi-chain support.
 
