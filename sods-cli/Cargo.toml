@@ -39,6 +39,7 @@ dirs = "5.0" # Using dirs instead of directories for simplicity
 sysinfo = "0.30"
 notify-rust = "4.10"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+futures-util = "0.3"
 
 [target.'cfg(unix)'.dependencies]
 daemonize = "0.5"

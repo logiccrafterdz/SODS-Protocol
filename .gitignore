@@ -14,7 +14,7 @@ target/
 *.rmeta
 *.exe
 *.pdb
-Cargo.lock
+# Cargo.lock
 
 # Build artifacts
 *.log

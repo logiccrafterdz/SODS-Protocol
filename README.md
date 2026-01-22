@@ -170,6 +170,7 @@ sods verify Tf --block 10002322 --json
 - **System Service**: Run as a daemon with `sods daemon` (Linux/macOS).
 - **Secure Webhooks**: Forward alerts to ntfy.sh, Discord, or Telegram with privacy guarantees.
 - **Threat Intelligence**: Subscribe to decentralized, community-maintained behavioral blocklists.
+- **Real-Time Mempool Monitoring**: Intercept pending transactions and detect threats before they are mined.
 - **Regression Testing**: Automated CI integration tests for multi-chain support.
 
 ## Behavioral Dictionary 2.0 (New!) 

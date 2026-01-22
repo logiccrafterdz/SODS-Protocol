@@ -15,7 +15,7 @@ categories = ["cryptography", "network-programming"]
 sods-core = { path = "../sods-core" }
 
 # Ethereum RPC client
-ethers-providers = "2.0"
+ethers-providers = { version = "2.0", features = ["ws", "rustls"] }
 ethers-core = "2.0"
 
 # Async runtime
@@ -32,10 +32,10 @@ lru = "0.12"
 
 # Random for jitter
 rand = "0.8"
+# Hex encoding
+hex = "0.4"
 
 [dev-dependencies]
-# Hex encoding for test vectors
-hex = "0.4"
 
 # For timing assertions
 tokio-test = "0.4"

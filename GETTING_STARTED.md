@@ -45,6 +45,14 @@ Continuously monitor the chain for emerging patterns:
 sods monitor --pattern "Sw{3,}" --chain base --interval 30s
 ```
 
+### Real-Time Mempool Monitoring (New!)
+Monitor **pending transactions** in real-time to detect threats before they are even mined:
+
+```bash
+# Monitor Base mempool for Sandwich attacks (Pending transactions)
+sods monitor --pattern "Sandwich" --chain base --mode pending
+```
+
 
 ### Run as a System Daemon (Linux/macOS)
 Run SODS as a background service with desktop notifications.
@@ -60,20 +68,12 @@ sods daemon status
 sods daemon stop
 ```
 
-# Stop daemon
-sods daemon stop
-```
-
 ## Forward Alerts to Your Phone / Discord / Telegram
 Forward alerts to any service by providing a secure HTTPS webhook URL:
 
 ```bash
 # Example: Send alerts to ntfy.sh (receive on phone)
 sods daemon start --pattern "Tf{2,}" --chain base --webhook-url "https://ntfy.sh/my_sods_alerts"
-
-# Example: Send alerts to Discord Webhook
-sods daemon start --pattern "Sw" --chain base --webhook-url "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN"
-```
 
 # Example: Send alerts to Discord Webhook
 sods daemon start --pattern "Sw" --chain base --webhook-url "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN"

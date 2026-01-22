@@ -1,6 +1,6 @@
 //! Monitor command implementation.
 
-use clap::Args;
+use clap::{Args, ValueEnum};
 use colored::Colorize;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -8,7 +8,17 @@ use tokio::time::sleep;
 use crate::config::get_chain;
 use crate::output;
 use sods_core::pattern::BehavioralPattern;
-use sods_verifier::BlockVerifier;
+use sods_verifier::{BlockVerifier, MempoolMonitor};
+
+/// Monitoring mode.
+#[derive(Debug, Clone, Copy, ValueEnum, Default, PartialEq)]
+pub enum MonitorMode {
+    /// Monitor finalized blocks (default)
+    #[default]
+    Block,
+    /// Monitor pending transactions (mempool)
+    Pending,
+}
 
 /// Arguments for the monitor command.
 #[derive(Args)]
@@ -21,7 +31,11 @@ pub struct MonitorArgs {
     #[arg(short, long, default_value = "sepolia")]
     pub chain: String,
 
-    /// Polling interval (e.g., "30s", "1m"). Min 10s.
+    /// Monitoring mode: block (default) or pending
+    #[arg(short, long, default_value = "block")]
+    pub mode: MonitorMode,
+
+    /// Polling interval (e.g., "30s", "1m"). Min 10s. Used for block mode.
     #[arg(short, long, default_value = "30s")]
     pub interval: String,
 
@@ -46,21 +60,11 @@ fn parse_duration(input: &str) -> Result<Duration, String> {
 }
 
 pub async fn run(args: MonitorArgs) -> i32 {
-    // 1. Parse Duration
-    let interval = match parse_duration(&args.interval) {
-        Ok(d) => {
-            if d.as_secs() < 10 {
-                output::warn("Minimum interval is 10s. Adjusting to 10s.");
-                Duration::from_secs(10)
-            } else if d.as_secs() > 300 {
-                output::warn("Maximum interval is 5m. Adjusting to 5m.");
-                Duration::from_secs(300)
-            } else {
-                d
-            }
-        },
-        Err(e) => {
-            output::error(&format!("Invalid interval: {}", e));
+    // 1. Resolve Chain
+    let chain_config = match get_chain(&args.chain) {
+        Some(c) => c,
+        None => {
+            output::error(&format!("Chain '{}' not supported.", args.chain));
             return 1;
         }
     };
@@ -74,21 +78,39 @@ pub async fn run(args: MonitorArgs) -> i32 {
         }
     };
 
-    // 3. Resolve Chain/RPC
-    let chain_config = match get_chain(&args.chain) {
-        Some(c) => c,
-        None => {
-            output::error(&format!("Chain '{}' not supported.", args.chain));
-            return 1;
+    output::header(&format!("🚨 Autonomous Monitor Active: {}", args.pattern));
+    println!("   Chain:    {}", chain_config.description.cyan());
+    println!("   Mode:     {:?}", args.mode);
+
+    if args.mode == MonitorMode::Pending {
+        return run_pending_monitor(args, chain_config, pattern).await;
+    }
+
+    // --- BLOCK MODE (Legacy) ---
+    
+    // 3. Parse Duration
+    let interval = match parse_duration(&args.interval) {
+        Ok(d) => {
+             if d.as_secs() < 10 {
+                output::warn("Minimum interval is 10s. Adjusting to 10s.");
+                Duration::from_secs(10)
+            } else if d.as_secs() > 300 {
+                output::warn("Maximum interval is 5m. Adjusting to 5m.");
+                Duration::from_secs(300)
+            } else {
+                d
+            }
+        },
+        Err(e) => {
+             output::error(&format!("Invalid interval: {}", e));
+             return 1;
         }
     };
 
-    let rpc_url = args.rpc_url.as_deref().unwrap_or(chain_config.default_rpc);
-
-    output::header(&format!("🚨 Autonomous Monitor Active: {}", args.pattern));
-    println!("   Chain:    {}", chain_config.description.cyan());
     println!("   Interval: {}s", interval.as_secs());
     println!("   Status:   Initializing...");
+
+    let rpc_url = args.rpc_url.as_deref().unwrap_or(chain_config.default_rpc);
 
     // 4. Initialize Verifier
     let verifier = match BlockVerifier::new(rpc_url) {
@@ -111,13 +133,6 @@ pub async fn run(args: MonitorArgs) -> i32 {
         }
     };
     
-    // Initial scan of current block to verify connection and maybe catch immediate action?
-    // User expectation: "Start monitoring NOW". If logic is "scan > last_scanned", we miss the current block unless we set last_scanned = current - 1
-    // Let's set last_scanned to current - 1 to scan the *current* head first?
-    // Or just start from next new block. "Monitoring" usually implies future events.
-    // Let's stick to future events to avoid noise, or maybe scan the current head.
-    // Let's scan current head immediately just to confirm it works, then loop.
-    // Actually, simple logic: last_scanned = current_head. Only scan *new* blocks (strictly >).
     println!("{}", "Waiting for new blocks... (Ctrl+C to stop)".dimmed());
 
     // 6. Polling Loop
@@ -135,13 +150,11 @@ pub async fn run(args: MonitorArgs) -> i32 {
         if current_head > last_scanned_block {
             let new_blocks_count = current_head - last_scanned_block;
             if new_blocks_count > 50 {
-                 // Too many blocks (e.g. computer woke from sleep). Skip to latest to catch up.
                  println!("   ⚠️ Missed {} blocks. Skipping to head #{}", new_blocks_count, current_head);
                  last_scanned_block = current_head - 1; 
             }
 
             for block_num in (last_scanned_block + 1)..=current_head {
-                // Rate limit inside burst scan: 200ms
                 if block_num > last_scanned_block + 1 {
                     sleep(Duration::from_millis(200)).await;
                 }
@@ -149,7 +162,6 @@ pub async fn run(args: MonitorArgs) -> i32 {
                 match verifier.fetch_block_symbols(block_num).await {
                     Ok(symbols) => {
                         if let Some(matched_seq) = pattern.matches(&symbols) {
-                            // ALERT!
                             let timestamp = chrono::Utc::now().to_rfc3339();
                             println!();
                             println!("🚨 {} Block #{} on {}", "PATTERN DETECTED!".red().bold(), block_num, args.chain);
@@ -157,11 +169,6 @@ pub async fn run(args: MonitorArgs) -> i32 {
                             println!("   Pattern: {}", args.pattern.yellow());
                             println!("   Matched: {} events", matched_seq.len());
                             println!();
-                        } else {
-                            // Optional: print heartbeat or just stay silent?
-                            // "Autonomous watchdog" -> silent until relevant.
-                            // Maybe a small dot to show liveness?
-                            // print!("."); use std::io::Write; std::io::stdout().flush().unwrap();
                         }
                     },
                     Err(e) => {
@@ -171,6 +178,69 @@ pub async fn run(args: MonitorArgs) -> i32 {
             }
             last_scanned_block = current_head;
         }
-        // Else: No new blocks, keep waiting
     }
+}
+
+async fn run_pending_monitor(
+    args: MonitorArgs, 
+    chain_config: &crate::config::ChainConfig,
+    pattern: BehavioralPattern
+) -> i32 {
+    // use futures_util::StreamExt; // Actually mempool monitor returns a Receiver
+
+    // Resolve WS URL
+    // If rpc_url is provided and starts with wss://, use it.
+    // Else use chain defaults.
+    let ws_url = if let Some(url) = &args.rpc_url {
+        if url.starts_with("wss://") || url.starts_with("ws://") {
+            url.as_str()
+        } else {
+             output::error("Custom RPC URL must be WebSocket (wss://) for pending mode.");
+             return 1;
+        }
+    } else {
+        match chain_config.default_ws {
+            Some(url) => url,
+            None => {
+                output::error(&format!("WebSocket not supported for chain '{}'. Use --mode block or provide --rpc-url wss://...", args.chain));
+                return 1;
+            }
+        }
+    };
+
+    println!("   URL:      {}", ws_url);
+    println!("   Status:   Connecting to Mempool...");
+
+    let monitor = match MempoolMonitor::connect(ws_url).await {
+        Ok(m) => m,
+        Err(e) => {
+            output::error(&format!("Failed to connect to WebSocket: {}", e));
+            return 1;
+        }
+    };
+
+    let mut rx = match monitor.monitor(pattern, args.pattern.clone()).await {
+        Ok(rx) => rx,
+        Err(e) => {
+            output::error(&format!("Failed to start monitor: {}", e));
+            return 1;
+        }
+    };
+
+    println!("{}", "Listening for pending transactions... (Ctrl+C to stop)".dimmed());
+
+    while let Some(alert) = rx.recv().await {
+        let timestamp = chrono::Utc::now().to_rfc3339();
+        println!();
+        println!("⚠️  {} Pending Tx on {}", "PENDING ALERT:".yellow().bold(), args.chain);
+        println!("   Tx Hash:  {}", alert.tx_hash);
+        println!("   Pattern:  {}", alert.pattern_name.cyan());
+        println!("   Seq:      {}", alert.matched_sequence);
+        println!("   Conf:     {:.0}%", alert.confidence * 100.0);
+        println!("   Est. Inc: {}", alert.estimated_inclusion);
+        println!("   Time:     {}", timestamp);
+        println!();
+    }
+
+    0
 }

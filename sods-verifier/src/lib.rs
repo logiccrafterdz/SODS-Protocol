@@ -38,6 +38,7 @@ pub mod query;
 pub mod result;
 pub mod rpc;
 pub mod verifier;
+pub mod mempool;
 
 // Re-export main types for convenience
 pub use error::SodsVerifierError;
@@ -45,3 +46,4 @@ pub use query::QueryParser;
 pub use result::VerificationResult;
 pub use rpc::RpcClient;
 pub use verifier::BlockVerifier;
+pub use mempool::{MempoolMonitor, PendingAlert};

@@ -1,6 +1,6 @@
 use clap::{Args, Subcommand};
 use colored::Colorize;
-use serde::Deserialize;
+// use serde::Deserialize;
 
 #[cfg(unix)]
 use std::fs;
