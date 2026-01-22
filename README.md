@@ -212,7 +212,7 @@ The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection,
 
 ## Status
 
-- Specification: **Draft v0.2**
+- Specification: **v1.0** (Stable)
 - PoC: **v0.1** (Sepolia testnet)
 - sods-core: **v0.2.0** (Rust crate)
 - sods-verifier: **v0.2.0** (Rust crate)
@@ -227,7 +227,7 @@ The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection,
 
 ## Specification
 
-[SODS Protocol — RFC v0.2](spec/SODS-RFC-v0.2.md)
+[SODS Protocol — Specification v1.0](spec/SODS-SPEC-v1.0.md)
 
 ## Repository Structure
 
