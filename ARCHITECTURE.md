@@ -73,17 +73,17 @@ SODS (Symbolic On-Demand Verification over Decentralized Summaries) enables trus
 
 1. **No trusted peers**: All peers are assumed potentially malicious
 2. **Cryptographic verification**: Every response signed with secp256k1
-3. **Social consensus**: Minimum 2/3 peers must agree on BMT root
+3. **Adaptive Sybil Immunity**: Consensus based on **Proof-of-Behavioral-Stake (PoBS)**
 4. **Local validation**: Proofs verified locally using sods-core
 
 ### Threat Mitigations
 
 | Threat | Mitigation |
 |--------|------------|
-| Malicious peer sends fake proof | Signature verification + consensus |
+| Malicious peer sends fake proof | **Reputation Decay** + Weighted Consensus |
 | Peer spoofs another peer's identity | secp256k1 public key binding |
 | RPC rate limiting | LRU cache + exponential backoff |
-| Sybil attack (many fake peers) | Reputation tracking + fallback to RPC |
+| Sybil attack (many fake peers) | **PoBS**: Reputation requires valid work; decays over time |
 | Man-in-the-middle | libp2p noise encryption |
 
 ## Data Flow

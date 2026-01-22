@@ -221,7 +221,7 @@ impl SodsClient {
         }
 
         // Evaluate consensus
-        let consensus = evaluate_consensus(valid_responses.clone(), DEFAULT_THRESHOLD);
+        let consensus = evaluate_consensus(valid_responses.clone(), &self.reputation, DEFAULT_THRESHOLD);
 
         // Update reputation
         for (peer_id, _) in &valid_responses {

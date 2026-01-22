@@ -47,6 +47,10 @@ pub struct VerifyArgs {
     /// Output as JSON
     #[arg(long)]
     pub json: bool,
+
+    /// Reputation threshold for P2P consensus (0.0 - 1.0)
+    #[arg(long, default_value = "0.1")]
+    pub reputation_threshold: f32,
 }
 
 /// JSON output structure.

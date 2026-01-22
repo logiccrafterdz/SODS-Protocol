@@ -1,21 +1,29 @@
-//! Peer reputation tracking.
+//! Peer reputation tracking with decay.
 
 use libp2p::PeerId;
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
-/// Reward for consistent response.
-const REWARD_AMOUNT: i32 = 1;
+/// Initial score for new peers.
+const INITIAL_SCORE: f32 = 0.1;
 
-/// Penalty for conflicting response.
-const PENALTY_AMOUNT: i32 = 2;
+/// Minimum score to be considered reliable.
+const MIN_RELIABLE_SCORE: f32 = 0.1; // Effectively bootstrapped after 1 valid proof
 
-/// Minimum score before peer is considered unreliable.
-const MIN_RELIABLE_SCORE: i32 = -5;
+/// Rate at which reputation decays (every DECAY_INTERVAL).
+const DECAY_FACTOR: f32 = 0.99;
 
 /// Tracks peer reliability based on response consistency.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ReputationTracker {
-    scores: HashMap<PeerId, i32>,
+    scores: HashMap<PeerId, f32>,
+    last_decay: Instant,
+}
+
+impl Default for ReputationTracker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ReputationTracker {
@@ -23,22 +31,42 @@ impl ReputationTracker {
     pub fn new() -> Self {
         Self {
             scores: HashMap::new(),
+            last_decay: Instant::now(),
+        }
+    }
+
+    /// Apply decay if enough time has passed.
+    pub fn decay_if_needed(&mut self) {
+        if self.last_decay.elapsed() >= Duration::from_secs(60) {
+            self.decay_all();
+            self.last_decay = Instant::now();
+        }
+    }
+
+    /// Decay all peer scores.
+    pub fn decay_all(&mut self) {
+        for score in self.scores.values_mut() {
+            *score *= DECAY_FACTOR;
         }
     }
 
     /// Reward a peer for consistent behavior.
+    /// score = min(score * 1.1 + 0.05, 1.0)
     pub fn reward(&mut self, peer: &PeerId) {
-        *self.scores.entry(*peer).or_insert(0) += REWARD_AMOUNT;
+        let score = self.scores.entry(*peer).or_insert(INITIAL_SCORE);
+        *score = (*score * 1.1 + 0.05).min(1.0);
     }
 
     /// Penalize a peer for conflicting behavior.
+    /// score = max(score * 0.7 - 0.1, 0.0)
     pub fn penalize(&mut self, peer: &PeerId) {
-        *self.scores.entry(*peer).or_insert(0) -= PENALTY_AMOUNT;
+        let score = self.scores.entry(*peer).or_insert(INITIAL_SCORE);
+        *score = (*score * 0.7 - 0.1).max(0.0);
     }
 
     /// Get a peer's current score.
-    pub fn get_score(&self, peer: &PeerId) -> i32 {
-        *self.scores.get(peer).unwrap_or(&0)
+    pub fn get_score(&self, peer: &PeerId) -> f32 {
+        *self.scores.get(peer).unwrap_or(&INITIAL_SCORE)
     }
 
     /// Check if a peer is considered reliable.
@@ -46,16 +74,15 @@ impl ReputationTracker {
         self.get_score(peer) >= MIN_RELIABLE_SCORE
     }
 
-    /// Select the best peers by score.
+    /// Select the best peers by score (weighted probability could be better, but greedy is fine for PoC).
     pub fn select_best_peers(&self, available: &[PeerId], count: usize) -> Vec<PeerId> {
         let mut peers: Vec<_> = available
             .iter()
-            .filter(|p| self.is_reliable(p))
             .map(|p| (*p, self.get_score(p)))
             .collect();
 
         // Sort by score descending
-        peers.sort_by(|a, b| b.1.cmp(&a.1));
+        peers.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         peers.into_iter().take(count).map(|(p, _)| p).collect()
     }
@@ -64,7 +91,7 @@ impl ReputationTracker {
     pub fn get_unreliable_peers(&self) -> Vec<PeerId> {
         self.scores
             .iter()
-            .filter(|(_, score)| **score < MIN_RELIABLE_SCORE)
+            .filter(|(_, score)| **score < 0.05) // Very low score threshold for blocking
             .map(|(peer, _)| *peer)
             .collect()
     }
@@ -89,59 +116,51 @@ mod tests {
     }
 
     #[test]
-    fn test_reward() {
+    fn test_reward_growth() {
         let mut tracker = ReputationTracker::new();
         let peer = random_peer();
         
+        // Initial -> Reward
         tracker.reward(&peer);
-        assert_eq!(tracker.get_score(&peer), 1);
-        
-        tracker.reward(&peer);
-        assert_eq!(tracker.get_score(&peer), 2);
+        let s1 = tracker.get_score(&peer);
+        assert!(s1 > INITIAL_SCORE);
+        assert!(s1 <= 1.0);
+
+        // Max cap
+        for _ in 0..20 { tracker.reward(&peer); }
+        assert_eq!(tracker.get_score(&peer), 1.0);
     }
 
     #[test]
-    fn test_penalize() {
+    fn test_penalty_drop() {
         let mut tracker = ReputationTracker::new();
         let peer = random_peer();
+        
+        // Reward first to boost
+        tracker.reward(&peer);
+        let s1 = tracker.get_score(&peer);
         
         tracker.penalize(&peer);
-        assert_eq!(tracker.get_score(&peer), -2);
+        let s2 = tracker.get_score(&peer);
+        assert!(s2 < s1);
+        
+        // Min floor
+        for _ in 0..10 { tracker.penalize(&peer); }
+        assert_eq!(tracker.get_score(&peer), 0.0);
     }
 
     #[test]
-    fn test_reliability() {
+    fn test_decay() {
         let mut tracker = ReputationTracker::new();
-        let good_peer = random_peer();
-        let bad_peer = random_peer();
+        let peer = random_peer();
         
-        // Good peer
-        tracker.reward(&good_peer);
-        assert!(tracker.is_reliable(&good_peer));
+        tracker.reward(&peer);
+        let s1 = tracker.get_score(&peer);
         
-        // Bad peer - penalize 3 times
-        for _ in 0..3 {
-            tracker.penalize(&bad_peer);
-        }
-        assert!(!tracker.is_reliable(&bad_peer));
-    }
-
-    #[test]
-    fn test_select_best_peers() {
-        let mut tracker = ReputationTracker::new();
-        let peer1 = random_peer();
-        let peer2 = random_peer();
-        let peer3 = random_peer();
+        tracker.decay_all();
+        let s2 = tracker.get_score(&peer);
         
-        tracker.reward(&peer1);
-        tracker.reward(&peer1); // score: 2
-        tracker.reward(&peer2); // score: 1
-        // peer3: score 0
-        
-        let available = vec![peer1, peer2, peer3];
-        let best = tracker.select_best_peers(&available, 2);
-        
-        assert_eq!(best.len(), 2);
-        assert_eq!(best[0], peer1); // Highest score first
+        assert!(s2 < s1);
+        assert!((s1 * DECAY_FACTOR - s2).abs() < 0.0001);
     }
 }

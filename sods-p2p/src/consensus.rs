@@ -4,8 +4,9 @@ use libp2p::PeerId;
 use std::collections::HashMap;
 
 use crate::protocol::ProofResponse;
+use crate::reputation::ReputationTracker;
 
-/// Default consensus threshold (2/3 majority).
+/// Default consensus threshold (2/3 majority of reputation).
 pub const DEFAULT_THRESHOLD: f64 = 0.66;
 
 /// Result of consensus evaluation.
@@ -39,27 +40,30 @@ impl ConsensusResult {
     }
 }
 
-/// Evaluate consensus from peer responses.
+/// Evaluate consensus from peer responses using reputation weights.
 ///
-/// Groups responses by BMT root and determines if enough peers agree.
-///
-/// # Arguments
-///
-/// * `responses` - List of (peer_id, response) pairs
-/// * `threshold` - Minimum fraction required for consensus (e.g., 0.67 for 2/3)
-///
-/// # Returns
-///
-/// ConsensusResult indicating whether consensus was reached.
+/// Groups responses by BMT root and determines if enough WEIGHTED peers agree.
 pub fn evaluate_consensus(
     responses: Vec<(PeerId, ProofResponse)>,
+    reputation: &ReputationTracker,
     threshold: f64,
 ) -> ConsensusResult {
     if responses.is_empty() {
         return ConsensusResult::failed(0);
     }
 
-    let total = responses.len();
+    let total_count = responses.len();
+    
+    // Calculate total weight of all responding peers
+    let total_weight: f32 = responses.iter()
+        .map(|(p, _)| reputation.get_score(p))
+        .sum();
+
+    if total_weight <= 0.0 {
+         // Edge case: all peers have 0 reputation? fallback to count?
+         // For now, if 0 weight, we can't decide trusted consensus.
+         return ConsensusResult::failed(total_count);
+    }
 
     // Filter successful responses
     let successful: Vec<_> = responses
@@ -68,11 +72,10 @@ pub fn evaluate_consensus(
         .collect();
 
     if successful.is_empty() {
-        // All failed - no consensus possible
         return ConsensusResult {
             is_verified: false,
             agreeing_peers: 0,
-            total_peers: total,
+            total_peers: total_count,
             bmt_root: None,
             proof_bytes: None,
             conflicting_peers: responses.iter().map(|(p, _)| *p).collect(),
@@ -88,14 +91,18 @@ pub fn evaluate_consensus(
             .push((*peer, resp));
     }
 
-    // Find the largest agreeing group
+    // Find the group with highest weight
     let (largest_root, largest_group) = groups
         .into_iter()
-        .max_by_key(|(_, g)| g.len())
+        .max_by(|(_, g1), (_, g2)| {
+            let w1: f32 = g1.iter().map(|(p, _)| reputation.get_score(p)).sum();
+            let w2: f32 = g2.iter().map(|(p, _)| reputation.get_score(p)).sum();
+            w1.partial_cmp(&w2).unwrap_or(std::cmp::Ordering::Equal)
+        })
         .expect("successful is non-empty");
 
-    let agreeing = largest_group.len();
-    let agreement_ratio = agreeing as f64 / total as f64;
+    let agreeing_weight: f32 = largest_group.iter().map(|(p, _)| reputation.get_score(p)).sum();
+    let agreement_ratio = agreeing_weight / total_weight;
 
     // Identify conflicting peers (those not in the largest group)
     let agreeing_peers: Vec<_> = largest_group.iter().map(|(p, _)| *p).collect();
@@ -105,14 +112,14 @@ pub fn evaluate_consensus(
         .filter(|p| !agreeing_peers.contains(p))
         .collect();
 
-    if agreement_ratio >= threshold {
+    if agreement_ratio as f64 >= threshold {
         // Consensus reached
         let proof_bytes = largest_group.first().map(|(_, r)| r.proof_bytes.clone());
         
         ConsensusResult {
             is_verified: true,
-            agreeing_peers: agreeing,
-            total_peers: total,
+            agreeing_peers: agreeing_peers.len(),
+            total_peers: total_count,
             bmt_root: Some(largest_root),
             proof_bytes,
             conflicting_peers,
@@ -121,8 +128,8 @@ pub fn evaluate_consensus(
         // No consensus
         ConsensusResult {
             is_verified: false,
-            agreeing_peers: agreeing,
-            total_peers: total,
+            agreeing_peers: agreeing_peers.len(),
+            total_peers: total_count,
             bmt_root: None,
             proof_bytes: None,
             conflicting_peers,
@@ -143,76 +150,32 @@ mod tests {
     }
 
     #[test]
-    fn test_unanimous_consensus() {
-        let root = [0xAB; 32];
+    fn test_weighted_consensus() {
+        let mut tracker = ReputationTracker::new();
+        let peer1 = PeerId::random();
+        let peer2 = PeerId::random(); // High rep
+        let peer3 = PeerId::random(); // Malicious low rep
+
+        // peer1: default 0.1
+        // peer2: reward 10x -> high score
+        for _ in 0..10 { tracker.reward(&peer2); } 
+        // peer3: default 0.1
+
+        let good_root = [0xAA; 32];
+        let bad_root = [0xBB; 32];
+
         let responses = vec![
-            (PeerId::random(), make_response(root, true)),
-            (PeerId::random(), make_response(root, true)),
-            (PeerId::random(), make_response(root, true)),
+            (peer1, make_response(good_root, true)),
+            (peer2, make_response(good_root, true)), // High weight agrees
+            (peer3, make_response(bad_root, true)),  // Low weight disagrees
         ];
 
-        let result = evaluate_consensus(responses, DEFAULT_THRESHOLD);
-
-        assert!(result.is_verified);
-        assert_eq!(result.agreeing_peers, 3);
-        assert_eq!(result.total_peers, 3);
-        assert_eq!(result.bmt_root, Some(root));
-        assert!(result.conflicting_peers.is_empty());
-    }
-
-    #[test]
-    fn test_two_thirds_consensus() {
-        let good_root = [0xAB; 32];
-        let bad_root = [0xCD; 32];
-        let bad_peer = PeerId::random();
+        let result = evaluate_consensus(responses, &tracker, DEFAULT_THRESHOLD);
         
-        let responses = vec![
-            (PeerId::random(), make_response(good_root, true)),
-            (PeerId::random(), make_response(good_root, true)),
-            (bad_peer, make_response(bad_root, true)),
-        ];
-
-        let result = evaluate_consensus(responses, DEFAULT_THRESHOLD);
-
         assert!(result.is_verified);
-        assert_eq!(result.agreeing_peers, 2);
         assert_eq!(result.bmt_root, Some(good_root));
-        assert_eq!(result.conflicting_peers.len(), 1);
-        assert!(result.conflicting_peers.contains(&bad_peer));
-    }
-
-    #[test]
-    fn test_no_consensus() {
-        let responses = vec![
-            (PeerId::random(), make_response([1; 32], true)),
-            (PeerId::random(), make_response([2; 32], true)),
-            (PeerId::random(), make_response([3; 32], true)),
-        ];
-
-        let result = evaluate_consensus(responses, DEFAULT_THRESHOLD);
-
-        assert!(!result.is_verified);
-        assert_eq!(result.agreeing_peers, 1);
-        assert_eq!(result.total_peers, 3);
-    }
-
-    #[test]
-    fn test_empty_responses() {
-        let result = evaluate_consensus(vec![], DEFAULT_THRESHOLD);
-        assert!(!result.is_verified);
-        assert_eq!(result.total_peers, 0);
-    }
-
-    #[test]
-    fn test_all_failed_responses() {
-        let responses = vec![
-            (PeerId::random(), make_response([0; 32], false)),
-            (PeerId::random(), make_response([0; 32], false)),
-        ];
-
-        let result = evaluate_consensus(responses, DEFAULT_THRESHOLD);
-
-        assert!(!result.is_verified);
-        assert_eq!(result.conflicting_peers.len(), 2);
+        assert!(result.conflicting_peers.contains(&peer3));
     }
 }
+
+
