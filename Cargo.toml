@@ -5,4 +5,5 @@ members = [
     "sods-verifier",
     "sods-p2p",
     "sods-cli",
+    "sods-zk",
 ]

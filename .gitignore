@@ -56,3 +56,10 @@ plugins/
 # Foundry
 out/
 cache/
+# RISC Zero
+**/methods/guest/target/
+**/methods/target/
+
+# ZK Proofs
+proof.bin
+public.json

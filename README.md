@@ -115,6 +115,21 @@ println!("Verified: {}", result.is_verified);
 println!("Agreeing peers: {}", result.agreeing_peers);
 ```
 
+### sods-zk (Layer 2.5)
+
+Zero-Knowledge Behavioral Proofs using RISC Zero. Handles:
+
+- Generating STARK proofs of pattern matches
+- Privacy-preserving verification (only true/false public output)
+- On-chain verification compatibility
+
+```rust
+use sods_zk::prove_behavior;
+
+let receipt = prove_behavior(symbols, "LP+ -> Sw -> LP-")?;
+let valid: bool = receipt.journal.decode()?;
+```
+
 ### sods-cli (Layer 3)
 
 Command-line interface for SODS Protocol. Provides:
@@ -168,6 +183,9 @@ sods symbols
 
 # List supported chains
 sods chains
+
+# Generate ZK Behavioral Proof (New in v2.5)
+sods zk-prove --pattern "Sandwich" --block 20000000 --chain ethereum
 
 # JSON output for scripting
 sods verify Tf --block 10002322 --json
@@ -244,6 +262,13 @@ sods verify Tf --block 10002322 --json
 - **Intent-Based Fulfillments (`CoWTrade`)**: Verify CoW Swap trade fulfillments directly from settlement events.
 - **Enriched Behavioral Metadata**: `BehavioralSymbol` now natively supports `user_op_hash`, `permit_deadline`, and `solver` fields.
 - **Expanded L2 Dictionary**: Canonical support for next-gen events on Base, Arbitrum, Optimism, and Scroll.
+
+## What's New in v2.5 (ZK Behavioral Proofs)
+
+- **Privacy-Preserving Verification**: Prove behaviors occurred without revealing sensitive metadata (addresses, amounts).
+- **RISC Zero Integration**: Native support for generating STARK receipts via zkVM.
+- **On-Chain ZK Verification**: Complete guide and snippets for Ethereum smart contract integration.
+- **`sods zk-prove`**: New top-level CLI command for zero-knowledge proof generation.
 
 ## Behavioral Dictionary 2.0 (New!)
 
@@ -328,16 +353,14 @@ sods-protocol/
 │       ├── result.rs
 │       ├── rpc.rs
 │       └── verifier.rs
-├── sods-p2p/           <- Layer 2: P2P Network (Rust)
+├── sods-zk/            <- Layer 2.5: ZK behavioral proofs (Rust)
 │   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── peer.rs
-│       ├── client.rs
-│       ├── behavior.rs
-│       ├── protocol.rs
-│       ├── consensus.rs
-│       └── ...
+│   ├── src/
+│   │   └── lib.rs
+│   └── methods/        <- Guest programs for zkVM
+│       ├── build.rs
+│       ├── src/
+│       └── guest/
 ├── sods-cli/           <- Layer 3: CLI Interface (Rust)
 │   ├── Cargo.toml
 │   └── src/

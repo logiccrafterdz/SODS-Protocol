@@ -50,6 +50,9 @@ enum Commands {
 
     /// Compute the privacy-safe hash of a behavioral pattern
     HashPattern(commands::hash_pattern::HashPatternArgs),
+
+    /// Generate a Zero-Knowledge proof of behavior
+    ZkProve(commands::zk_prove::ZkProveArgs),
 }
 
 #[tokio::main]
@@ -67,6 +70,7 @@ async fn main() {
         Commands::Threats(args) => commands::threats::run(args).await,
         Commands::ExportProof(args) => commands::export_proof::run(args).await,
         Commands::HashPattern(args) => commands::hash_pattern::run(args).await,
+        Commands::ZkProve(args) => commands::zk_prove::run(args).await,
     };
 
     std::process::exit(exit_code);

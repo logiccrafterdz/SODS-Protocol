@@ -1,0 +1,10 @@
+[package]
+name = "sods-zk-methods"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+risc0-zkvm = "1.0"
+
+[build-dependencies]
+risc0-build = "1.0"

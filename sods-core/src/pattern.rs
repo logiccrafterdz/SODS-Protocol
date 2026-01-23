@@ -211,6 +211,15 @@ impl BehavioralPattern {
     }
 }
 
+/// Helper function for ZK guest or simple matching
+pub fn matches_str(symbols: &[BehavioralSymbol], pattern_str: &str) -> bool {
+    if let Ok(p) = BehavioralPattern::parse(pattern_str) {
+        p.matches(symbols).is_some()
+    } else {
+        false
+    }
+}
+
 fn parse_amount(input: &str) -> Result<U256> {
     let parts: Vec<&str> = input.split_whitespace().collect();
     if parts.is_empty() {
@@ -373,5 +382,16 @@ mod tests {
     fn test_parse_invalid_amount() {
         assert!(parse_amount("10 eth").is_err()); // "ether" expected
         assert!(parse_amount("abc ether").is_err());
+    }
+    #[test]
+    fn test_matches_str() {
+        let symbols = vec![
+            mock_sym("Tf", 0),
+            mock_sym("Sw", 1),
+            mock_sym("Tf", 2),
+        ];
+        assert!(matches_str(&symbols, "Tf -> Sw"));
+        assert!(matches_str(&symbols, "Sandwich"));
+        assert!(!matches_str(&symbols, "Dep"));
     }
 }
