@@ -14,50 +14,58 @@ use crate::symbol::BehavioralSymbol;
 // ============================================================================
 
 // ============================================================================
-// Core Event Topic Hashes (keccak256 of event signatures)
+// Core Event Signatures
 // ============================================================================
 
+/// Compute topic0 (keccak256 hash) of an event signature.
+pub fn event_signature_to_topic0(signature: &str) -> H256 {
+    use sha3::{Digest, Keccak256};
+    let mut hasher = Keccak256::new();
+    hasher.update(signature.as_bytes());
+    H256::from_slice(&hasher.finalize())
+}
+
 /// ERC20 Transfer(address indexed from, address indexed to, uint256 value)
-/// Also ERC721 Transfer(address indexed from, address indexed to, uint256 tokenId)
-const TRANSFER_TOPIC: &str = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const TRANSFER_SIG: &str = "Transfer(address,address,uint256)";
 
 /// WETH Deposit(address indexed dst, uint256 wad)
-const DEPOSIT_TOPIC: &str = "0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c";
+const DEPOSIT_SIG: &str = "Deposit(address,uint256)";
 
 /// WETH Withdrawal(address indexed src, uint256 wad)
-const WITHDRAWAL_TOPIC: &str = "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65";
+const WITHDRAWAL_SIG: &str = "Withdrawal(address,uint256)";
 
 /// Uniswap V2 Swap(address indexed sender, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out, address indexed to)
-const SWAP_V2_TOPIC: &str = "0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822";
-// Uniswap V3 Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)
-const SWAP_V3_TOPIC: &str = "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67";
+const SWAP_V2_SIG: &str = "Swap(address,uint256,uint256,uint256,uint256,address)";
 
-/// Uniswap V2 Mint(address indexed sender, uint256 amount0, uint256 amount1) - Add Liquidity
-const MINT_V2_TOPIC: &str = "0x4c209b5fc8ad50758f13e2e1088ba56a560dff690a1c6fef26391d14d59cf6ad";
+/// Uniswap V3 Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)
+const SWAP_V3_SIG: &str = "Swap(address,address,int256,int256,uint160,uint128,int24)";
 
-/// Uniswap V2 Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to) - Remove Liquidity
-const BURN_V2_TOPIC: &str = "0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496";
+/// Uniswap V2 Mint(address indexed sender, uint256 amount0, uint256 amount1)
+const MINT_V2_SIG: &str = "Mint(address,uint256,uint256)";
+
+/// Uniswap V2 Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to)
+const BURN_V2_SIG: &str = "Burn(address,uint256,uint256,address)";
 
 /// Seaport OrderFulfilled(...)
-const SEAPORT_ORDER_FULFILLED: &str = "0x9d9af8e38d66c62e2c12f0225249fd9d721c54b83f48d9352c97c6cacdcb6f31";
+const SEAPORT_ORDER_FULFILLED_SIG: &str = "OrderFulfilled(bytes32,address,address,address,(uint8,address,uint256,uint256)[],(uint8,address,uint256,uint256,address)[])";
 
 /// Optimism DepositFinalized(...) / L1->L2 Bridge
-const OPTIMISM_DEPOSIT_FINALIZED: &str = "0xeb2b8427f7a793d5d7107771239e3ec40089856f67566606f35b6279f06574f2";
+const OPTIMISM_DEPOSIT_FINALIZED_SIG: &str = "DepositFinalized(address,address,address,address,uint256,bytes)";
 
-/// Blur: OrdersMatched(bytes32 indexed orderHash, bytes32 indexed orderHash2, ...)
-const BLUR_ORDERS_MATCHED: &str = "0x61cbb2a3dee0b6064c2e681aadd61677fb4ef319f0b547508d495626f5a62f64";
+/// Blur: OrdersMatched(...)
+const BLUR_ORDERS_MATCHED_SIG: &str = "OrdersMatched(address,uint256,bytes32,uint256,address,uint256,uint256,uint256,uint256)";
 
-/// Arbitrum OutboundTransferInitiated (L2->L1 withdrawal)
-const ARBITRUM_OUTBOUND_TRANSFER: &str = "0x3073a74ecb728d10be779fe19a74a1428e20468f5b4d167bf9c73d9067847d73";
+/// Arbitrum OutboundTransferInitiated
+const ARBITRUM_OUTBOUND_TRANSFER_SIG: &str = "OutboundTransferInitiated(address,address,address,uint256,uint256,bytes)";
 
-/// Scroll L2->L1 MessageSent for bridge withdrawals
-const SCROLL_MESSAGE_SENT: &str = "0x104371f3b442861a2a7b82a070afbbaab748bb13757bf47769e170e37809ec1e";
+/// Scroll L2->L1 MessageSent
+const SCROLL_MESSAGE_SENT_SIG: &str = "MessageSent(address,address,uint256,uint256,bytes)";
 
-/// Scroll FinalizeDepositERC20 (L1->L2 bridge)
-const SCROLL_FINALIZE_DEPOSIT_ERC20: &str = "0x165ba69f6ab40c50cade6f65431801e5f9c7d7830b7545391920db039133ba34";
+/// Scroll FinalizeDepositERC20
+const SCROLL_FINALIZE_DEPOSIT_ERC20_SIG: &str = "FinalizeDepositERC20(address,address,address,address,uint256,bytes)";
 
-/// Scroll WithdrawalInitiated (L2->L1 bridge)
-const SCROLL_WITHDRAWAL_INITIATED: &str = "0x61ed099e74a97a1d7f8bb0952a88ca8b7b8ebd00c126ea04671f92a81213318a";
+/// Scroll WithdrawalInitiated
+const SCROLL_WITHDRAWAL_INITIATED_SIG: &str = "WithdrawalInitiated(address,address,address,address,uint256,bytes)";
 
 use ethers_core::types::{Address, U256};
 
@@ -66,15 +74,11 @@ use ethers_core::types::{Address, U256};
 // ============================================================================
 
 /// Dictionary mapping EVM event topics to behavioral symbol codes.
-///
-/// The dictionary comes pre-loaded with core immutable symbols.
-///
 #[derive(Debug, Clone)]
 pub struct SymbolDictionary {
     /// Mapping from topic hash to symbol code
     registry: HashMap<H256, &'static str>,
     /// Dynamic plugins (Symbol -> ParserType)
-    /// We store String symbols because they are dynamic (not static str)
     dynamic_registry: HashMap<H256, String>,
     /// Parser logic map
     plugin_parsers: HashMap<H256, crate::plugins::ParserType>,
@@ -85,28 +89,27 @@ impl Default for SymbolDictionary {
     fn default() -> Self {
         let mut registry = HashMap::new();
 
-        // Parse and insert core symbols
-        let core_symbols: &[(&str, &'static str)] = &[
-            (TRANSFER_TOPIC, "Tf"),
-            (DEPOSIT_TOPIC, "Dep"),
-            (WITHDRAWAL_TOPIC, "Wdw"),
-            (SWAP_V2_TOPIC, "Sw"),
-            (SWAP_V3_TOPIC, "Sw"),
-            (MINT_V2_TOPIC, "LP+"),
-            (BURN_V2_TOPIC, "LP-"),
-            (SEAPORT_ORDER_FULFILLED, "BuyNFT"),
-            (BLUR_ORDERS_MATCHED, "ListNFT"),
-            (OPTIMISM_DEPOSIT_FINALIZED, "BridgeIn"),
-            (ARBITRUM_OUTBOUND_TRANSFER, "BridgeOut"),
-            (SCROLL_MESSAGE_SENT, "BridgeOut"),
-            (SCROLL_FINALIZE_DEPOSIT_ERC20, "BridgeIn"),
-            (SCROLL_WITHDRAWAL_INITIATED, "BridgeOut"),
+        // Compute and insert core symbols at runtime
+        let core_signatures: &[(&str, &'static str)] = &[
+            (TRANSFER_SIG, "Tf"),
+            (DEPOSIT_SIG, "Dep"),
+            (WITHDRAWAL_SIG, "Wdw"),
+            (SWAP_V2_SIG, "Sw"),
+            (SWAP_V3_SIG, "Sw"),
+            (MINT_V2_SIG, "LP+"),
+            (BURN_V2_SIG, "LP-"),
+            (SEAPORT_ORDER_FULFILLED_SIG, "BuyNFT"),
+            (BLUR_ORDERS_MATCHED_SIG, "ListNFT"),
+            (OPTIMISM_DEPOSIT_FINALIZED_SIG, "BridgeIn"),
+            (ARBITRUM_OUTBOUND_TRANSFER_SIG, "BridgeOut"),
+            (SCROLL_MESSAGE_SENT_SIG, "BridgeOut"),
+            (SCROLL_FINALIZE_DEPOSIT_ERC20_SIG, "BridgeIn"),
+            (SCROLL_WITHDRAWAL_INITIATED_SIG, "BridgeOut"),
         ];
 
-        for (topic_hex, symbol) in core_symbols {
-            if let Ok(topic) = topic_hex.parse::<H256>() {
-                registry.insert(topic, *symbol);
-            }
+        for (sig, symbol) in core_signatures {
+            let topic = event_signature_to_topic0(sig);
+            registry.insert(topic, *symbol);
         }
 
         Self { 
@@ -186,7 +189,7 @@ impl SymbolDictionary {
             }
         } 
         // Fallback to legacy hardcoded heuristic if no plugin or plugin is generic
-        else if *topic == TRANSFER_TOPIC.parse::<H256>().unwrap() { // Standard Transfer
+        else if *topic == event_signature_to_topic0(TRANSFER_SIG) { // Standard Transfer
              if log.topics.len() >= 3 {
                  from = Address::from(log.topics[1]);
                  to = Address::from(log.topics[2]);
@@ -230,10 +233,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_signature_hashing() {
+        let topic = event_signature_to_topic0("Transfer(address,address,uint256)");
+        let expected = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+        assert_eq!(hex::encode(topic), expected);
+    }
+
+    #[test]
     fn test_mint_nft_detection() {
         // Test that Transfer from 0x0 is detected as MintNFT
         let dict = SymbolDictionary::default();
-        let topic = TRANSFER_TOPIC.parse::<H256>().unwrap();
+        let topic = event_signature_to_topic0(TRANSFER_SIG);
         
         let mut log = Log::default();
         log.topics = vec![
@@ -243,10 +253,6 @@ mod tests {
             H256::from_low_u64_be(123) // token_id = 123
         ];
         
-        // We need to insert the Transfer mapping first if it wasn't pre-loaded?
-        // Ah, default() loads it.
-        // Wait, transferring logic is hardcoded inside parse_log to check for Transfer topic specifically
-        
         let sym = dict.parse_log(&log).unwrap();
         assert_eq!(sym.symbol(), "MintNFT");
         assert_eq!(sym.token_id, Some(U256::from(123)));
@@ -255,51 +261,48 @@ mod tests {
     #[test]
     fn test_seaport_buynft() {
         let dict = SymbolDictionary::default();
-        let topic = SEAPORT_ORDER_FULFILLED.parse::<H256>().unwrap();
+        let topic = event_signature_to_topic0(SEAPORT_ORDER_FULFILLED_SIG);
         assert_eq!(dict.symbol_for_topic(topic), Some("BuyNFT"));
     }
 
     #[test]
     fn test_default_has_core_symbols() {
         let dict = SymbolDictionary::default();
-        // 6 core + 1 v3 + 1 seaport + 1 optimism = 9?
-        assert!(dict.len() >= 6); 
+        assert!(dict.len() >= 14); 
     }
-    
-    // ... existing basic lookups ...
     
     #[test]
     fn test_transfer_lookup() {
         let dict = SymbolDictionary::default();
-        let topic = TRANSFER_TOPIC.parse::<H256>().unwrap();
+        let topic = event_signature_to_topic0(TRANSFER_SIG);
         assert_eq!(dict.symbol_for_topic(topic), Some("Tf"));
     }
 
     #[test]
     fn test_blur_listnft() {
         let dict = SymbolDictionary::default();
-        let topic = BLUR_ORDERS_MATCHED.parse::<H256>().unwrap();
+        let topic = event_signature_to_topic0(BLUR_ORDERS_MATCHED_SIG);
         assert_eq!(dict.symbol_for_topic(topic), Some("ListNFT"));
     }
 
     #[test]
     fn test_optimism_bridge_in() {
         let dict = SymbolDictionary::default();
-        let topic = OPTIMISM_DEPOSIT_FINALIZED.parse::<H256>().unwrap();
+        let topic = event_signature_to_topic0(OPTIMISM_DEPOSIT_FINALIZED_SIG);
         assert_eq!(dict.symbol_for_topic(topic), Some("BridgeIn"));
     }
 
     #[test]
     fn test_arbitrum_bridge_out() {
         let dict = SymbolDictionary::default();
-        let topic = ARBITRUM_OUTBOUND_TRANSFER.parse::<H256>().unwrap();
+        let topic = event_signature_to_topic0(ARBITRUM_OUTBOUND_TRANSFER_SIG);
         assert_eq!(dict.symbol_for_topic(topic), Some("BridgeOut"));
     }
 
     #[test]
     fn test_scroll_bridge_out() {
         let dict = SymbolDictionary::default();
-        let topic = SCROLL_MESSAGE_SENT.parse::<H256>().unwrap();
+        let topic = event_signature_to_topic0(SCROLL_MESSAGE_SENT_SIG);
         assert_eq!(dict.symbol_for_topic(topic), Some("BridgeOut"));
     }
 
@@ -312,14 +315,14 @@ mod tests {
     #[test]
     fn test_scroll_bridge_in_v2() {
         let dict = SymbolDictionary::default();
-        let topic = SCROLL_FINALIZE_DEPOSIT_ERC20.parse::<H256>().unwrap();
+        let topic = event_signature_to_topic0(SCROLL_FINALIZE_DEPOSIT_ERC20_SIG);
         assert_eq!(dict.symbol_for_topic(topic), Some("BridgeIn"));
     }
 
     #[test]
     fn test_scroll_bridge_out_v2() {
         let dict = SymbolDictionary::default();
-        let topic = SCROLL_WITHDRAWAL_INITIATED.parse::<H256>().unwrap();
+        let topic = event_signature_to_topic0(SCROLL_WITHDRAWAL_INITIATED_SIG);
         assert_eq!(dict.symbol_for_topic(topic), Some("BridgeOut"));
     }
 }

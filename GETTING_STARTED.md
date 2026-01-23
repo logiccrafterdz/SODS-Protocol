@@ -153,18 +153,18 @@ sods verify "ListNFT" --block 19500000 --chain ethereum
 ```
 
 ### Cross-Chain Bridge Monitoring
-Monitor L1↔L2 bridge activity:
+Monitor L1↔L2 bridge activity with future-proof event signature resolution:
 
 ```bash
-# Detect bridge deposits on Optimism
+# Detect bridge deposits on Optimism (Standard Signature)
 sods verify "BridgeIn" --block 115000000 --chain optimism
 
-# Monitor bridge withdrawals on Scroll
+# Monitor bridge withdrawals on Scroll (Dynamic Resolution)
 sods trend --pattern "BridgeOut" --chain scroll --window 20
-
-# Monitor Arbitrum L2→L1 withdrawals
-sods verify "BridgeOut" --block 180000000 --chain arbitrum
 ```
+
+> [!NOTE]
+> SODS uses dynamic event signature hashing (EVM standard) for bridge events, ensuring monitoring remains robust even if L2 contracts are upgraded or redeployed.
 
 ### MEV Frontrun/Backrun Detection
 Detect frontrunning and backrunning patterns:
