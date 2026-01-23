@@ -50,3 +50,11 @@ sods export-proof --pattern "LP-" --block 123456 --chain base --format calldata
 
 - **Gas Cost**: ~50,000 - 100,000 gas depending on proof depth.
 - **Trust Model**: Verification relies on the provided `bmtRoot`. In production, this root should be sourced from a trusted commitment (e.g. a storage proof or a signed oracle update).
+
+## Trustless Mode (Deep Verification)
+
+SODS now cryptographically verifies that logs belong to the claimed block by recomputing the receipt trie root locally and comparing it against the block header's `receiptsRoot`. This ensures the RPC provider cannot omit or fabricate logs.
+
+```bash
+sods verify --mode trustless "Tf" --block 10002322 --chain sepolia
+```

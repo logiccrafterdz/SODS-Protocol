@@ -200,11 +200,8 @@ impl BlockVerifier {
             // Step 2c: Validate receipts against header
             let validation = verify_receipts_against_header(&receipts, &header);
             
-            // Note: For simplified PoC, we're using a placeholder trie.
-            // In production, this would fail if receipts don't match.
-            // For now, we trust the RPC if we can fetch receipts successfully.
-            // TODO: Implement proper Patricia trie validation
-            if !validation.is_valid && false { // Disabled for PoC
+            // Cryptographically verify that logs match the block header's receiptsRoot
+            if !validation.is_valid {
                 return Err(SodsVerifierError::InvalidReceiptProof {
                     computed: format!("0x{}", hex::encode(validation.computed_root)),
                     expected: format!("0x{}", hex::encode(validation.expected_root)),

@@ -1563,6 +1563,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hash-db"
+version = "0.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d23bd4e7b5eda0d0f3a307e8b381fdc8ba9000f26fbe912250c0a4cc3956364a"
+
+[[package]]
 name = "hashbrown"
 version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4038,12 +4044,15 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "ethers-core",
+ "hash-db",
  "hex",
  "serde",
  "serde_json",
  "sha2",
+ "sha3",
  "thiserror 1.0.69",
  "tiny-keccak",
+ "triehash",
 ]
 
 [[package]]
@@ -4575,6 +4584,16 @@ dependencies = [
  "thread_local",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "triehash"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1631b201eb031b563d2e85ca18ec8092508e262a3196ce9bd10a67ec87b9f5c"
+dependencies = [
+ "hash-db",
+ "rlp",
 ]
 
 [[package]]

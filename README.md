@@ -213,6 +213,14 @@ sods verify Tf --block 10002322 --json
 - **EVM-Friendly Hashing**: Introduced Keccak256 tree construction and leaf hashing to match Solidity's native hashing rules.
 - **Trustless Behavioral Oracle**: Transforms SODS from an off-chain analysis tool into a reactive, trustless behavioral guard.
 
+## What's New in v1.5 (Deep Verification)
+
+- **Cryptographically Correct Receipt Trie**: Replaced placeholder trie computation with an accurate implementation of the Ethereum Ordered Patricia Trie.
+- **EIP-4844 Support**: Deep verification now supports Type 3 (Blob) transactions used by modern L2 solutions.
+- **Trustless Mode Verification**: SODS now locally recomputes the receipt trie root to verify log authenticity against the block header's `receiptsRoot`.
+- **CLI Support**: Enforce deep cryptographic verification using the `--mode trustless` flag.
+- **Improved Security**: Native detection of RPC tampering; SODS will fail verification if the provided logs do not match the on-chain consensus.
+
 ## Behavioral Dictionary 2.0 (New!)
 
 The protocol now supports context-aware behavioral analysis with **Metadata**, **MEV Patterns**, and **Confidence Scoring**.
@@ -284,6 +292,7 @@ sods-protocol/
 │       ├── tree.rs
 │       ├── proof.rs
 │       ├── pattern.rs
+│       ├── header_anchor.rs
 │       └── error.rs
 ├── sods-verifier/      <- Layer 1: Local Verifier (Rust)
 │   ├── Cargo.toml

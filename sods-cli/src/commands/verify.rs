@@ -16,6 +16,8 @@ pub enum Mode {
     P2p,
     /// RPC only
     Rpc,
+    /// Cryptographically anchored verification (Trustless)
+    Trustless,
 }
 
 /// Arguments for the verify command.
@@ -171,8 +173,14 @@ pub async fn run(args: VerifyArgs) -> i32 {
     // Create verifier and run
     let start = std::time::Instant::now();
     
-    // Choose verifier based on --no-header-proof flag
-    let verifier: sods_verifier::BlockVerifier = if args.no_header_proof {
+    // Determine if header proof (Trustless Mode) is required
+    let require_header = match args.mode {
+        Mode::Trustless => true,
+        _ => !args.no_header_proof,
+    };
+
+    // Choose verifier based on requirements
+    let verifier: sods_verifier::BlockVerifier = if !require_header {
         match sods_verifier::BlockVerifier::new_rpc_only(&rpc_urls) {
             Ok(v) => v.with_backoff_profile(profile),
             Err(e) => {

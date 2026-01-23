@@ -20,7 +20,6 @@
 
 use ethers_core::types::{Bloom, Log, TransactionReceipt, H256};
 use sha3::{Digest, Keccak256};
-use std::collections::BTreeMap;
 
 // use crate::error::{Result, SodsVerifierError};
 
@@ -117,114 +116,12 @@ pub fn bloom_contains_any_topic(bloom: &Bloom, topics: &[H256]) -> bool {
     topics.iter().any(|t| bloom_contains_topic(bloom, t))
 }
 
-/// RLP-encode a receipt for trie inclusion.
-///
-/// Receipts are encoded as:
-/// - Legacy: RLP([status, cumulative_gas, logs_bloom, logs])
-/// - EIP-2718: type_byte || RLP([status, cumulative_gas, logs_bloom, logs])
-fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
-    use ethers_core::utils::rlp::RlpStream;
-
-    let mut stream = RlpStream::new();
-    stream.begin_list(4);
-
-    // Status (1 = success, 0 = failure)
-    let status = receipt.status.map(|s| s.as_u64()).unwrap_or(1);
-    stream.append(&status);
-
-    // Cumulative gas used
-    stream.append(&receipt.cumulative_gas_used);
-
-    // Logs bloom (256 bytes)
-    stream.append(&receipt.logs_bloom.as_bytes().to_vec());
-
-    // Logs
-    stream.begin_list(receipt.logs.len());
-    for log in &receipt.logs {
-        stream.begin_list(3);
-        stream.append(&log.address.as_bytes().to_vec());
-
-        // Topics
-        stream.begin_list(log.topics.len());
-        for topic in &log.topics {
-            stream.append(&topic.as_bytes().to_vec());
-        }
-
-        // Data
-        stream.append(&log.data.to_vec());
-    }
-
-    let rlp_bytes = stream.out().to_vec();
-
-    // Handle EIP-2718 typed transactions
-    // Type 0 (legacy) = no prefix, Type 1 = 0x01 prefix, Type 2 = 0x02 prefix
-    match receipt.transaction_type {
-        Some(t) if t.as_u64() == 1 => {
-            let mut typed = vec![0x01];
-            typed.extend(rlp_bytes);
-            typed
-        }
-        Some(t) if t.as_u64() == 2 => {
-            let mut typed = vec![0x02];
-            typed.extend(rlp_bytes);
-            typed
-        }
-        _ => rlp_bytes, // Legacy or type 0
-    }
-}
-
-/// RLP-encode an integer key for trie path.
-fn rlp_encode_index(index: usize) -> Vec<u8> {
-    // use ethers_core::utils::rlp::Encodable;
-    let mut stream = ethers_core::utils::rlp::RlpStream::new();
-    stream.append(&index);
-    stream.out().to_vec()
-}
-
 /// Compute the Merkle-Patricia trie root from a list of receipts.
 ///
 /// The receipt trie is ordered by transaction index (0, 1, 2, ...).
 /// Keys are RLP-encoded indices, values are RLP-encoded receipts.
 pub fn compute_receipts_root(receipts: &[TransactionReceipt]) -> H256 {
-    if receipts.is_empty() {
-        // Empty trie root = keccak256(RLP(""))
-        return H256::from_slice(&Keccak256::digest(&[0x80]));
-    }
-
-    // Build key-value pairs: (RLP(index), RLP(receipt))
-    let mut entries: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
-    for (i, receipt) in receipts.iter().enumerate() {
-        let key = rlp_encode_index(i);
-        let value = rlp_encode_receipt(receipt);
-        entries.insert(key, value);
-    }
-
-    // Use triehash crate for proper Patricia trie computation
-    // For now, use a simplified hash for PoC (proper impl requires triehash dependency)
-    compute_ordered_trie_root(&entries)
-}
-
-/// Compute ordered trie root from key-value pairs.
-///
-/// This is a simplified implementation. For production, use the `triehash` crate
-/// which implements the exact Ethereum Patricia Merkle Trie algorithm.
-fn compute_ordered_trie_root(entries: &BTreeMap<Vec<u8>, Vec<u8>>) -> H256 {
-    // use ethers_core::utils::rlp::RlpStream;
-
-    if entries.is_empty() {
-        return H256::from_slice(&Keccak256::digest(&[0x80]));
-    }
-
-    // For a proper implementation, we need to build the actual Patricia trie
-    // This is a placeholder that hashes all entries in order
-    // TODO: Replace with proper triehash implementation
-    let mut hasher = Keccak256::new();
-    for (key, value) in entries {
-        hasher.update(key);
-        hasher.update(value);
-    }
-
-    H256::from_slice(&hasher.finalize())
+    sods_core::header_anchor::compute_receipts_root(receipts)
 }
 
 /// Verify that receipts match the block header's receiptsRoot.

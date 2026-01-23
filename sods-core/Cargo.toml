@@ -13,7 +13,10 @@ categories = ["cryptography", "data-structures"]
 [dependencies]
 # SHA-256 hashing for Merkle tree construction
 sha2 = "0.10"
+sha3 = "0.10"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
+triehash = "0.8"
+hash-db = "0.15"
 
 # Ethereum types: H256, Address, Log, etc.
 ethers-core = "2.0"
