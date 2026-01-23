@@ -451,11 +451,12 @@ async fn run_daemon_loop(
 
                                                 // Webhook
                                                 if let Some(ref url) = webhook_url {
+                                                    let pattern_hash = ethers_core::utils::keccak256(target.pattern_str.as_bytes());
                                                     let payload = json!({
                                                         "alert": "Behavioral pattern detected",
                                                         "chain": chain,
                                                         "block_number": block_num,
-                                                        "pattern": target.pattern_str,
+                                                        "pattern_hash": format!("0x{}", hex::encode(pattern_hash)),
                                                         "threat_name": target.name,
                                                         "severity": target.severity,
                                                         "timestamp": chrono::Utc::now().to_rfc3339(),

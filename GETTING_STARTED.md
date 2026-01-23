@@ -73,29 +73,26 @@ sods monitor --pattern "Sandwich" --chain base --mode pending
 ```
 
 
-### Run as a System Daemon (Linux/macOS)
-Run SODS as a background service with desktop notifications.
+## Privacy-Preserving Alerts (New!)
+
+Webhook alerts use **pattern hashing** to prevent privacy leaks. Attackers observing your webhook traffic cannot learn which specific behaviors you are monitoring.
+
+To correlate alerts with your rules, use the `hash-pattern` utility:
 
 ```bash
-# Start daemon
-sods daemon start --pattern "Tf{2,}" --chain base --autostart
-
-# Check status
-sods daemon status
-
-# Stop daemon
-sods daemon stop
+# Compute the privacy-safe hash for your pattern
+sods hash-pattern "LP+ -> Sw{3,} -> LP-"
+# Output: 0x8a3b7c...
 ```
 
-## Forward Alerts to Your Phone / Discord / Telegram
-Forward alerts to any service by providing a secure HTTPS webhook URL:
+When an alert is received, look for the `pattern_hash` field to identify which rule triggered.
+
+### Run as a System Daemon (Linux/macOS)
+Run SODS as a background service with desktop notifications and private webhook alerts.
 
 ```bash
-# Example: Send alerts to ntfy.sh (receive on phone)
-sods daemon start --pattern "Tf{2,}" --chain base --webhook-url "https://ntfy.sh/my_sods_alerts"
-
-# Example: Send alerts to Discord Webhook
-sods daemon start --pattern "Sw" --chain base --webhook-url "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN"
+# Start daemon with private webhook
+sods daemon start --pattern "Tf{2,}" --chain base --webhook-url "https://ntfy.sh/my_alerts"
 ```
 
 ## Monitor Community Threat Feeds

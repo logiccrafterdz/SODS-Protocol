@@ -9,3 +9,4 @@ pub mod monitor;
 pub mod daemon;
 pub mod threats;
 pub mod export_proof;
+pub mod hash_pattern;

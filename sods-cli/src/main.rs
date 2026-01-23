@@ -47,6 +47,9 @@ enum Commands {
 
     /// Export an on-chain verifiable behavioral proof
     ExportProof(commands::export_proof::ExportProofArgs),
+
+    /// Compute the privacy-safe hash of a behavioral pattern
+    HashPattern(commands::hash_pattern::HashPatternArgs),
 }
 
 #[tokio::main]
@@ -63,6 +66,7 @@ async fn main() {
         Commands::Daemon(args) => commands::daemon::run(args).await,
         Commands::Threats(args) => commands::threats::run(args).await,
         Commands::ExportProof(args) => commands::export_proof::run(args).await,
+        Commands::HashPattern(args) => commands::hash_pattern::run(args).await,
     };
 
     std::process::exit(exit_code);
