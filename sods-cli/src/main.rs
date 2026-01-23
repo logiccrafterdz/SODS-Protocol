@@ -44,6 +44,9 @@ enum Commands {
 
     /// Manage decentralized threat intelligence
     Threats(commands::threats::ThreatsArgs),
+
+    /// Export an on-chain verifiable behavioral proof
+    ExportProof(commands::export_proof::ExportProofArgs),
 }
 
 #[tokio::main]
@@ -59,6 +62,7 @@ async fn main() {
         Commands::Monitor(args) => commands::monitor::run(args).await,
         Commands::Daemon(args) => commands::daemon::run(args).await,
         Commands::Threats(args) => commands::threats::run(args).await,
+        Commands::ExportProof(args) => commands::export_proof::run(args).await,
     };
 
     std::process::exit(exit_code);

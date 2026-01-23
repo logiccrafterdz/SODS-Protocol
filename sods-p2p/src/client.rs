@@ -67,7 +67,7 @@ impl SodsClient {
 
     /// Create a new SODS client with RPC fallback.
     pub fn with_fallback(rpc_url: &str) -> Result<Self> {
-        let verifier = BlockVerifier::new(rpc_url)?;
+        let verifier = BlockVerifier::new(&[rpc_url.to_string()])?;
         Self::build(Some(verifier))
     }
 

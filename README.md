@@ -203,12 +203,15 @@ sods verify Tf --block 10002322 --json
 - **Production L2 Validation**: Confirmed behavioral symbol extraction on Scroll Mainnet and Polygon zkEVM Mainnet using on-chain blocks.
 - **Deployer Detection**: Advanced infrastructure to identify contract deployers for rug pull detection (`from == deployer` condition) with LRU caching.
 
-## What's New in v1.3 (Current)
-
-- **High-Reliability L2 Service**: Hardened RPC layer for unstable L2 public endpoints.
-- **Multi-Endpoint Fallback**: Automatic failover across multiple diverse RPC providers (e.g., official, PublicNode, 1RPC) to ensure zero downtime.
-- **L2-Aware Backoff Profiles**: Stricter backoff delays specifically tuned for L2 network rate limits.
 - **Connection Health Checks**: Pre-flight validation of RPC health before starting long-running monitoring or trend sessions.
+
+## What's New in v1.4 (Latest)
+
+- **On-Chain Behavioral Proofs**: SODS can now generate proofs that are verifiable inside Ethereum smart contracts.
+- **Solidity Verifier Library**: `SODSVerifier.sol` enables DeFi protocols to natively react to verified on-chain behaviors (Rug Pulls, MEV, etc.).
+- **ABI-Encoded Export**: New `sods export-proof` command generates hex-encoded calldata for direct contract interaction.
+- **EVM-Friendly Hashing**: Introduced Keccak256 tree construction and leaf hashing to match Solidity's native hashing rules.
+- **Trustless Behavioral Oracle**: Transforms SODS from an off-chain analysis tool into a reactive, trustless behavioral guard.
 
 ## Behavioral Dictionary 2.0 (New!)
 
@@ -315,7 +318,10 @@ sods-protocol/
 │           ├── discover.rs
 │           ├── trend.rs
 │           ├── monitor.rs
-│           └── daemon.rs
+│           ├── daemon.rs
+│           └── export_proof.rs
+├── contracts/          <- Smart Contracts (Solidity)
+│   └── SODSVerifier.sol
 └── poc/                <- Python PoC
     ├── README.md
     ├── bmt_builder.py

@@ -203,3 +203,13 @@ SODS is hardened for unreliable L2 public RPCs (Scroll, Polygon zkEVM, Base, etc
 
 ### Using Custom RPCs with Fallback
 If you provide a custom RPC URL via `--rpc-url`, SODS will use that as the primary endpoint but still maintain the ability to fallback to public defaults if yours becomes unavailable.
+
+## On-Chain Verification (New in v1.4)
+
+Generate behavioral proofs that can be verified inside Ethereum smart contracts:
+
+```bash
+sods export-proof --pattern "Sandwich" --block 20000000 --chain ethereum --format calldata
+```
+
+**[Read the On-Chain Verification Guide](ONCHAIN.md)**

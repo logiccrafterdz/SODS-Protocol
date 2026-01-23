@@ -8,3 +8,4 @@ pub mod trend;
 pub mod monitor;
 pub mod daemon;
 pub mod threats;
+pub mod export_proof;

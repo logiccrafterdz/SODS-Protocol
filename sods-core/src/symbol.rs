@@ -150,6 +150,21 @@ impl BehavioralSymbol {
 
         hasher.finalize().into()
     }
+
+    /// Compute the leaf hash for this symbol using Keccak256 (EVM compatible).
+    ///
+    /// Formula: `keccak256(abi.encodePacked(symbol, log_index))`
+    pub fn leaf_hash_keccak(&self) -> [u8; 32] {
+        use tiny_keccak::{Hasher, Keccak};
+
+        let mut hasher = Keccak::v256();
+        hasher.update(self.symbol.as_bytes());
+        hasher.update(&self.log_index.to_be_bytes());
+        
+        let mut output = [0u8; 32];
+        hasher.finalize(&mut output);
+        output
+    }
 }
 
 impl Ord for BehavioralSymbol {

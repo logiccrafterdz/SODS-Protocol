@@ -319,7 +319,7 @@ mod tests {
     #[test]
     fn test_scroll_bridge_out_v2() {
         let dict = SymbolDictionary::default();
-        let topic = SCROLL_WITHDRAW_ERC20.parse::<H256>().unwrap();
+        let topic = SCROLL_WITHDRAWAL_INITIATED.parse::<H256>().unwrap();
         assert_eq!(dict.symbol_for_topic(topic), Some("BridgeOut"));
     }
 }

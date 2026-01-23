@@ -52,3 +52,7 @@ poc/bmr.bin
 .sods/
 plugins/
 *.json.bk
+
+# Foundry
+out/
+cache/

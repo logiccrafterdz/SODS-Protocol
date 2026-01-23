@@ -39,7 +39,7 @@ impl SodsPeer {
     ///
     /// * `rpc_url` - RPC endpoint for fetching block data
     pub fn new(rpc_url: &str) -> Result<Self> {
-        let verifier = BlockVerifier::new(rpc_url)?;
+        let verifier = BlockVerifier::new(&[rpc_url.to_string()])?;
         let keypair = Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(keypair.public());
 
