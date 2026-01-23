@@ -147,6 +147,47 @@ impl RpcClient {
         })
     }
 
+    pub async fn fetch_contract_deployer(&self, contract_address: ethers_core::types::Address) -> Result<Option<ethers_core::types::Address>> {
+        let code = self.provider
+            .get_code(contract_address, None)
+            .await
+            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?;
+        
+        if code.is_empty() {
+            return Ok(None);
+        }
+
+        let _ = self.provider
+            .get_transaction_count(contract_address, None)
+            .await
+            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?;
+        
+        for block_num in 0..1000u64 {
+            let block = match self.provider.get_block_with_txs(block_num).await {
+                Ok(Some(b)) => b,
+                _ => continue,
+            };
+            
+            for tx in block.transactions {
+                if tx.to.is_none() {
+                    let receipt = self.provider
+                        .get_transaction_receipt(tx.hash)
+                        .await
+                        .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?;
+                    
+                    if let Some(r) = receipt {
+                        if r.contract_address == Some(contract_address) {
+                            self.update_adaptive_delay(true, None);
+                            return Ok(Some(tx.from));
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(None)
+    }
+
     /// Fetch all transaction receipts for a block.
     pub async fn fetch_block_receipts(&self, block_number: u64) -> Result<Vec<ethers_core::types::TransactionReceipt>> {
         // First get all transactions in the block

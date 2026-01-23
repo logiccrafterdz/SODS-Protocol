@@ -73,9 +73,17 @@ pub const SYMBOLS: &[(&str, &str)] = &[
     ("Tf", "ERC20 Transfer"),
     ("Dep", "WETH Deposit"),
     ("Wdw", "WETH Withdrawal"),
-    ("Sw", "Uniswap V2 Swap"),
+    ("Sw", "Uniswap V2/V3 Swap"),
     ("LP+", "Uniswap V2 Mint (Add Liquidity)"),
     ("LP-", "Uniswap V2 Burn (Remove Liquidity)"),
+    ("MintNFT", "ERC721/ERC1155 Mint (Transfer from 0x0)"),
+    ("BuyNFT", "NFT Purchase (Seaport OrderFulfilled)"),
+    ("ListNFT", "NFT Listing (Blur OrdersMatched)"),
+    ("BridgeIn", "L1→L2 Bridge Deposit (Optimism DepositFinalized)"),
+    ("BridgeOut", "L2→L1 Bridge Withdrawal (Arbitrum/Scroll)"),
+    ("Frontrun", "MEV Frontrun Pattern (Tf → Sw)"),
+    ("Backrun", "MEV Backrun Pattern (Sw → Tf)"),
+    ("Sandwich", "MEV Sandwich Pattern (Tf → Sw → Tf)"),
 ];
 
 /// Check if a symbol is supported.

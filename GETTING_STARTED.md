@@ -127,3 +127,63 @@ sods threats list
 # Trust a new researcher (add their public key)
 sods threats add-key 02a1b2c3...
 ```
+
+## Detect Advanced Threats
+
+### MEV Detection (Sandwich Attacks)
+Detect sandwich attacks where a victim's swap is bracketed by attacker transactions:
+
+```bash
+# Verify sandwich pattern in a specific block
+sods verify "Sandwich" --block 20000000 --chain ethereum
+
+# Monitor for real-time sandwich attacks on Base
+sods monitor --pattern "Sandwich" --chain base --interval 5s
+```
+
+### NFT Activity Monitoring
+Track NFT mints, listings, and purchases:
+
+```bash
+# Detect NFT mints on Base
+sods trend --pattern "MintNFT" --chain base --window 50
+
+# Monitor Seaport NFT purchases
+sods verify "BuyNFT" --block 19500000 --chain ethereum
+
+# Detect Blur listings
+sods verify "ListNFT" --block 19500000 --chain ethereum
+```
+
+### Cross-Chain Bridge Monitoring
+Monitor L1↔L2 bridge activity:
+
+```bash
+# Detect bridge deposits on Optimism
+sods verify "BridgeIn" --block 115000000 --chain optimism
+
+# Monitor bridge withdrawals on Scroll
+sods trend --pattern "BridgeOut" --chain scroll --window 20
+
+# Monitor Arbitrum L2→L1 withdrawals
+sods verify "BridgeOut" --block 180000000 --chain arbitrum
+```
+
+### MEV Frontrun/Backrun Detection
+Detect frontrunning and backrunning patterns:
+
+```bash
+# Detect frontrun pattern (Transfer before Swap)
+sods verify "Frontrun" --block 20000000 --chain ethereum
+
+# Detect backrun pattern (Swap followed by Transfer)
+sods verify "Backrun" --block 20000000 --chain ethereum
+```
+
+### Rug Pull Detection with Deployer Context
+Detect potential rug pulls by monitoring deployer activity:
+
+```bash
+# Monitor for LP removal by deployer (high confidence rug indicator)
+sods monitor --pattern "LP+ where from == deployer -> Sw{2,} -> LP-" --chain base --interval 10s
+```

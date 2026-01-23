@@ -255,4 +255,46 @@ mod tests {
         let symbols_fail = vec![sym3, sym2];
          assert!(p.matches(&symbols_fail).is_none());
     }
+
+    #[test]
+    fn test_parse_frontrun_preset() {
+        let p = BehavioralPattern::parse("Frontrun").unwrap();
+        assert_eq!(p.steps.len(), 2);
+        match &p.steps[0] {
+            PatternStep::Exact(s, _) => assert_eq!(s, "Tf"),
+            _ => panic!("Wrong step type"),
+        }
+        match &p.steps[1] {
+            PatternStep::Exact(s, _) => assert_eq!(s, "Sw"),
+            _ => panic!("Wrong step type"),
+        }
+    }
+
+    #[test]
+    fn test_parse_backrun_preset() {
+        let p = BehavioralPattern::parse("Backrun").unwrap();
+        assert_eq!(p.steps.len(), 2);
+        match &p.steps[0] {
+            PatternStep::Exact(s, _) => assert_eq!(s, "Sw"),
+            _ => panic!("Wrong step type"),
+        }
+        match &p.steps[1] {
+            PatternStep::Exact(s, _) => assert_eq!(s, "Tf"),
+            _ => panic!("Wrong step type"),
+        }
+    }
+
+    #[test]
+    fn test_frontrun_match() {
+        let symbols = vec![mock_sym("Tf", 0), mock_sym("Sw", 1)];
+        let p = BehavioralPattern::parse("Frontrun").unwrap();
+        assert!(p.matches(&symbols).is_some());
+    }
+
+    #[test]
+    fn test_backrun_match() {
+        let symbols = vec![mock_sym("Sw", 0), mock_sym("Tf", 1)];
+        let p = BehavioralPattern::parse("Backrun").unwrap();
+        assert!(p.matches(&symbols).is_some());
+    }
 }

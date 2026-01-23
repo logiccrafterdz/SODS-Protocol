@@ -266,4 +266,38 @@ mod tests {
         let topic = TRANSFER_TOPIC.parse::<H256>().unwrap();
         assert_eq!(dict.symbol_for_topic(topic), Some("Tf"));
     }
+
+    #[test]
+    fn test_blur_listnft() {
+        let dict = SymbolDictionary::default();
+        let topic = BLUR_ORDERS_MATCHED.parse::<H256>().unwrap();
+        assert_eq!(dict.symbol_for_topic(topic), Some("ListNFT"));
+    }
+
+    #[test]
+    fn test_optimism_bridge_in() {
+        let dict = SymbolDictionary::default();
+        let topic = OPTIMISM_DEPOSIT_FINALIZED.parse::<H256>().unwrap();
+        assert_eq!(dict.symbol_for_topic(topic), Some("BridgeIn"));
+    }
+
+    #[test]
+    fn test_arbitrum_bridge_out() {
+        let dict = SymbolDictionary::default();
+        let topic = ARBITRUM_OUTBOUND_TRANSFER.parse::<H256>().unwrap();
+        assert_eq!(dict.symbol_for_topic(topic), Some("BridgeOut"));
+    }
+
+    #[test]
+    fn test_scroll_bridge_out() {
+        let dict = SymbolDictionary::default();
+        let topic = SCROLL_MESSAGE_SENT.parse::<H256>().unwrap();
+        assert_eq!(dict.symbol_for_topic(topic), Some("BridgeOut"));
+    }
+
+    #[test]
+    fn test_all_new_symbols_registered() {
+        let dict = SymbolDictionary::default();
+        assert!(dict.len() >= 12);
+    }
 }
