@@ -66,6 +66,10 @@ pub enum DaemonCommands {
         /// Join the P2P decentralized threat intelligence network
         #[arg(long)]
         p2p_threat_network: bool,
+
+        /// Auto-remove rules after duration (e.g. 24h, 30m)
+        #[arg(long, default_value = "24h")]
+        expire_after: String,
     },
     /// Stop the running daemon
     Stop,
@@ -83,14 +87,14 @@ pub struct ThreatFeedItem {
     pub description: Option<String>,
 }
 
-#[cfg(unix)]
 #[derive(Clone)]
-struct MonitoringTarget {
-    pattern: sods_core::pattern::BehavioralPattern,
-    name: String,
-    severity: String,
-    pattern_str: String,
-    chain: String,
+pub(crate) struct MonitoringTarget {
+    pub(crate) pattern: sods_core::pattern::BehavioralPattern,
+    pub(crate) name: String,
+    pub(crate) severity: String,
+    pub(crate) pattern_str: String,
+    pub(crate) chain: String,
+    pub(crate) expires_at: std::time::SystemTime,
 }
 
 #[cfg(unix)]
@@ -122,8 +126,27 @@ fn get_trusted_keys_file() -> PathBuf {
 }
 
 // -----------------------------------------------------------------------------
-// Unix Implementation
+// Helpers
 // -----------------------------------------------------------------------------
+
+pub(crate) fn parse_duration(s: &str) -> std::time::Duration {
+    let mut num_str = String::new();
+    let mut unit = 'h';
+    for c in s.chars() {
+        if c.is_numeric() {
+            num_str.push(c);
+        } else {
+            unit = c;
+            break;
+        }
+    }
+    let val = num_str.parse::<u64>().unwrap_or(24);
+    match unit {
+        'm' => std::time::Duration::from_secs(val * 60),
+        'h' => std::time::Duration::from_secs(val * 3600),
+        _ => std::time::Duration::from_secs(val * 3600),
+    }
+}
 
 #[cfg(unix)]
 async fn start_daemon(
@@ -134,8 +157,11 @@ async fn start_daemon(
     autostart: bool, 
     webhook_url: Option<String>,
     threat_feed: Option<String>,
-    p2p_threat_network: bool
+    p2p_threat_network: bool,
+    expire_after_str: String
 ) -> i32 {
+    let expire_duration = parse_duration(&expire_after_str);
+    let expires_at = std::time::SystemTime::now() + expire_duration;
     let sods_dir = get_sods_dir();
     let pid_file = get_pid_file();
     let log_file = get_log_file();
@@ -167,6 +193,7 @@ async fn start_daemon(
                     severity: "manual".to_string(),
                     pattern_str: p,
                     chain: chain.clone(),
+                    expires_at,
                 });
             },
             Err(e) => {
@@ -192,6 +219,7 @@ async fn start_daemon(
                                  severity: item.severity,
                                  pattern_str: item.pattern,
                                  chain: item.chain,
+                                 expires_at,
                              });
                          },
                          Err(e) => eprintln!("⚠️ Skipping invalid pattern '{}': {}", item.name, e),
@@ -250,7 +278,7 @@ async fn start_daemon(
             // Let's proceed assuming structure holds.
             
             let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(run_daemon_loop(targets, chain, interval, rpc_url, webhook_url, p2p_threat_network));
+            rt.block_on(run_daemon_loop(targets, chain, interval, rpc_url, webhook_url, p2p_threat_network, expire_after_str));
             0 
         }
         Err(e) => {
@@ -280,6 +308,7 @@ async fn run_daemon_loop(
     rpc_url_opt: Option<String>,
     webhook_url: Option<String>,
     p2p_enabled: bool,
+    expire_after_str: String,
 ) {
     use sods_verifier::BlockVerifier;
     use crate::config::get_chain;
@@ -322,6 +351,8 @@ async fn run_daemon_loop(
         None
     };
 
+    let expire_duration = parse_duration(&expire_after_str);
+
     // --- Load Persisted Rules ---
     if p2p_enabled {
         let rules_file = get_threat_rules_file();
@@ -338,6 +369,7 @@ async fn run_daemon_loop(
                                      severity: rule.severity,
                                      pattern_str: rule.pattern,
                                      chain: rule.chain,
+                                     expires_at: std::time::SystemTime::now() + expire_duration,
                                  });
                              }
                          }
@@ -375,6 +407,8 @@ async fn run_daemon_loop(
     }
 
     let mut timer = tokio::time::interval(interval);
+    let mut last_gc = std::time::Instant::now();
+    let expire_duration = parse_duration(&expire_after_str);
 
     loop {
         tokio::select! {
@@ -412,6 +446,7 @@ async fn run_daemon_loop(
                                  severity: rule.severity,
                                  pattern_str: rule.pattern,
                                  chain: rule.chain,
+                                 expires_at: std::time::SystemTime::now() + expire_duration,
                              });
                              
                              let msg = format!("Active P2P Rule Applied: {}", rule.name);
@@ -424,6 +459,17 @@ async fn run_daemon_loop(
 
              // 2. Monitoring Interval
              _ = timer.tick() => {
+                 // --- Garbage Collection ---
+                 if last_gc.elapsed() >= Duration::from_secs(300) {
+                     let before = targets.len();
+                     targets.retain(|t| std::time::SystemTime::now() < t.expires_at);
+                     let after = targets.len();
+                     if before > after {
+                         println!("🧹 Garbage Collection: Pruned {} expired rules ({} remaining).", before - after, after);
+                     }
+                     last_gc = std::time::Instant::now();
+                 }
+
                  match verifier.get_latest_block().await {
                     Ok(current_head) => {
                         if current_head > last_scanned_block {
@@ -527,7 +573,8 @@ async fn start_daemon(
     _autostart: bool, 
     _webhook_url: Option<String>,
     _threat_feed: Option<String>,
-    _p2p_threat_network: bool
+    _p2p_threat_network: bool,
+    _expire_after: String,
 ) -> i32 {
     output::error("Daemon mode is currently only supported on Linux/macOS.");
     1
@@ -550,8 +597,8 @@ fn check_status() -> bool {
 
 pub async fn run(args: DaemonArgs) -> i32 {
     match args.command {
-        DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network } => {
-            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network).await
+        DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after } => {
+            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after).await
         },
         DaemonCommands::Stop => stop_daemon(),
         DaemonCommands::Status => {
@@ -562,5 +609,46 @@ pub async fn run(args: DaemonArgs) -> i32 {
             }
             0
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, SystemTime};
+    use sods_core::pattern::BehavioralPattern;
+
+    #[test]
+    fn test_parse_duration() {
+        assert_eq!(parse_duration("1h"), Duration::from_secs(3600));
+        assert_eq!(parse_duration("30m"), Duration::from_secs(1800));
+        assert_eq!(parse_duration("24h"), Duration::from_secs(24 * 3600));
+        assert_eq!(parse_duration("5x"), Duration::from_secs(5 * 3600)); // Default to h
+    }
+
+    #[test]
+    fn test_target_retention() {
+        let mut targets = vec![
+            MonitoringTarget {
+                pattern: BehavioralPattern::parse("Tf").unwrap(),
+                name: "Expired".to_string(),
+                severity: "info".to_string(),
+                pattern_str: "Tf".to_string(),
+                chain: "base".to_string(),
+                expires_at: SystemTime::now() - Duration::from_secs(10),
+            },
+            MonitoringTarget {
+                pattern: BehavioralPattern::parse("Sw").unwrap(),
+                name: "Active".to_string(),
+                severity: "info".to_string(),
+                pattern_str: "Sw".to_string(),
+                chain: "base".to_string(),
+                expires_at: SystemTime::now() + Duration::from_secs(10),
+            },
+        ];
+
+        targets.retain(|t| SystemTime::now() < t.expires_at);
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].name, "Active");
     }
 }

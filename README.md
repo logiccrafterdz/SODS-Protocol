@@ -221,6 +221,14 @@ sods verify Tf --block 10002322 --json
 - **CLI Support**: Enforce deep cryptographic verification using the `--mode trustless` flag.
 - **Improved Security**: Native detection of RPC tampering; SODS will fail verification if the provided logs do not match the on-chain consensus.
 
+## What's New in v2.1 (Hardening)
+
+- **P2P Sybil Resistance (Proof-of-Behavior)**: New peers must solve a behavioral puzzle (verifying a random block) to gain a "Reliable" status. P2P trust is now earned, not granted.
+- **Hardened ABI Encoding (v2.0)**: Replaced manual byte manipulation with the `ethabi` crate for 100% Solidity compatibility. Ensures all exported proofs are perfectly decoded by `SODSVerifier.sol`.
+- **Dynamic L2 Event Resolution**: Moving from hardcoded topic hashes to dynamic signature hashing. SODS is now resilient to bridge contract redeploys and upgrades on L2s (Scroll, Polygon zkEVM, etc.).
+- **Daemon Memory Leak Fix (GC)**: Periodic garbage collection of expired monitoring rules (every 5 minutes). Long-running daemons now maintain a stable memory footprint.
+- **Customizable Expiration**: New `--expire-after` flag for the daemon to automatically prune old threat reports.
+
 ## Behavioral Dictionary 2.0 (New!)
 
 The protocol now supports context-aware behavioral analysis with **Metadata**, **MEV Patterns**, and **Confidence Scoring**.
@@ -256,13 +264,13 @@ The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection 
 
 ## Status
 
-- Specification: **v1.0** (Stable)
+- Specification: **v1.1** (Updated)
 - PoC: **v0.1** (Sepolia testnet)
-- sods-core: **v0.2.0** (Rust crate)
+- sods-core: **v0.3.0** (Rust crate)
 - sods-verifier: **v0.2.0** (Rust crate)
-- sods-p2p: **v0.2.0** (Rust crate)
-- sods-cli: **v1.1.0** (Rust binary)
-- Stage: **v1.1** / Production-Ready L2 Support
+- sods-p2p: **v0.3.0** (Rust crate)
+- sods-cli: **v1.2.0** (Rust binary)
+- Stage: **v2.1** / Hardened L2 Support
 - Seeking: Technical feedback, threat analysis, edge cases
 
 ## Architecture

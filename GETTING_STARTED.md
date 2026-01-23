@@ -95,6 +95,19 @@ Run SODS as a background service with desktop notifications and private webhook 
 sods daemon start --pattern "Tf{2,}" --chain base --webhook-url "https://ntfy.sh/my_alerts"
 ```
 
+### 🛡️ Long-Running Stability (v2.1)
+SODS is designed for 24/7 background operation. To prevent unbounded memory growth, especially when connected to high-frequency P2P threat feeds:
+- **Auto-Expiration**: Rules automatically expire after **24 hours** by default.
+- **Garbage Collection**: Every 5 minutes, SODS prunes expired rules from memory.
+- **Custom Expiration**: Use `--expire-after` to tune the rule lifespan.
+  ```bash
+  # Keep rules for only 1 hour
+  sods daemon start --expire-after 1h
+  
+  # Keep rules for 30 minutes
+  sods daemon start --expire-after 30m
+  ```
+
 ## Monitor Community Threat Feeds
 Protect yourself by subscribing to public behavioral blocklists (e.g., known rug pull patterns).
 
