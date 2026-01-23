@@ -60,6 +60,10 @@ pub struct BlockHeader {
     pub hash: H256,
     /// Root of the receipt trie
     pub receipts_root: H256,
+    /// Parent beacon block root (EIP-4788)
+    pub parent_beacon_block_root: Option<H256>,
+    /// Block timestamp
+    pub timestamp: u64,
     /// Bloom filter for logs in this block
     pub logs_bloom: Bloom,
 }

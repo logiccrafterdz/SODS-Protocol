@@ -30,6 +30,10 @@ pub struct ExportProofArgs {
     /// Custom RPC URL
     #[arg(long)]
     pub rpc_url: Option<String>,
+
+    /// Include beacon root anchor for on-chain verification
+    #[arg(long)]
+    pub anchored: bool,
 }
 
 pub async fn run(args: ExportProofArgs) -> i32 {
@@ -76,9 +80,23 @@ pub async fn run(args: ExportProofArgs) -> i32 {
         // Build Keccak BMT
         let bmt = BehavioralMerkleTree::new_keccak(symbols.clone());
         
-        let chain_id = 11155111; // Default to Sepolia for now, should be in config
+        let chain_id = 11155111; // Default to Sepolia
         
-        if let Some(proof) = bmt.generate_onchain_proof(&matched, chain_id, args.block) {
+        // Fetch beacon root and timestamp if anchored
+        let (beacon_root, timestamp) = if args.anchored {
+            output::info("Fetching beacon root and timestamp for anchoring...");
+            match verifier.fetch_block_header(args.block).await {
+                Ok(header) => (header.parent_beacon_block_root.map(|h| h.0), header.timestamp),
+                Err(e) => {
+                    output::error(&format!("Failed to fetch block header for anchoring: {}", e));
+                    return 1;
+                }
+            }
+        } else {
+            (None, 0)
+        };
+
+        if let Some(proof) = bmt.generate_onchain_proof(&matched, chain_id, args.block, beacon_root, timestamp) {
             match args.format {
                 Format::Calldata => {
                     let calldata = proof.to_calldata();

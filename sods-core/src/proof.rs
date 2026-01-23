@@ -158,13 +158,17 @@ pub struct OnChainBehavioralProof {
     pub merkle_path: Vec<[u8; 32]>,
     /// The BMT root (Keccak256)
     pub bmt_root: [u8; 32],
+    /// Beacon root for the block (EIP-4788)
+    pub beacon_root: Option<[u8; 32]>,
+    /// Block timestamp (for beacon root lookup)
+    pub timestamp: u64,
 }
 
 impl OnChainBehavioralProof {
     /// Export the proof as ABI-encoded calldata for `SODSVerifier.verifyBehavior`.
     pub fn to_calldata(&self) -> Vec<u8> {
         // Function signature:
-        // verifyBehavior(uint256,uint256,string[],uint32[],bytes32[],bytes32[],bytes32)
+        // verifyBehavior(uint256,uint256,string[],uint32[],bytes32[],bytes32[],bytes32,bytes32,uint256)
         
         // This is complex to do manually without ethabi. 
         // ABI encoding for dynamic arrays involves offsets.
@@ -195,40 +199,62 @@ impl OnChainBehavioralProof {
         let symbols_data = self.encode_string_array();
         offset += symbols_data.len();
 
-        // 4. logIndices (uint32[]) -> Offset at 0x60 (96)
+        // 9. timestamp (uint256) -> Fixed size at 0x100 (256)
+        let mut ts_bytes = [0u8; 32];
+        ts_bytes[24..32].copy_from_slice(&self.timestamp.to_be_bytes());
+        data.extend_from_slice(&ts_bytes);
+
+        // Append dynamic data
+        self.encode_with_dynamic_data(data)
+    }
+
+    fn encode_with_dynamic_data(&self, mut base_data: Vec<u8>) -> Vec<u8> {
+        let dynamic_start = 288; // 9 slots
+        let mut current_offset = dynamic_start;
+
+        // Correctly set offsets in the first 9 slots (which are already in base_data)
+        // Offset 3 (symbols) is at index 64
+        let mut symbols_offset = [0u8; 32];
+        symbols_offset[31] = (current_offset % 256) as u8;
+        symbols_offset[30] = (current_offset / 256) as u8;
+        base_data[64..96].copy_from_slice(&symbols_offset);
+        
+        let symbols_data = self.encode_string_array();
+        current_offset += symbols_data.len();
+
+        // Offset 4 (logIndices) is at index 96
         let mut logs_offset = [0u8; 32];
-        logs_offset[31] = offset as u8;
-        data.extend_from_slice(&logs_offset);
+        logs_offset[31] = (current_offset % 256) as u8;
+        logs_offset[30] = (current_offset / 256) as u8;
+        base_data[96..128].copy_from_slice(&logs_offset);
 
         let logs_data = self.encode_uint32_array();
-        offset += logs_data.len();
+        current_offset += logs_data.len();
 
-        // 5. leafHashes (bytes32[]) -> Offset at 0x80 (128)
+        // Offset 5 (leafHashes) is at index 128
         let mut leaves_offset = [0u8; 32];
-        leaves_offset[31] = offset as u8;
-        data.extend_from_slice(&leaves_offset);
+        leaves_offset[31] = (current_offset % 256) as u8;
+        leaves_offset[30] = (current_offset / 256) as u8;
+        base_data[128..160].copy_from_slice(&leaves_offset);
 
         let leaves_data = self.encode_bytes32_array(&self.leaf_hashes);
-        offset += leaves_data.len();
+        current_offset += leaves_data.len();
 
-        // 6. merklePath (bytes32[]) -> Offset at 0xA0 (160)
+        // Offset 6 (merklePath) is at index 160
         let mut path_offset = [0u8; 32];
-        path_offset[31] = (offset % 256) as u8;
-        path_offset[30] = (offset / 256) as u8;
-        data.extend_from_slice(&path_offset);
+        path_offset[31] = (current_offset % 256) as u8;
+        path_offset[30] = (current_offset / 256) as u8;
+        base_data[160..192].copy_from_slice(&path_offset);
 
         let path_data = self.encode_bytes32_array(&self.merkle_path);
 
-        // 7. bmtRoot (bytes32) -> Fixed size at 0xC0 (192)
-        data.extend_from_slice(&self.bmt_root);
-
         // Append dynamic data
-        data.extend_from_slice(&symbols_data);
-        data.extend_from_slice(&logs_data);
-        data.extend_from_slice(&leaves_data);
-        data.extend_from_slice(&path_data);
+        base_data.extend_from_slice(&symbols_data);
+        base_data.extend_from_slice(&logs_data);
+        base_data.extend_from_slice(&leaves_data);
+        base_data.extend_from_slice(&path_data);
 
-        data
+        base_data
     }
 
     fn encode_string_array(&self) -> Vec<u8> {
@@ -370,7 +396,7 @@ mod tests {
         let bmt = BehavioralMerkleTree::new_keccak(syms.clone());
         let matched = vec![&syms[0], &syms[1]];
         
-        let proof = bmt.generate_onchain_proof(&matched, 11155111, 100).unwrap();
+        let proof = bmt.generate_onchain_proof(&matched, 11155111, 100, None, 1700000000).unwrap();
         let calldata = proof.to_calldata();
         
         // Basic length check for ABI encoded dynamic data

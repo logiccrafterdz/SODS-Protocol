@@ -194,6 +194,8 @@ impl RpcClient {
                         number: block.number.map(|n| n.as_u64()).unwrap_or(block_number),
                         hash: block.hash.unwrap_or_default(),
                         receipts_root: block.receipts_root,
+                        parent_beacon_block_root: block.parent_beacon_block_root,
+                        timestamp: block.timestamp.as_u64(),
                         logs_bloom: block.logs_bloom.unwrap_or_default(),
                     });
                 }

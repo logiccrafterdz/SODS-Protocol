@@ -148,6 +148,11 @@ impl BlockVerifier {
         self.rpc_client.health_check().await
     }
 
+    /// Fetch a block's header.
+    pub async fn fetch_block_header(&self, block_number: u64) -> Result<crate::header_anchor::BlockHeader> {
+        self.rpc_client.fetch_block_header(block_number).await
+    }
+
     /// Verify if a behavioral symbol exists in a block.
     ///
     /// ## Verification Pipeline

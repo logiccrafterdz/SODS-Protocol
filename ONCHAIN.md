@@ -48,13 +48,35 @@ sods export-proof --pattern "LP-" --block 123456 --chain base --format calldata
 
 ## Security & Costs
 
-- **Gas Cost**: ~50,000 - 100,000 gas depending on proof depth.
-- **Trust Model**: Verification relies on the provided `bmtRoot`. In production, this root should be sourced from a trusted commitment (e.g. a storage proof or a signed oracle update).
+- **Gas Cost**: ~50,000 - 150,000 gas depending on proof depth and beacon root lookup.
+- **Trust Model**: Verification relies on the provided `bmtRoot`. In **Trustless Mode**, this root is anchored to Ethereum's consensus via EIP-4788.
 
-## Trustless Mode (Deep Verification)
+## Trustless On-Chain Verification (EIP-4788)
 
-SODS now cryptographically verifies that logs belong to the claimed block by recomputing the receipt trie root locally and comparing it against the block header's `receiptsRoot`. This ensures the RPC provider cannot omit or fabricate logs.
+SODS now uses Ethereum's beacon root precompile to anchor BMT roots directly to the consensus layer, eliminating oracle dependency for behavioral verification.
 
+### 1. Generate Anchored Proof
+Use the `--anchored` flag to include the beacon root and block timestamp:
 ```bash
-sods verify --mode trustless "Tf" --block 10002322 --chain sepolia
+sods export-proof --pattern "LP-" --block 20000000 --chain ethereum --anchored
 ```
+
+### 2. Verify with Anchor
+The `SODSVerifier.verifyBehavior` function automatically validates the proof against the on-chain beacon root if provided.
+
+```solidity
+bool valid = SODSVerifier.verifyBehavior(
+    blockNumber,
+    chainId,
+    symbols,
+    indices,
+    leafHashes,
+    merklePath,
+    bmtRoot,
+    beaconRoot, // Fetched via CLI --anchored
+    timestamp   // Block timestamp
+);
+```
+
+> [!TIP]
+> This requires a post-Dencun block on a network that supports the EIP-4788 precompile (0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02).

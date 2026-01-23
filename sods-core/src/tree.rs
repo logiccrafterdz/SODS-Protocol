@@ -303,7 +303,14 @@ impl BehavioralMerkleTree {
     }
 
     /// Generate an on-chain verifiable proof.
-    pub fn generate_onchain_proof(&self, matched_symbols: &[&BehavioralSymbol], chain_id: u64, block_number: u64) -> Option<crate::proof::OnChainBehavioralProof> {
+    pub fn generate_onchain_proof(
+        &self, 
+        matched_symbols: &[&BehavioralSymbol], 
+        chain_id: u64, 
+        block_number: u64,
+        beacon_root: Option<[u8; 32]>,
+        timestamp: u64,
+    ) -> Option<crate::proof::OnChainBehavioralProof> {
         let mut symbols = Vec::new();
         let mut log_indices = Vec::new();
         let mut leaf_hashes = Vec::new();
@@ -315,10 +322,6 @@ impl BehavioralMerkleTree {
         }
 
         // For simplicity in the first version, we'll provide the proof for the FIRST symbol
-        // and expect the contract to verify the sequence manually or extend to multiproofs.
-        // But the requirement says "shared path to root".
-        // Let's generate a standard inclusion proof for the first symbol as a starting point.
-        
         let first_idx = self.symbols.iter().position(|s| {
             s.symbol() == matched_symbols[0].symbol() && s.log_index() == matched_symbols[0].log_index()
         })?;
@@ -333,6 +336,8 @@ impl BehavioralMerkleTree {
             leaf_hashes,
             merkle_path: proof.path,
             bmt_root: self.root,
+            beacon_root,
+            timestamp,
         })
     }
 }
