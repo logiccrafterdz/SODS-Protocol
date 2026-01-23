@@ -53,6 +53,12 @@ const ARBITRUM_OUTBOUND_TRANSFER: &str = "0x3073a74ecb728d10be779fe19a74a1428e20
 /// Scroll L2->L1 MessageSent for bridge withdrawals
 const SCROLL_MESSAGE_SENT: &str = "0x104371f3b442861a2a7b82a070afbbaab748bb13757bf47769e170e37809ec1e";
 
+/// Scroll FinalizeDepositERC20 (L1->L2 bridge)
+const SCROLL_FINALIZE_DEPOSIT_ERC20: &str = "0x165ba69f6ab40c50cade6f65431801e5f9c7d7830b7545391920db039133ba34";
+
+/// Scroll WithdrawalInitiated (L2->L1 bridge)
+const SCROLL_WITHDRAWAL_INITIATED: &str = "0x61ed099e74a97a1d7f8bb0952a88ca8b7b8ebd00c126ea04671f92a81213318a";
+
 use ethers_core::types::{Address, U256};
 
 // ============================================================================
@@ -93,6 +99,8 @@ impl Default for SymbolDictionary {
             (OPTIMISM_DEPOSIT_FINALIZED, "BridgeIn"),
             (ARBITRUM_OUTBOUND_TRANSFER, "BridgeOut"),
             (SCROLL_MESSAGE_SENT, "BridgeOut"),
+            (SCROLL_FINALIZE_DEPOSIT_ERC20, "BridgeIn"),
+            (SCROLL_WITHDRAWAL_INITIATED, "BridgeOut"),
         ];
 
         for (topic_hex, symbol) in core_symbols {
@@ -298,6 +306,20 @@ mod tests {
     #[test]
     fn test_all_new_symbols_registered() {
         let dict = SymbolDictionary::default();
-        assert!(dict.len() >= 12);
+        assert!(dict.len() >= 14);
+    }
+
+    #[test]
+    fn test_scroll_bridge_in_v2() {
+        let dict = SymbolDictionary::default();
+        let topic = SCROLL_FINALIZE_DEPOSIT_ERC20.parse::<H256>().unwrap();
+        assert_eq!(dict.symbol_for_topic(topic), Some("BridgeIn"));
+    }
+
+    #[test]
+    fn test_scroll_bridge_out_v2() {
+        let dict = SymbolDictionary::default();
+        let topic = SCROLL_WITHDRAW_ERC20.parse::<H256>().unwrap();
+        assert_eq!(dict.symbol_for_topic(topic), Some("BridgeOut"));
     }
 }

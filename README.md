@@ -194,9 +194,10 @@ sods verify Tf --block 10002322 --json
   - `MintNFT`: ERC721/ERC1155 Mint (Transfer from 0x0)
   - `BuyNFT`: Seaport NFT purchases (OrderFulfilled)
   - `ListNFT`: Blur NFT listings (OrdersMatched)
-  - `BridgeIn`: L1→L2 bridge deposits (Optimism DepositFinalized)
-  - `BridgeOut`: L2→L1 withdrawals (Arbitrum OutboundTransfer, Scroll MessageSent)
+  - `BridgeIn`: L1→L2 bridge deposits (Optimism DepositFinalized, Scroll FinalizeDepositERC20)
+  - `BridgeOut`: L2→L1 withdrawals (Arbitrum OutboundTransfer, Scroll MessageSent/WithdrawalInitiated)
   - `Frontrun` / `Backrun`: MEV pattern presets for frontrun (Tf→Sw) and backrun (Sw→Tf) detection
+- **Production L2 Validation**: Confirmed behavioral symbol extraction on Scroll Mainnet and Polygon zkEVM Mainnet using on-chain blocks.
 - **Deployer Detection**: Advanced infrastructure to identify contract deployers for rug pull detection (`from == deployer` condition) with LRU caching.
 
 ## Behavioral Dictionary 2.0 (New!)
