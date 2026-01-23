@@ -20,7 +20,10 @@ library SODSVerifier {
     /// @param bmtRoot The Keccak256 BMT root to verify against.
     /// @param beaconRoot The expected beacon root (untrusted input from proof).
     /// @param timestamp The block timestamp.
-    /// @return bool True if the proof is valid and anchored.
+    /// @param receiptsRoot The root of the transaction receipts trie.
+    /// @param signature The ECDSA signature over the commitment.
+    /// @param trustedSigner The address authorized to sign BMT commitments.
+    /// @return bool True if the proof is valid, anchored, and signed (if provided).
     function verifyBehavior(
         uint256 blockNumber,
         uint256 chainId,
@@ -30,9 +33,36 @@ library SODSVerifier {
         bytes32[] calldata merklePath,
         bytes32 bmtRoot,
         bytes32 beaconRoot,
-        uint256 timestamp
+        uint256 timestamp,
+        bytes32 receiptsRoot,
+        bytes calldata signature,
+        address trustedSigner
     ) external view returns (bool) {
-        // 1. Anchor to Beacon Chain (EIP-4788)
+        // 1. Verify Commitment Signature (if provided)
+        if (signature.length == 65 && trustedSigner != address(0)) {
+            bytes32 commitmentHash = keccak256(abi.encodePacked(
+                uint64(chainId),
+                uint64(blockNumber),
+                receiptsRoot,
+                bmtRoot
+            ));
+            
+            // Extract v, r, s
+            bytes32 r;
+            bytes32 s;
+            uint8 v;
+            assembly {
+                r := calldataload(signature.offset)
+                s := calldataload(add(signature.offset, 32))
+                v := byte(0, calldataload(add(signature.offset, 64)))
+            }
+            if (v < 27) v += 27;
+
+            address recovered = ecrecover(commitmentHash, v, r, s);
+            if (recovered != trustedSigner) return false;
+        }
+
+        // 2. Anchor to Beacon Chain (EIP-4788)
         // We verify that the provided beaconRoot is actually part of Ethereum's consensus
         if (beaconRoot != bytes32(0)) {
             try IBeaconRoots(BEACON_ROOTS_ADDRESS).getBeaconRoot(uint64(timestamp)) returns (bytes32 trustedRoot) {

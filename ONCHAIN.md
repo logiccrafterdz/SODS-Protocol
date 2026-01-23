@@ -80,3 +80,40 @@ bool valid = SODSVerifier.verifyBehavior(
 
 > [!TIP]
 > This requires a post-Dencun block on a network that supports the EIP-4788 precompile (0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02).
+
+## Signed Behavioral Commitments
+
+For maximal security, SODS can sign a commitment that binds the BMT root to the block's `receiptsRoot`. This prevents any tampering with the BMT structure off-chain.
+
+### 1. Generate Signed Proof
+Provide a private key and the expected trusted signer address:
+```bash
+sods export-proof --pattern "LP-" --block 20000000 --chain ethereum \
+  --anchored \
+  --signing-key 0x... \
+  --trusted-signer 0x...
+```
+
+### 2. Verify On-Chain
+The contract will recover the signer from the signature and compare it against the `trustedSigner` address.
+
+```solidity
+SODSVerifier.verifyBehavior(
+    blockNumber,
+    chainId,
+    symbols,
+    indices,
+    leafHashes,
+    merklePath,
+    bmtRoot,
+    beaconRoot,
+    timestamp,
+    receiptsRoot,
+    signature,
+    trustedSigner
+);
+```
+
+### 3. Security Notes
+- **Replay Protection**: The commitment includes `chainId` and `blockNumber`.
+- **Integrity**: The signature covers both the block identifiers and the roots, ensuring the BMT matches the specific block logs.

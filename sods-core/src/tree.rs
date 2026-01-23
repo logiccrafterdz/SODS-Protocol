@@ -338,6 +338,8 @@ impl BehavioralMerkleTree {
             bmt_root: self.root,
             beacon_root,
             timestamp,
+            receipts_root: None,
+            signature: None,
         })
     }
 }

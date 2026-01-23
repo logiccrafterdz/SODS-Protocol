@@ -162,21 +162,18 @@ pub struct OnChainBehavioralProof {
     pub beacon_root: Option<[u8; 32]>,
     /// Block timestamp (for beacon root lookup)
     pub timestamp: u64,
+    /// Receipts root (for signed commitment)
+    pub receipts_root: Option<[u8; 32]>,
+    /// ECDSA signature (optional)
+    pub signature: Option<Vec<u8>>,
 }
 
 impl OnChainBehavioralProof {
     /// Export the proof as ABI-encoded calldata for `SODSVerifier.verifyBehavior`.
     pub fn to_calldata(&self) -> Vec<u8> {
-        // Function signature:
-        // verifyBehavior(uint256,uint256,string[],uint32[],bytes32[],bytes32[],bytes32,bytes32,uint256)
+        // signature: verifyBehavior(uint256,uint256,string[],uint32[],bytes32[],bytes32[],bytes32,bytes32,uint256,bytes32,bytes,address)
         
-        // This is complex to do manually without ethabi. 
-        // ABI encoding for dynamic arrays involves offsets.
-        
-        // Let's use a simpler, flat format for now or implement the correct offsets.
-        // Actually, the user asked for hex-encoded calldata for a specific signature.
-        
-        let mut data = Vec::new();
+        let mut data = Vec::with_capacity(384);
 
         // 1. blockNumber (uint256)
         let mut block_bytes = [0u8; 32];
@@ -188,71 +185,91 @@ impl OnChainBehavioralProof {
         chain_bytes[24..32].copy_from_slice(&self.chain_id.to_be_bytes());
         data.extend_from_slice(&chain_bytes);
 
-        // Offsets for dynamic types (relative to start of arguments, which is 7 slots = 224 bytes)
-        let mut offset = 224; 
+        // PLACEHOLDERS for dynamic offsets (3, 4, 5, 6, 11)
+        for _ in 0..4 { data.extend_from_slice(&[0u8; 32]); } // 3, 4, 5, 6
 
-        // 3. symbols (string[]) -> Offset at 0x40 (64)
-        let mut symbols_offset = [0u8; 32];
-        symbols_offset[31] = offset as u8; // Assuming small total size for PoC
-        data.extend_from_slice(&symbols_offset);
-        
-        let symbols_data = self.encode_string_array();
-        offset += symbols_data.len();
+        // 7. bmtRoot (bytes32)
+        data.extend_from_slice(&self.bmt_root);
 
-        // 9. timestamp (uint256) -> Fixed size at 0x100 (256)
+        // 8. beaconRoot (bytes32)
+        data.extend_from_slice(&self.beacon_root.unwrap_or([0u8; 32]));
+
+        // 9. timestamp (uint256)
         let mut ts_bytes = [0u8; 32];
         ts_bytes[24..32].copy_from_slice(&self.timestamp.to_be_bytes());
         data.extend_from_slice(&ts_bytes);
 
-        // Append dynamic data
+        // 10. receiptsRoot (bytes32)
+        data.extend_from_slice(&self.receipts_root.unwrap_or([0u8; 32]));
+
+        // 11. signature (bytes) OFFSET (placeholder)
+        data.extend_from_slice(&[0u8; 32]);
+
+        // 12. trustedSigner (address)
+        data.extend_from_slice(&[0u8; 32]); // Place holder for signer address (handled off-chain or ignored if not used)
+
         self.encode_with_dynamic_data(data)
     }
 
     fn encode_with_dynamic_data(&self, mut base_data: Vec<u8>) -> Vec<u8> {
-        let dynamic_start = 288; // 9 slots
+        let dynamic_start = 384; // 12 slots * 32
         let mut current_offset = dynamic_start;
 
-        // Correctly set offsets in the first 9 slots (which are already in base_data)
-        // Offset 3 (symbols) is at index 64
+        // Offset 3 (symbols) at index 64
         let mut symbols_offset = [0u8; 32];
         symbols_offset[31] = (current_offset % 256) as u8;
         symbols_offset[30] = (current_offset / 256) as u8;
         base_data[64..96].copy_from_slice(&symbols_offset);
-        
         let symbols_data = self.encode_string_array();
         current_offset += symbols_data.len();
 
-        // Offset 4 (logIndices) is at index 96
+        // Offset 4 (logIndices) at index 96
         let mut logs_offset = [0u8; 32];
         logs_offset[31] = (current_offset % 256) as u8;
         logs_offset[30] = (current_offset / 256) as u8;
         base_data[96..128].copy_from_slice(&logs_offset);
-
         let logs_data = self.encode_uint32_array();
         current_offset += logs_data.len();
 
-        // Offset 5 (leafHashes) is at index 128
+        // Offset 5 (leafHashes) at index 128
         let mut leaves_offset = [0u8; 32];
         leaves_offset[31] = (current_offset % 256) as u8;
         leaves_offset[30] = (current_offset / 256) as u8;
         base_data[128..160].copy_from_slice(&leaves_offset);
-
         let leaves_data = self.encode_bytes32_array(&self.leaf_hashes);
         current_offset += leaves_data.len();
 
-        // Offset 6 (merklePath) is at index 160
+        // Offset 6 (merklePath) at index 160
         let mut path_offset = [0u8; 32];
         path_offset[31] = (current_offset % 256) as u8;
         path_offset[30] = (current_offset / 256) as u8;
         base_data[160..192].copy_from_slice(&path_offset);
-
         let path_data = self.encode_bytes32_array(&self.merkle_path);
+        current_offset += path_data.len();
 
-        // Append dynamic data
+        // Offset 11 (signature) at index 320 (10th slot)
+        let mut sig_offset = [0u8; 32];
+        sig_offset[31] = (current_offset % 256) as u8;
+        sig_offset[30] = (current_offset / 256) as u8;
+        base_data[320..352].copy_from_slice(&sig_offset);
+        
+        let mut sig_data = Vec::new();
+        if let Some(sig) = &self.signature {
+            let mut sig_len = [0u8; 32];
+            sig_len[31] = sig.len() as u8;
+            sig_data.extend_from_slice(&sig_len);
+            sig_data.extend_from_slice(sig);
+            while sig_data.len() % 32 != 0 { sig_data.push(0); }
+        } else {
+            sig_data.extend_from_slice(&[0u8; 32]); // Length 0
+        }
+
+        // Append all dynamic data
         base_data.extend_from_slice(&symbols_data);
         base_data.extend_from_slice(&logs_data);
         base_data.extend_from_slice(&leaves_data);
         base_data.extend_from_slice(&path_data);
+        base_data.extend_from_slice(&sig_data);
 
         base_data
     }

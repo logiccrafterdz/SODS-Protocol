@@ -57,4 +57,6 @@ pub use shadow::BehavioralShadow;
 pub mod plugins;
 pub mod header_anchor;
 pub mod ssz;
+pub mod commitment;
+pub use commitment::BehavioralCommitment;
 pub use plugins::SymbolPlugin;

@@ -34,6 +34,14 @@ pub struct ExportProofArgs {
     /// Include beacon root anchor for on-chain verification
     #[arg(long)]
     pub anchored: bool,
+
+    /// Private key to sign the behavioral commitment (hex)
+    #[arg(long)]
+    pub signing_key: Option<String>,
+
+    /// Address authorized to sign commitments (hex)
+    #[arg(long)]
+    pub trusted_signer: Option<String>,
 }
 
 pub async fn run(args: ExportProofArgs) -> i32 {
@@ -83,34 +91,74 @@ pub async fn run(args: ExportProofArgs) -> i32 {
         let chain_id = 11155111; // Default to Sepolia
         
         // Fetch beacon root and timestamp if anchored
-        let (beacon_root, timestamp) = if args.anchored {
-            output::info("Fetching beacon root and timestamp for anchoring...");
+        let (beacon_root, timestamp, receipts_root) = if args.anchored {
+            output::info("Fetching block metadata for anchoring...");
             match verifier.fetch_block_header(args.block).await {
-                Ok(header) => (header.parent_beacon_block_root.map(|h| h.0), header.timestamp),
+                Ok(header) => (header.parent_beacon_block_root.map(|h| h.0), header.timestamp, Some(header.receipts_root.0)),
                 Err(e) => {
                     output::error(&format!("Failed to fetch block header for anchoring: {}", e));
                     return 1;
                 }
             }
         } else {
-            (None, 0)
+            (None, 0, None)
         };
 
-        if let Some(proof) = bmt.generate_onchain_proof(&matched, chain_id, args.block, beacon_root, timestamp) {
-            match args.format {
-                Format::Calldata => {
-                    let calldata = proof.to_calldata();
-                    println!("0x{}", hex::encode(calldata));
+        let mut proof = match bmt.generate_onchain_proof(&matched, chain_id, args.block, beacon_root, timestamp) {
+            Some(p) => p,
+            None => {
+                output::error("Failed to generate on-chain proof.");
+                return 1;
+            }
+        };
+
+        proof.receipts_root = receipts_root;
+
+        // Signing logic
+        if let Some(key_str) = args.signing_key {
+            output::info("Signing behavioral commitment...");
+            use ethers_signers::{LocalWallet, Signer};
+            
+            let wallet: LocalWallet = match key_str.parse() {
+                Ok(w) => w,
+                Err(e) => {
+                    output::error(&format!("Invalid signing key: {}", e));
+                    return 1;
                 }
-                Format::Json => {
-                    println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+            };
+
+            let commitment = sods_core::BehavioralCommitment::new(
+                chain_id,
+                args.block,
+                receipts_root.unwrap_or([0u8; 32]),
+                bmt.root(),
+            );
+
+            let hash = commitment.hash();
+            
+            // Sign the commitment hash
+            match wallet.sign_message(hash).await {
+                Ok(sig) => {
+                    proof.signature = Some(sig.to_vec());
+                    output::success(&format!("Commitment signed by {}", wallet.address()));
+                }
+                Err(e) => {
+                    output::error(&format!("Failed to sign commitment: {}", e));
+                    return 1;
                 }
             }
-            0
-        } else {
-            output::error("Failed to generate on-chain proof.");
-            1
         }
+
+        match args.format {
+            Format::Calldata => {
+                let calldata = proof.to_calldata();
+                println!("0x{}", hex::encode(calldata));
+            }
+            Format::Json => {
+                println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+            }
+        }
+        0
     } else {
         output::error("Pattern not found in block.");
         1
