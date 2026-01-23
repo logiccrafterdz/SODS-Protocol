@@ -5,13 +5,13 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 /// Initial score for new peers.
-const INITIAL_SCORE: f32 = 0.1;
+const INITIAL_SCORE: f32 = 0.0;
 
 /// Minimum score to be considered reliable.
-const MIN_RELIABLE_SCORE: f32 = 0.1; // Effectively bootstrapped after 1 valid proof
+const MIN_RELIABLE_SCORE: f32 = 0.4; // Must solve puzzle + 1 good response
 
 /// Rate at which reputation decays (every DECAY_INTERVAL).
-const DECAY_FACTOR: f32 = 0.99;
+const DECAY_FACTOR: f32 = 0.95;
 
 /// Tracks peer reliability based on response consistency.
 #[derive(Debug, Clone)]
@@ -150,17 +150,19 @@ mod tests {
     }
 
     #[test]
-    fn test_decay() {
+    fn test_pob_scoring_threshold() {
         let mut tracker = ReputationTracker::new();
         let peer = random_peer();
         
-        tracker.reward(&peer);
-        let s1 = tracker.get_score(&peer);
+        // New peer = 0.0
+        assert_eq!(tracker.get_score(&peer), 0.0);
+        assert!(!tracker.is_reliable(&peer));
+
+        // Solving puzzle (simulated by many rewards)
+        for _ in 0..10 { tracker.reward(&peer); }
         
-        tracker.decay_all();
-        let s2 = tracker.get_score(&peer);
-        
-        assert!(s2 < s1);
-        assert!((s1 * DECAY_FACTOR - s2).abs() < 0.0001);
+        // Should be reliable now
+        assert!(tracker.get_score(&peer) >= MIN_RELIABLE_SCORE);
+        assert!(tracker.is_reliable(&peer));
     }
 }

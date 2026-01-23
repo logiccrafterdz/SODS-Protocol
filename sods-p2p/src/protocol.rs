@@ -7,6 +7,9 @@ use sha2::{Digest, Sha256};
 /// Protocol name for SODS proof exchange.
 pub const PROTOCOL_NAME: &str = "/sods/proof/1.0.0";
 
+/// Protocol name for SODS Proof-of-Behavior puzzles.
+pub const PUZZLE_PROTOCOL_NAME: &str = "/sods/puzzle/1.0.0";
+
 /// Request for a behavioral proof.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRequest {
@@ -14,6 +17,22 @@ pub struct ProofRequest {
     pub symbol: String,
     /// The block number to query
     pub block_number: u64,
+}
+
+/// A Proof-of-Behavior puzzle challenge.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PuzzleChallenge {
+    pub chain_id: u64,
+    pub block_number: u64,
+    pub symbol: String,
+}
+
+/// A solution to a Proof-of-Behavior puzzle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PuzzleSolution {
+    pub occurrences: u32,
+    /// Success indicator
+    pub success: bool,
 }
 
 /// Response containing a behavioral proof with cryptographic signature.

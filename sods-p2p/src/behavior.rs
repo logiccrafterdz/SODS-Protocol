@@ -13,6 +13,11 @@ pub fn sods_protocol() -> StreamProtocol {
     StreamProtocol::new("/sods/proof/1.0.0")
 }
 
+/// Protocol identifier for SODS puzzles.
+pub fn puzzle_protocol() -> StreamProtocol {
+    StreamProtocol::new("/sods/puzzle/1.0.0")
+}
+
 /// Combined network behavior for SODS P2P.
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "SodsBehaviourEvent")]
@@ -21,6 +26,8 @@ pub struct SodsBehaviour {
     pub identify: identify::Behaviour,
     /// Request-response for proof exchange
     pub request_response: request_response::cbor::Behaviour<ProofRequest, ProofResponse>,
+    /// Request-response for puzzles
+    pub puzzle: request_response::cbor::Behaviour<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>,
     /// Gossipsub for threat intelligence
     pub gossipsub: gossipsub::Behaviour,
 }
@@ -32,6 +39,8 @@ pub enum SodsBehaviourEvent {
     Identify(identify::Event),
     /// Request-response event
     RequestResponse(request_response::Event<ProofRequest, ProofResponse>),
+    /// Puzzle event
+    Puzzle(request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>),
     /// Gossipsub event
     Gossipsub(gossipsub::Event),
 }
@@ -45,6 +54,12 @@ impl From<identify::Event> for SodsBehaviourEvent {
 impl From<request_response::Event<ProofRequest, ProofResponse>> for SodsBehaviourEvent {
     fn from(event: request_response::Event<ProofRequest, ProofResponse>) -> Self {
         SodsBehaviourEvent::RequestResponse(event)
+    }
+}
+
+impl From<request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>> for SodsBehaviourEvent {
+    fn from(event: request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>) -> Self {
+        SodsBehaviourEvent::Puzzle(event)
     }
 }
 
@@ -72,6 +87,12 @@ impl SodsBehaviour {
             request_response::Config::default(),
         );
 
+        // Puzzle config
+        let puzzle = request_response::cbor::Behaviour::new(
+            [(puzzle_protocol(), request_response::ProtocolSupport::Full)],
+            request_response::Config::default(),
+        );
+
         // Gossipsub config
         let message_authenticity = gossipsub::MessageAuthenticity::Signed(keypair.clone());
         let gossipsub_config = gossipsub::ConfigBuilder::default()
@@ -86,6 +107,7 @@ impl SodsBehaviour {
         Self {
             identify,
             request_response,
+            puzzle,
             gossipsub,
         }
     }

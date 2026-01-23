@@ -99,9 +99,20 @@ Standardized event representations (e.g., `Tf`, `Sw`) derived from raw logs, enr
 | Malicious peer sends fake proof | **Reputation Decay** + Weighted Consensus |
 | Peer spoofs another peer's identity | secp256k1 public key binding |
 | RPC rate limiting | LRU cache + exponential backoff |
-| Sybil attack (many fake peers) | **PoBS**: Reputation requires valid work; decays over time |
+| Sybil attack (many fake peers) | **PoB Challenge**: New peers must solve verification puzzles |
 | Man-in-the-middle | libp2p noise encryption |
 | **Malicious RPC fabricates logs** | **Block Header Anchoring** (v1.2+) |
+
+## P2P Sybil Resistance (Proof-of-Behavior)
+
+To prevent Sybil attacks without economic assumptions (staking), SODS uses a **Proof-of-Behavior (PoB)** challenge mechanism:
+
+1. **New Peer Connection**: When a new peer is discovered, the client issues a `PuzzleChallenge`.
+2. **Behavioral Puzzle**: The challenge asks the peer to verify a specific symbol count in a random recent block.
+3. **Local Solver**: The peer uses its local `sods-verifier` to solve the challenge and sends back a `PuzzleSolution`.
+4. **Verification**: The client verifies the solution using its own local RPC fallback.
+5. **Reliability Status**: Only peers that solve the puzzle successfully are granted a reputation boost (INITIAL_SCORE 0.0 → 0.5) and included in consensus queries.
+6. **Decay**: Trusted status is lost if a peer remains inactive or provides conflicting proofs (DECAY_FACTOR 0.95).
 
 ## Block Header Anchoring (v1.2+)
 

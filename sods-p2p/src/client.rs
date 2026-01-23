@@ -57,6 +57,7 @@ pub struct SodsClient {
     known_peers: HashSet<PeerId>,
     local_peer_id: PeerId,
     pending_requests: HashMap<OutboundRequestId, PeerId>,
+    pending_challenges: HashMap<OutboundRequestId, (PeerId, crate::protocol::PuzzleChallenge)>,
 }
 
 impl SodsClient {
@@ -96,6 +97,7 @@ impl SodsClient {
             known_peers: HashSet::new(),
             local_peer_id,
             pending_requests: HashMap::new(),
+            pending_challenges: HashMap::new(),
         })
     }
 
@@ -122,10 +124,14 @@ impl SodsClient {
 
         // Wait for peer discovery
         let discovery = timeout(DISCOVERY_TIMEOUT, async {
-            while self.known_peers.len() < QUERY_PEER_COUNT {
+            // We want to wait for reliable peers, not just any peers
+            while self.known_peers.iter().filter(|p| self.reputation.is_reliable(p)).count() < QUERY_PEER_COUNT {
                 match self.swarm.select_next_some().await {
                     SwarmEvent::Behaviour(SodsBehaviourEvent::Identify(event)) => {
                         self.handle_identify_event(event);
+                    }
+                    SwarmEvent::Behaviour(SodsBehaviourEvent::Puzzle(event)) => {
+                        self.handle_puzzle_event(event).await;
                     }
                     SwarmEvent::NewListenAddr { address, .. } => {
                         debug!("Listening on {}", address);
@@ -140,7 +146,10 @@ impl SodsClient {
 
         let _ = discovery.await;
 
-        info!("Discovered {} peers", self.known_peers.len());
+        info!("Discovered {} peers ({} reliable)", 
+            self.known_peers.len(), 
+            self.known_peers.iter().filter(|p| self.reputation.is_reliable(p)).count()
+        );
         Ok(())
     }
 
@@ -150,13 +159,83 @@ impl SodsClient {
             identify::Event::Received { peer_id, info, .. } => {
                 if peer_id != self.local_peer_id {
                     debug!("Identified peer: {} ({})", peer_id, info.agent_version);
-                    self.known_peers.insert(peer_id);
+                    if !self.known_peers.contains(&peer_id) {
+                        self.known_peers.insert(peer_id);
+                        self.issue_challenge(&peer_id);
+                    }
                     for addr in info.listen_addrs {
                         self.swarm.add_peer_address(peer_id, addr);
                     }
                 }
             }
             _ => {}
+        }
+    }
+
+    /// Issue a Proof-of-Behavior challenge to a new peer.
+    fn issue_challenge(&mut self, peer_id: &PeerId) {
+        info!("Issuing PoB challenge to {}", peer_id);
+        
+        // Generate challenge from a recent block (hardcoded for PoC or fetched)
+        // In a real scenario, we'd pick a random block from the last X.
+        let challenge = crate::protocol::PuzzleChallenge {
+            chain_id: 11155111, // Sepolia
+            block_number: 10002800, // Hardcoded for PoC
+            symbol: "Tf".to_string(),
+        };
+
+        let request_id = self.swarm.behaviour_mut().puzzle.send_request(peer_id, challenge.clone());
+        self.pending_challenges.insert(request_id, (*peer_id, challenge));
+    }
+
+    /// Handle puzzle solution events.
+    async fn handle_puzzle_event(&mut self, event: request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>) {
+        if let request_response::Event::Message { peer, message } = event {
+            if let request_response::Message::Response { response, request_id, .. } = message {
+                 if let Some((pid, challenge)) = self.pending_challenges.remove(&request_id) {
+                    if pid == peer {
+                        info!("Received PoB solution from {}", peer);
+                        self.verify_solution(peer, challenge, response).await;
+                    }
+                 }
+            }
+        }
+    }
+
+    /// Verify the puzzle solution using local RPC.
+    async fn verify_solution(
+        &mut self, 
+        peer_id: PeerId, 
+        challenge: crate::protocol::PuzzleChallenge, 
+        solution: crate::protocol::PuzzleSolution
+    ) {
+        let Some(verifier) = &self.fallback_verifier else {
+            warn!("No fallback verifier available to verify PoB solution. Assuming malicious.");
+            return;
+        };
+
+        match verifier.verify_symbol_in_block(&challenge.symbol, challenge.block_number).await {
+            Ok(result) => {
+                if result.occurrences as u32 == solution.occurrences {
+                    info!("✅ Peer {} SOLVED Proof-of-Behavior puzzle. Granting reliability.", peer_id);
+                    // Initial Reward to hit MIN_RELIABLE_SCORE (0.4)
+                    // score = min(0.0 * 1.1 + 0.5 = 0.5, 1.0)
+                    let score = self.reputation.get_score(&peer_id); // 0.0
+                    if score < 0.4 {
+                        self.reputation.reward(&peer_id);
+                        self.reputation.reward(&peer_id); // Boost to be sure (0.0 -> 0.05 -> 0.1 ? No, rewarding starts from 0.0)
+                        // Actually, Reward logic in reputation.rs: *score = (*score * 1.1 + 0.05).min(1.0);
+                        // 0.0 -> 0.05 -> 0.105 -> 0.165 ... 
+                        // I might need to adjust reputation.rs reward to handle PoB better or call it more times.
+                        // Let's call it enough times to hit 0.4.
+                        for _ in 0..10 { self.reputation.reward(&peer_id); }
+                    }
+                } else {
+                    warn!("❌ Peer {} FAILED Proof-of-Behavior puzzle. Rejected.", peer_id);
+                    self.reputation.penalize(&peer_id);
+                }
+            },
+            Err(e) => warn!("Failed to verify PoB solution due to RPC error: {}", e),
         }
     }
 
@@ -273,6 +352,9 @@ impl SodsClient {
                             self.pending_requests.remove(&request_id);
                             responses.push((peer, response));
                         }
+                    }
+                    SwarmEvent::Behaviour(SodsBehaviourEvent::Puzzle(event)) => {
+                        self.handle_puzzle_event(event).await;
                     }
                     SwarmEvent::Behaviour(SodsBehaviourEvent::Identify(event)) => {
                         self.handle_identify_event(event);

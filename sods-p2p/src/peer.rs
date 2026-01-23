@@ -140,6 +140,9 @@ impl SodsPeer {
                 SwarmEvent::Behaviour(SodsBehaviourEvent::RequestResponse(event)) => {
                     self.handle_request_response_event(event).await;
                 }
+                SwarmEvent::Behaviour(SodsBehaviourEvent::Puzzle(event)) => {
+                    self.handle_puzzle_event(event).await;
+                }
                 SwarmEvent::Behaviour(SodsBehaviourEvent::Gossipsub(event)) => {
                     self.handle_gossip_event(event);
                 }
@@ -310,5 +313,58 @@ impl SodsPeer {
         }
 
         ProofResponse::error_signed("Failed to generate proof", &self.signing_key)
+    }
+    /// Handle puzzle-related events.
+    async fn handle_puzzle_event(
+        &mut self,
+        event: request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>,
+    ) {
+        use request_response::Event;
+
+        match event {
+            Event::Message { peer, message } => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    info!("Received PoB challenge from {}: {:?}", peer, request);
+                    let response = self.solve_puzzle(request).await;
+
+                    if let Err(e) = self
+                        .swarm
+                        .behaviour_mut()
+                        .puzzle
+                        .send_response(channel, response)
+                    {
+                        warn!("Failed to send puzzle response: {:?}", e);
+                    }
+                }
+                request_response::Message::Response { .. } => {
+                    // Peers don't receive puzzle responses
+                }
+            },
+            _ => {
+                // Handle failures if necessary
+            }
+        }
+    }
+
+    /// Solve a Proof-of-Behavior puzzle.
+    async fn solve_puzzle(&mut self, challenge: crate::protocol::PuzzleChallenge) -> crate::protocol::PuzzleSolution {
+        match self
+            .verifier
+            .verify_symbol_in_block(&challenge.symbol, challenge.block_number)
+            .await
+        {
+            Ok(result) => {
+                crate::protocol::PuzzleSolution {
+                    occurrences: result.occurrences as u32,
+                    success: true,
+                }
+            }
+            Err(_) => crate::protocol::PuzzleSolution {
+                occurrences: 0,
+                success: false,
+            },
+        }
     }
 }
