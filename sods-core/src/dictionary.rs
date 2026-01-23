@@ -44,6 +44,15 @@ const SEAPORT_ORDER_FULFILLED: &str = "0x9d9af8e38d66c62e2c12f0225249fd9d721c54b
 /// Optimism DepositFinalized(...) / L1->L2 Bridge
 const OPTIMISM_DEPOSIT_FINALIZED: &str = "0xeb2b8427f7a793d5d7107771239e3ec40089856f67566606f35b6279f06574f2";
 
+/// Blur: OrdersMatched(bytes32 indexed orderHash, bytes32 indexed orderHash2, ...)
+const BLUR_ORDERS_MATCHED: &str = "0x61cbb2a3dee0b6064c2e681aadd61677fb4ef319f0b547508d495626f5a62f64";
+
+/// Arbitrum OutboundTransferInitiated (L2->L1 withdrawal)
+const ARBITRUM_OUTBOUND_TRANSFER: &str = "0x3073a74ecb728d10be779fe19a74a1428e20468f5b4d167bf9c73d9067847d73";
+
+/// Scroll L2->L1 MessageSent for bridge withdrawals
+const SCROLL_MESSAGE_SENT: &str = "0x104371f3b442861a2a7b82a070afbbaab748bb13757bf47769e170e37809ec1e";
+
 use ethers_core::types::{Address, U256};
 
 // ============================================================================
@@ -80,7 +89,10 @@ impl Default for SymbolDictionary {
             (MINT_V2_TOPIC, "LP+"),
             (BURN_V2_TOPIC, "LP-"),
             (SEAPORT_ORDER_FULFILLED, "BuyNFT"),
+            (BLUR_ORDERS_MATCHED, "ListNFT"),
             (OPTIMISM_DEPOSIT_FINALIZED, "BridgeIn"),
+            (ARBITRUM_OUTBOUND_TRANSFER, "BridgeOut"),
+            (SCROLL_MESSAGE_SENT, "BridgeOut"),
         ];
 
         for (topic_hex, symbol) in core_symbols {

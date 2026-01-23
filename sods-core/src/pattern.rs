@@ -42,11 +42,15 @@ impl BehavioralPattern {
                 ]
             }),
             "Frontrun" => return Ok(Self {
-                // Heuristic: High gas price Tf often indicates frontrun, 
-                // but here we just look for Tf -> Sw pattern as a placeholder
                 steps: vec![
                     PatternStep::Exact("Tf".into(), PatternCondition::None),
                     PatternStep::Exact("Sw".into(), PatternCondition::None),
+                ]
+            }),
+            "Backrun" => return Ok(Self {
+                steps: vec![
+                    PatternStep::Exact("Sw".into(), PatternCondition::None),
+                    PatternStep::Exact("Tf".into(), PatternCondition::None),
                 ]
             }),
             _ => {}
