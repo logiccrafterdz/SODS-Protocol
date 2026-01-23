@@ -111,6 +111,7 @@ impl BehavioralShadow {
         match condition {
             PatternCondition::None => true,
             PatternCondition::FromDeployer => symbol.is_from_deployer,
+            PatternCondition::ValueGreaterThan(threshold) => symbol.value > *threshold,
         }
     }
     

@@ -78,6 +78,8 @@ fn list_symbols() -> i32 {
     output::info("You can also verify complex behavioral sequences:");
     println!("  {:<20} {}", "Sequence", "Use '->' (e.g., 'LP+ -> Sw -> LP-')");
     println!("  {:<20} {}", "Exact Count", "Use '{n}' (e.g., 'Sw{3}' for 3 Swaps)");
+    println!("  {:<20} {}", "Context Filter", "Use 'where from == deployer'");
+    println!("  {:<20} {}", "Value Filter", "Use 'where value > 10 ether' (or gwei)");
     
     println!();
     output::hint("Load new symbols: sods symbols load <URL>");

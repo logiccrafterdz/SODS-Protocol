@@ -1,3 +1,4 @@
+use ethers_core::types::U256;
 use crate::symbol::BehavioralSymbol;
 use crate::error::{SodsError, Result};
 
@@ -5,6 +6,7 @@ use crate::error::{SodsError, Result};
 pub enum PatternCondition {
     None,
     FromDeployer,
+    ValueGreaterThan(U256),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -71,6 +73,10 @@ impl BehavioralPattern {
                 
                 let cond = if cond_str == "from == deployer" {
                     PatternCondition::FromDeployer
+                } else if let Some(stripped) = cond_str.strip_prefix("value >") {
+                    let amount_str = stripped.trim();
+                    let amount = parse_amount(amount_str)?;
+                    PatternCondition::ValueGreaterThan(amount)
                 } else {
                     return Err(SodsError::PatternError(format!("Unsupported condition: {}", cond_str)));
                 };
@@ -200,8 +206,38 @@ impl BehavioralPattern {
         match condition {
             PatternCondition::None => true,
             PatternCondition::FromDeployer => symbol.is_from_deployer,
+            PatternCondition::ValueGreaterThan(threshold) => symbol.value > *threshold,
         }
     }
+}
+
+fn parse_amount(input: &str) -> Result<U256> {
+    let parts: Vec<&str> = input.split_whitespace().collect();
+    if parts.is_empty() {
+        return Err(SodsError::PatternError("Empty amount".to_string()));
+    }
+
+    if parts.len() == 1 {
+        // Raw integer
+        return U256::from_dec_str(parts[0])
+            .map_err(|e| SodsError::PatternError(format!("Invalid amount: {}", e)));
+    }
+
+    if parts.len() == 2 {
+        let value = parts[0].parse::<f64>()
+            .map_err(|_| SodsError::PatternError(format!("Invalid number: {}", parts[0])))?;
+        let unit = parts[1].to_lowercase();
+
+        let multiplier = match unit.as_str() {
+            "ether" => 1_000_000_000_000_000_000f64,
+            "gwei" => 1_000_000_000f64,
+            _ => return Err(SodsError::PatternError(format!("Unsupported unit: {}", unit))),
+        };
+
+        return Ok(U256::from((value * multiplier) as u128));
+    }
+
+    Err(SodsError::PatternError(format!("Malformed amount: {}", input)))
 }
 
 #[cfg(test)]
@@ -296,5 +332,46 @@ mod tests {
         let symbols = vec![mock_sym("Sw", 0), mock_sym("Tf", 1)];
         let p = BehavioralPattern::parse("Backrun").unwrap();
         assert!(p.matches(&symbols).is_some());
+    }
+
+    #[test]
+    fn test_parse_value_condition() {
+        let p = BehavioralPattern::parse("Tf where value > 1 ether").unwrap();
+        match &p.steps[0] {
+            PatternStep::Exact(s, PatternCondition::ValueGreaterThan(v)) => {
+                assert_eq!(s, "Tf");
+                assert_eq!(*v, U256::from(1_000_000_000_000_000_000u128));
+            }
+            _ => panic!("Wrong step type or condition"),
+        }
+    }
+
+    #[test]
+    fn test_match_value_condition() {
+        use ethers_core::types::Address;
+        let sym_high = BehavioralSymbol::new("Tf", 0)
+            .with_context(Address::zero(), Address::zero(), U256::from(2_000_000_000_000_000_000u128), None);
+        let sym_low = BehavioralSymbol::new("Tf", 1)
+            .with_context(Address::zero(), Address::zero(), U256::from(500_000_000_000_000_000u128), None);
+        
+        let p = BehavioralPattern::parse("Tf where value > 1 ether").unwrap();
+        
+        // High value matches
+        assert!(p.matches(&vec![sym_high]).is_some());
+        // Low value fails
+        assert!(p.matches(&vec![sym_low]).is_none());
+    }
+
+    #[test]
+    fn test_parse_amount_units() {
+        assert_eq!(parse_amount("10 ether").unwrap(), U256::from(10_000_000_000_000_000_000u128));
+        assert_eq!(parse_amount("500 gwei").unwrap(), U256::from(500_000_000_000u128));
+        assert_eq!(parse_amount("1000000").unwrap(), U256::from(1_000_000));
+    }
+
+    #[test]
+    fn test_parse_invalid_amount() {
+        assert!(parse_amount("10 eth").is_err()); // "ether" expected
+        assert!(parse_amount("abc ether").is_err());
     }
 }

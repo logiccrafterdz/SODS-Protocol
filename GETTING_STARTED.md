@@ -180,10 +180,16 @@ sods verify "Frontrun" --block 20000000 --chain ethereum
 sods verify "Backrun" --block 20000000 --chain ethereum
 ```
 
-### Rug Pull Detection with Deployer Context
-Detect potential rug pulls by monitoring deployer activity:
+### Context-Aware Patterns (New in v1.2)
+Enhance your detection with contextual conditions like `from == deployer` and `value` comparisons.
 
 ```bash
 # Monitor for LP removal by deployer (high confidence rug indicator)
 sods monitor --pattern "LP+ where from == deployer -> Sw{2,} -> LP-" --chain base --interval 10s
+
+# Verify high-value transfers in a block
+sods verify "Tf where value > 50 ether" --block 20000000 --chain ethereum
+
+# Detect large swaps on Base
+sods verify "Sw where value > 10000 gwei" --block 9000000 --chain base
 ```
