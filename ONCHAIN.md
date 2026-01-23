@@ -40,7 +40,7 @@ contract BehavioralGuard {
 ```
 
 ### 3. Generate Proof via CLI
-Use SODS CLI to generate the calldata needed for your contract:
+Use SODS CLI to generate the calldata needed for your contract. SODS now uses the `ethabi` library (v2.0 ABI) for 100% Solidity compatibility.
 
 ```bash
 sods export-proof --pattern "LP-" --block 123456 --chain base --format calldata

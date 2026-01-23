@@ -172,164 +172,44 @@ impl OnChainBehavioralProof {
     /// Export the proof as ABI-encoded calldata for `SODSVerifier.verifyBehavior`.
     pub fn to_calldata(&self) -> Vec<u8> {
         // signature: verifyBehavior(uint256,uint256,string[],uint32[],bytes32[],bytes32[],bytes32,bytes32,uint256,bytes32,bytes,address)
-        
-        let mut data = Vec::with_capacity(384);
+        use ethabi::{encode, Token};
 
-        // 1. blockNumber (uint256)
-        let mut block_bytes = [0u8; 32];
-        block_bytes[24..32].copy_from_slice(&self.block_number.to_be_bytes());
-        data.extend_from_slice(&block_bytes);
+        let tokens = vec![
+            Token::Uint(self.block_number.into()),
+            Token::Uint(self.chain_id.into()),
+            Token::Array(
+                self.symbols
+                    .iter()
+                    .map(|s| Token::String(s.clone()))
+                    .collect(),
+            ),
+            Token::Array(
+                self.log_indices
+                    .iter()
+                    .map(|&i| Token::Uint(i.into()))
+                    .collect(),
+            ),
+            Token::Array(
+                self.leaf_hashes
+                    .iter()
+                    .map(|&h| Token::FixedBytes(h.to_vec()))
+                    .collect(),
+            ),
+            Token::Array(
+                self.merkle_path
+                    .iter()
+                    .map(|&h| Token::FixedBytes(h.to_vec()))
+                    .collect(),
+            ),
+            Token::FixedBytes(self.bmt_root.to_vec()),
+            Token::FixedBytes(self.beacon_root.unwrap_or([0u8; 32]).to_vec()),
+            Token::Uint(self.timestamp.into()),
+            Token::FixedBytes(self.receipts_root.unwrap_or([0u8; 32]).to_vec()),
+            Token::Bytes(self.signature.clone().unwrap_or_default()),
+            Token::Address(ethabi::Address::zero()), // trustedSigner (placeholder)
+        ];
 
-        // 2. chainId (uint256)
-        let mut chain_bytes = [0u8; 32];
-        chain_bytes[24..32].copy_from_slice(&self.chain_id.to_be_bytes());
-        data.extend_from_slice(&chain_bytes);
-
-        // PLACEHOLDERS for dynamic offsets (3, 4, 5, 6, 11)
-        for _ in 0..4 { data.extend_from_slice(&[0u8; 32]); } // 3, 4, 5, 6
-
-        // 7. bmtRoot (bytes32)
-        data.extend_from_slice(&self.bmt_root);
-
-        // 8. beaconRoot (bytes32)
-        data.extend_from_slice(&self.beacon_root.unwrap_or([0u8; 32]));
-
-        // 9. timestamp (uint256)
-        let mut ts_bytes = [0u8; 32];
-        ts_bytes[24..32].copy_from_slice(&self.timestamp.to_be_bytes());
-        data.extend_from_slice(&ts_bytes);
-
-        // 10. receiptsRoot (bytes32)
-        data.extend_from_slice(&self.receipts_root.unwrap_or([0u8; 32]));
-
-        // 11. signature (bytes) OFFSET (placeholder)
-        data.extend_from_slice(&[0u8; 32]);
-
-        // 12. trustedSigner (address)
-        data.extend_from_slice(&[0u8; 32]); // Place holder for signer address (handled off-chain or ignored if not used)
-
-        self.encode_with_dynamic_data(data)
-    }
-
-    fn encode_with_dynamic_data(&self, mut base_data: Vec<u8>) -> Vec<u8> {
-        let dynamic_start = 384; // 12 slots * 32
-        let mut current_offset = dynamic_start;
-
-        // Offset 3 (symbols) at index 64
-        let mut symbols_offset = [0u8; 32];
-        symbols_offset[31] = (current_offset % 256) as u8;
-        symbols_offset[30] = (current_offset / 256) as u8;
-        base_data[64..96].copy_from_slice(&symbols_offset);
-        let symbols_data = self.encode_string_array();
-        current_offset += symbols_data.len();
-
-        // Offset 4 (logIndices) at index 96
-        let mut logs_offset = [0u8; 32];
-        logs_offset[31] = (current_offset % 256) as u8;
-        logs_offset[30] = (current_offset / 256) as u8;
-        base_data[96..128].copy_from_slice(&logs_offset);
-        let logs_data = self.encode_uint32_array();
-        current_offset += logs_data.len();
-
-        // Offset 5 (leafHashes) at index 128
-        let mut leaves_offset = [0u8; 32];
-        leaves_offset[31] = (current_offset % 256) as u8;
-        leaves_offset[30] = (current_offset / 256) as u8;
-        base_data[128..160].copy_from_slice(&leaves_offset);
-        let leaves_data = self.encode_bytes32_array(&self.leaf_hashes);
-        current_offset += leaves_data.len();
-
-        // Offset 6 (merklePath) at index 160
-        let mut path_offset = [0u8; 32];
-        path_offset[31] = (current_offset % 256) as u8;
-        path_offset[30] = (current_offset / 256) as u8;
-        base_data[160..192].copy_from_slice(&path_offset);
-        let path_data = self.encode_bytes32_array(&self.merkle_path);
-        current_offset += path_data.len();
-
-        // Offset 11 (signature) at index 320 (10th slot)
-        let mut sig_offset = [0u8; 32];
-        sig_offset[31] = (current_offset % 256) as u8;
-        sig_offset[30] = (current_offset / 256) as u8;
-        base_data[320..352].copy_from_slice(&sig_offset);
-        
-        let mut sig_data = Vec::new();
-        if let Some(sig) = &self.signature {
-            let mut sig_len = [0u8; 32];
-            sig_len[31] = sig.len() as u8;
-            sig_data.extend_from_slice(&sig_len);
-            sig_data.extend_from_slice(sig);
-            while sig_data.len() % 32 != 0 { sig_data.push(0); }
-        } else {
-            sig_data.extend_from_slice(&[0u8; 32]); // Length 0
-        }
-
-        // Append all dynamic data
-        base_data.extend_from_slice(&symbols_data);
-        base_data.extend_from_slice(&logs_data);
-        base_data.extend_from_slice(&leaves_data);
-        base_data.extend_from_slice(&path_data);
-        base_data.extend_from_slice(&sig_data);
-
-        base_data
-    }
-
-    fn encode_string_array(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        // Array length
-        let mut len_bytes = [0u8; 32];
-        len_bytes[31] = self.symbols.len() as u8;
-        data.extend_from_slice(&len_bytes);
-
-        // For string[], each element has an offset
-        let mut offset = self.symbols.len() * 32;
-        let mut dynamic_data = Vec::new();
-
-        for s in &self.symbols {
-            let mut off_bytes = [0u8; 32];
-            off_bytes[31] = offset as u8;
-            data.extend_from_slice(&off_bytes);
-
-            // String data: length then content padded to 32 bytes
-            let mut str_len = [0u8; 32];
-            str_len[31] = s.len() as u8;
-            dynamic_data.extend_from_slice(&str_len);
-            
-            let mut content = s.as_bytes().to_vec();
-            while content.len() % 32 != 0 { content.push(0); }
-            dynamic_data.extend_from_slice(&content);
-            
-            offset += 32 + content.len();
-        }
-        data.extend_from_slice(&dynamic_data);
-        data
-    }
-
-    fn encode_uint32_array(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        let mut len_bytes = [0u8; 32];
-        len_bytes[31] = self.log_indices.len() as u8;
-        data.extend_from_slice(&len_bytes);
-
-        for &idx in &self.log_indices {
-            let mut val = [0u8; 32];
-            val[31] = (idx % 256) as u8;
-            val[30] = (idx / 256) as u8;
-            data.extend_from_slice(&val);
-        }
-        data
-    }
-
-    fn encode_bytes32_array(&self, arr: &[[u8; 32]]) -> Vec<u8> {
-        let mut data = Vec::new();
-        let mut len_bytes = [0u8; 32];
-        len_bytes[31] = arr.len() as u8;
-        data.extend_from_slice(&len_bytes);
-
-        for &val in arr {
-            data.extend_from_slice(&val);
-        }
-        data
+        encode(&tokens)
     }
 }
 

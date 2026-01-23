@@ -4194,6 +4194,7 @@ name = "sods-core"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "ethabi",
  "ethers-core",
  "hash-db",
  "hex",

@@ -20,6 +20,7 @@ hash-db = "0.15"
 
 # Ethereum types: H256, Address, Log, etc.
 ethers-core = "2.0"
+ethabi = "18"
 
 # Serialization for proofs and symbols
 serde = { version = "1.0", features = ["derive"] }
