@@ -112,6 +112,9 @@ pub const SYMBOLS: &[(&str, &str)] = &[
     ("Frontrun", "MEV Frontrun Pattern (Tf → Sw)"),
     ("Backrun", "MEV Backrun Pattern (Sw → Tf)"),
     ("Sandwich", "MEV Sandwich Pattern (Tf → Sw → Tf)"),
+    ("AAOp", "ERC-4337 UserOperation execution"),
+    ("Permit2", "Permit2 gasless approval"),
+    ("CoWTrade", "CoW Swap intent fulfillment"),
 ];
 
 /// Check if a symbol is supported.

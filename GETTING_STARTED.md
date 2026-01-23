@@ -190,6 +190,20 @@ sods verify "Frontrun" --block 20000000 --chain ethereum
 sods verify "Backrun" --block 20000000 --chain ethereum
 ```
 
+### Next-Gen Behavior Monitoring (v2.2)
+Monitor emerging Web3 paradigms like Account Abstraction, Permit2, and CoW Swap:
+
+```bash
+# Detect ERC-4337 UserOperation executions (AAOp)
+sods verify "AAOp" --block 20000000 --chain ethereum
+
+# Monitor Permit2 gasless approvals on Base
+sods trend --pattern "Permit2" --chain base --window 50
+
+# Verify CoW Swap intent fulfillments
+sods verify "CoWTrade" --block 20000000 --chain ethereum
+```
+
 ### Context-Aware Patterns (New in v1.2)
 Enhance your detection with contextual conditions like `from == deployer` and `value` comparisons.
 

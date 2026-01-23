@@ -33,6 +33,9 @@ We've built a minimal PoC that verifies behavioral patterns in Sepolia blocks �
 | `ListNFT` | NFT Listing (Blur) | 202 bytes  | < 1 ms            |
 | `BridgeIn` | L1→L2 Deposit     | 202 bytes  | < 1 ms            |
 | `BridgeOut` | L2→L1 Withdrawal | 202 bytes  | < 1 ms            |
+| `AAOp`  | ERC-4337 UserOp      | 202 bytes  | < 1 ms            |
+| `Permit2`| Gasless Approval    | 202 bytes  | < 1 ms            |
+| `CoWTrade`| CoW Swap Intent    | 202 bytes  | < 1 ms            |
 
 **[See the full PoC results and code](poc/)**
 
@@ -151,6 +154,11 @@ sods monitor --pattern "Sw{3,}" --chain base --interval 30s
 # Run as background daemon with community threat feed (and webhooks)
 sods daemon start --threat-feed "https://raw.githubusercontent.com/sods/threats/main/base.json" --chain base --webhook-url "https://ntfy.sh/my_alerts" --autostart
 
+# Monitor Next-Gen Activity (New in v2.2)
+sods verify AAOp --block 20000000 --chain ethereum
+sods trend --pattern "Permit2" --chain base --window 50
+sods verify "CoWTrade" --block 20000000 --chain ethereum
+
 
 
 
@@ -228,6 +236,14 @@ sods verify Tf --block 10002322 --json
 - **Dynamic L2 Event Resolution**: Moving from hardcoded topic hashes to dynamic signature hashing. SODS is now resilient to bridge contract redeploys and upgrades on L2s (Scroll, Polygon zkEVM, etc.).
 - **Daemon Memory Leak Fix (GC)**: Periodic garbage collection of expired monitoring rules (every 5 minutes). Long-running daemons now maintain a stable memory footprint.
 - **Customizable Expiration**: New `--expire-after` flag for the daemon to automatically prune old threat reports.
+
+## What's New in v2.2 (Next-Gen Dictionary)
+
+- **ERC-4337 Support (`AAOp`)**: Detect and verify Account Abstraction UserOperation executions with `user_op_hash` context.
+- **Permit2 Support (`Permit2`)**: Monitor gasless token approvals and extract expiration deadlines.
+- **Intent-Based Fulfillments (`CoWTrade`)**: Verify CoW Swap trade fulfillments directly from settlement events.
+- **Enriched Behavioral Metadata**: `BehavioralSymbol` now natively supports `user_op_hash`, `permit_deadline`, and `solver` fields.
+- **Expanded L2 Dictionary**: Canonical support for next-gen events on Base, Arbitrum, Optimism, and Scroll.
 
 ## Behavioral Dictionary 2.0 (New!)
 

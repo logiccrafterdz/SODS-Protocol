@@ -65,6 +65,15 @@ pub struct BehavioralSymbol {
 
     /// Optional raw contextual data (legacy/compat)
     pub metadata: Vec<u8>,
+
+    /// Account Abstraction UserOperation Hash (ERC-4337)
+    pub user_op_hash: Option<H256>,
+
+    /// Permit2 expiration/deadline (timestamp)
+    pub permit_deadline: Option<u64>,
+
+    /// CoW Swap solver address
+    pub solver: Option<Address>,
 }
 
 impl BehavioralSymbol {
@@ -82,6 +91,9 @@ impl BehavioralSymbol {
             nonce: 0,
             call_sequence: 0,
             metadata: vec![],
+            user_op_hash: None,
+            permit_deadline: None,
+            solver: None,
         }
     }
 
@@ -105,6 +117,24 @@ impl BehavioralSymbol {
         self.tx_hash = tx_hash;
         self.nonce = nonce;
         self.call_sequence = call_sequence;
+        self
+    }
+
+    /// Set Account Abstraction context (Builder pattern).
+    pub fn with_aa_context(mut self, user_op_hash: H256) -> Self {
+        self.user_op_hash = Some(user_op_hash);
+        self
+    }
+
+    /// Set Permit2 context (Builder pattern).
+    pub fn with_permit2_context(mut self, deadline: u64) -> Self {
+        self.permit_deadline = Some(deadline);
+        self
+    }
+
+    /// Set CoW Swap context (Builder pattern).
+    pub fn with_cow_context(mut self, solver: Address) -> Self {
+        self.solver = Some(solver);
         self
     }
 

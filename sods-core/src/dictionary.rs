@@ -67,6 +67,15 @@ const SCROLL_FINALIZE_DEPOSIT_ERC20_SIG: &str = "FinalizeDepositERC20(address,ad
 /// Scroll WithdrawalInitiated
 const SCROLL_WITHDRAWAL_INITIATED_SIG: &str = "WithdrawalInitiated(address,address,address,address,uint256,bytes)";
 
+/// ERC-4337 UserOperationEvent
+const AA_OP_SIG: &str = "UserOperationEvent(bytes32,address,address,uint256,bool,uint256,uint256)";
+
+/// Permit2 Permit(...)
+const PERMIT2_SIG: &str = "Permit(address,address,uint256,uint256,address,uint256)";
+
+/// CoW Swap Trade(...)
+const COW_TRADE_SIG: &str = "Trade(address,address,address,uint256,uint256,uint256,bytes)";
+
 use ethers_core::types::{Address, U256};
 
 // ============================================================================
@@ -105,6 +114,9 @@ impl Default for SymbolDictionary {
             (SCROLL_MESSAGE_SENT_SIG, "BridgeOut"),
             (SCROLL_FINALIZE_DEPOSIT_ERC20_SIG, "BridgeIn"),
             (SCROLL_WITHDRAWAL_INITIATED_SIG, "BridgeOut"),
+            (AA_OP_SIG, "AAOp"),
+            (PERMIT2_SIG, "Permit2"),
+            (COW_TRADE_SIG, "CoWTrade"),
         ];
 
         for (sig, symbol) in core_signatures {
@@ -208,6 +220,50 @@ impl SymbolDictionary {
                  }
              }
         } 
+        else if *topic == event_signature_to_topic0(AA_OP_SIG) { // ERC-4337
+            if log.topics.len() >= 3 {
+                let op_hash = log.topics[1];
+                let sender = Address::from(log.topics[2]);
+                
+                return Some(BehavioralSymbol::new("AAOp", log_index)
+                    .with_context(sender, Address::zero(), U256::zero(), None)
+                    .with_aa_context(op_hash));
+            }
+        }
+        else if *topic == event_signature_to_topic0(PERMIT2_SIG) { // Permit2
+            if log.topics.len() >= 3 {
+                let owner = Address::from(log.topics[1]);
+                let spender = Address::from(log.topics[2]);
+                
+                // deadline is usually in data, let's assume standard layout
+                // index 32: value, 64: expiration, 96: nonce, 128: signature...
+                let mut deadline = 0;
+                if log.data.len() >= 64 {
+                    deadline = U256::from_big_endian(&log.data[32..64]).as_u64();
+                    value = U256::from_big_endian(&log.data[0..32]);
+                }
+
+                return Some(BehavioralSymbol::new("Permit2", log_index)
+                    .with_context(owner, spender, value, None)
+                    .with_permit2_context(deadline));
+            }
+        }
+        else if *topic == event_signature_to_topic0(COW_TRADE_SIG) { // CoW Swap
+            if log.topics.len() >= 2 {
+                let owner = Address::from(log.topics[1]);
+                
+                // GPv2 Settlement Trade(owner, sellToken, buyToken, sellAmount, buyAmount, feeAmount, orderUid)
+                // Topics[1] is owner. Data contains tokens and amounts.
+                if log.data.len() >= 128 {
+                    // let sell_token = Address::from(H256::from_slice(&log.data[12..32]));
+                    to = Address::from(H256::from_slice(&log.data[44..64])); // buyToken
+                    value = U256::from_big_endian(&log.data[96..128]); // buyAmount
+                }
+
+                return Some(BehavioralSymbol::new("CoWTrade", log_index)
+                    .with_context(owner, to, value, None));
+            }
+        }
         
         // Construct Symbol
         Some(BehavioralSymbol::new(symbol_code, log_index)
@@ -268,7 +324,7 @@ mod tests {
     #[test]
     fn test_default_has_core_symbols() {
         let dict = SymbolDictionary::default();
-        assert!(dict.len() >= 14); 
+        assert_eq!(dict.len(), 17); 
     }
     
     #[test]
@@ -309,7 +365,7 @@ mod tests {
     #[test]
     fn test_all_new_symbols_registered() {
         let dict = SymbolDictionary::default();
-        assert!(dict.len() >= 14);
+        assert_eq!(dict.len(), 17);
     }
 
     #[test]
@@ -324,5 +380,73 @@ mod tests {
         let dict = SymbolDictionary::default();
         let topic = event_signature_to_topic0(SCROLL_WITHDRAWAL_INITIATED_SIG);
         assert_eq!(dict.symbol_for_topic(topic), Some("BridgeOut"));
+    }
+
+    #[test]
+    fn test_aa_op_parsing() {
+        let dict = SymbolDictionary::default();
+        let topic = event_signature_to_topic0(AA_OP_SIG);
+        let op_hash = H256::repeat_byte(0xAA);
+        let sender = Address::repeat_byte(0x11);
+        
+        let mut log = Log::default();
+        log.topics = vec![topic, op_hash, H256::from(sender)];
+        log.log_index = Some(10.into());
+        
+        let sym = dict.parse_log(&log).unwrap();
+        assert_eq!(sym.symbol(), "AAOp");
+        assert_eq!(sym.user_op_hash, Some(op_hash));
+        assert_eq!(sym.from, sender);
+    }
+
+    #[test]
+    fn test_permit2_parsing() {
+        let dict = SymbolDictionary::default();
+        let topic = event_signature_to_topic0(PERMIT2_SIG);
+        let owner = Address::repeat_byte(0x22);
+        let spender = Address::repeat_byte(0x33);
+        
+        let mut log = Log::default();
+        log.topics = vec![topic, H256::from(owner), H256::from(spender)];
+        
+        // Data: value (32), deadline (32)
+        let mut data = vec![0u8; 64];
+        let value = U256::from(1000);
+        let deadline = 123456789u64;
+        value.to_big_endian(&mut data[0..32]);
+        U256::from(deadline).to_big_endian(&mut data[32..64]);
+        log.data = data.into();
+        
+        let sym = dict.parse_log(&log).unwrap();
+        assert_eq!(sym.symbol(), "Permit2");
+        assert_eq!(sym.from, owner);
+        assert_eq!(sym.to, spender);
+        assert_eq!(sym.value, value);
+        assert_eq!(sym.permit_deadline, Some(deadline));
+    }
+
+    #[test]
+    fn test_cow_trade_parsing() {
+        let dict = SymbolDictionary::default();
+        let topic = event_signature_to_topic0(COW_TRADE_SIG);
+        let owner = Address::repeat_byte(0x44);
+        
+        let mut log = Log::default();
+        log.topics = vec![topic, H256::from(owner)];
+        
+        // GPv2 Settlement Trade(owner, sellToken, buyToken, sellAmount, buyAmount, feeAmount, orderUid)
+        // Data layout (non-indexed): sellToken, buyToken, sellAmount, buyAmount, feeAmount, orderUid
+        let mut data = vec![0u8; 160];
+        let buy_token = Address::repeat_byte(0x55);
+        let buy_amount = U256::from(5000);
+        H256::from(buy_token).as_bytes().iter().enumerate().for_each(|(i, &b)| data[32+i] = b); // index 32-64
+        buy_amount.to_big_endian(&mut data[96..128]); // buyAmount
+        log.data = data.into();
+        
+        let sym = dict.parse_log(&log).unwrap();
+        assert_eq!(sym.symbol(), "CoWTrade");
+        assert_eq!(sym.from, owner);
+        assert_eq!(sym.to, buy_token);
+        assert_eq!(sym.value, buy_amount);
     }
 }
