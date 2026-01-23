@@ -25,6 +25,14 @@ We've built a minimal PoC that verifies behavioral patterns in Sepolia blocks �
 | `Tf`   | ERC20 Transfer       | 202 bytes  | < 1 ms            |
 | `Dep`  | WETH Deposit         | 202 bytes  | < 1 ms            |
 | `Wdw`  | WETH Withdrawal      | 202 bytes  | < 1 ms            |
+| `Sw`   | Uniswap Swap         | 202 bytes  | < 1 ms            |
+| `LP+`  | Add Liquidity        | 202 bytes  | < 1 ms            |
+| `LP-`  | Remove Liquidity     | 202 bytes  | < 1 ms            |
+| `MintNFT` | NFT Mint          | 202 bytes  | < 1 ms            |
+| `BuyNFT`  | NFT Purchase (Seaport) | 202 bytes | < 1 ms         |
+| `ListNFT` | NFT Listing (Blur) | 202 bytes  | < 1 ms            |
+| `BridgeIn` | L1→L2 Deposit     | 202 bytes  | < 1 ms            |
+| `BridgeOut` | L2→L1 Withdrawal | 202 bytes  | < 1 ms            |
 
 **[See the full PoC results and code](poc/)**
 
@@ -182,6 +190,11 @@ sods verify Tf --block 10002322 --json
 - **Adaptive RPC**: Self-healing connection logic that automatically throttles requests when rate limits are detected (Adaptive Backoff).
 - **Dynamic Symbol Loading**: Extensible plugin system to load new behavioral symbols from JSON definitions (URL/File) without recompiling.
 - **Enhanced Monitoring**: `sods monitor` now supports auto-adaptation and custom plugin loading at runtime.
+- **New Behavioral Symbols**:
+  - `ListNFT`: Blur NFT listings (OrdersMatched)
+  - `BridgeOut`: L2→L1 withdrawals (Arbitrum OutboundTransfer, Scroll MessageSent)
+  - `Frontrun` / `Backrun`: MEV pattern presets for frontrun (Tf→Sw) and backrun (Sw→Tf) detection
+- **Deployer Detection**: RPC integration to identify contract deployers for rug pull detection (`from == deployer` condition)
 
 ## Behavioral Dictionary 2.0 (New!)
 
@@ -190,8 +203,8 @@ The protocol now supports context-aware behavioral analysis with **Metadata**, *
 ### 1. Context-Aware Symbols
 Symbols now carry rich metadata to enable deeper analysis:
 - `Tf` (Transfer): `from`, `to`, `value`
-- `MintNFT` / `BuyNFT`: NFT Market activity
-- `BridgeIn`: Cross-chain bridge deposits
+- `MintNFT` / `BuyNFT` / `ListNFT`: NFT Market activity (Seaport, Blur)
+- `BridgeIn` / `BridgeOut`: Cross-chain bridge deposits and withdrawals (Optimism, Arbitrum, Scroll)
 
 ### 2. MEV Pattern DSL
 Detect complex MEV strategies using the new pattern language:
@@ -199,6 +212,10 @@ Detect complex MEV strategies using the new pattern language:
 ```bash
 # Detect Sandwich Attacks (Heuristic: Transfer -> Swap -> Transfer)
 sods verify "Sandwich" --block 123456
+
+# Detect Frontrun/Backrun patterns
+sods verify "Frontrun" --block 123456   # Tf -> Sw
+sods verify "Backrun" --block 123456    # Sw -> Tf
 
 # Detect Deployer Rug Pulls (Context condition)
 sods verify "Tf where from == deployer" --block 123456
