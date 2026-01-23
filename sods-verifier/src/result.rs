@@ -17,6 +17,7 @@ use std::time::Duration;
 ///
 /// ```rust
 /// use sods_verifier::VerificationResult;
+/// use sods_verifier::header_anchor::VerificationMode;
 /// use std::time::Duration;
 ///
 /// let result = VerificationResult {
@@ -27,6 +28,7 @@ use std::time::Duration;
 ///     merkle_root: Some(vec![0u8; 32]),
 ///     occurrences: 2,
 ///     confidence_score: 0.95,
+///     verification_mode: VerificationMode::Trustless,
 ///     verification_time: Duration::from_micros(500),
 ///     rpc_fetch_time: Duration::from_millis(150),
 ///     total_time: Duration::from_millis(200),

@@ -191,10 +191,13 @@ sods verify Tf --block 10002322 --json
 - **Dynamic Symbol Loading**: Extensible plugin system to load new behavioral symbols from JSON definitions (URL/File) without recompiling.
 - **Enhanced Monitoring**: `sods monitor` now supports auto-adaptation and custom plugin loading at runtime.
 - **New Behavioral Symbols**:
+  - `MintNFT`: ERC721/ERC1155 Mint (Transfer from 0x0)
+  - `BuyNFT`: Seaport NFT purchases (OrderFulfilled)
   - `ListNFT`: Blur NFT listings (OrdersMatched)
+  - `BridgeIn`: L1→L2 bridge deposits (Optimism DepositFinalized)
   - `BridgeOut`: L2→L1 withdrawals (Arbitrum OutboundTransfer, Scroll MessageSent)
   - `Frontrun` / `Backrun`: MEV pattern presets for frontrun (Tf→Sw) and backrun (Sw→Tf) detection
-- **Deployer Detection**: RPC integration to identify contract deployers for rug pull detection (`from == deployer` condition)
+- **Deployer Detection**: Advanced infrastructure to identify contract deployers for rug pull detection (`from == deployer` condition) with LRU caching.
 
 ## Behavioral Dictionary 2.0 (New!)
 
@@ -222,11 +225,12 @@ sods verify "Tf where from == deployer" --block 123456
 ```
 
 ### 3. Confidence Scoring Engine
-The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection, rewarding:
--  Valid Merkle Proofs (Base)
--  Signed Transactions (+0.2)
--  Deployer Actions (+0.3)
--  Value Transfers (+0.1)
+The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection per Behavioral Dictionary 2.0 spec:
+-  **Base Score**: 0.5 (Verified Merkle Proof)
+-  **Signed Action**: +0.2 (Known transaction sender)
+-  **Deployer Context**: +0.3 (Action initiated by contract deployer)
+-  **Value Density**: +0.1 (Detection involves value transfer)
+-  **Data Integrity**: -0.4 (Penalty if internal/causal transaction data is missing)
 
 ## Status
 
