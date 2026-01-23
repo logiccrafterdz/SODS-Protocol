@@ -55,23 +55,36 @@ enum Commands {
     ZkProve(commands::zk_prove::ZkProveArgs),
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let cli = Cli::parse();
 
-    let exit_code = match cli.command {
-        Commands::Verify(args) => commands::verify::run(args).await,
-        Commands::Chains => commands::chains::run(),
-        Commands::Symbols(args) => commands::symbols::run(args).await,
-        Commands::Discover(args) => commands::discover::run(args).await,
-        Commands::Trend(args) => commands::trend::run(args).await,
-        Commands::Monitor(args) => commands::monitor::run(args).await,
-        Commands::Daemon(args) => commands::daemon::run(args).await,
-        Commands::Threats(args) => commands::threats::run(args).await,
-        Commands::ExportProof(args) => commands::export_proof::run(args).await,
-        Commands::HashPattern(args) => commands::hash_pattern::run(args).await,
-        Commands::ZkProve(args) => commands::zk_prove::run(args).await,
-    };
+    // Special handling for Daemon to avoid fork issues with tokio threads
+    if let Commands::Daemon(args) = cli.command {
+        let exit_code = commands::daemon::run_sync(args);
+        std::process::exit(exit_code);
+    }
+
+    // Standard async runtime for other commands
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to create tokio runtime");
+
+    let exit_code = rt.block_on(async {
+        match cli.command {
+            Commands::Verify(args) => commands::verify::run(args).await,
+            Commands::Chains => commands::chains::run(),
+            Commands::Symbols(args) => commands::symbols::run(args).await,
+            Commands::Discover(args) => commands::discover::run(args).await,
+            Commands::Trend(args) => commands::trend::run(args).await,
+            Commands::Monitor(args) => commands::monitor::run(args).await,
+            Commands::Threats(args) => commands::threats::run(args).await,
+            Commands::ExportProof(args) => commands::export_proof::run(args).await,
+            Commands::HashPattern(args) => commands::hash_pattern::run(args).await,
+            Commands::ZkProve(args) => commands::zk_prove::run(args).await,
+            Commands::Daemon(_) => unreachable!(), // Handled above
+        }
+    });
 
     std::process::exit(exit_code);
 }

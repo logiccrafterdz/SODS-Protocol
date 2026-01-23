@@ -149,7 +149,7 @@ pub(crate) fn parse_duration(s: &str) -> std::time::Duration {
 }
 
 #[cfg(unix)]
-async fn start_daemon(
+fn start_daemon(
     pattern: Option<String>, 
     chain: String, 
     interval: String, 
@@ -203,35 +203,8 @@ async fn start_daemon(
         }
     }
     
-    // 2. HTTP Threat Feed
-    if let Some(feed_url) = threat_feed {
-        println!("Fetching threat feed from {}...", feed_url);
-        match fetch_threat_feed(&feed_url).await {
-            Ok(items) => {
-                println!("Loaded {} patterns from threat feed.", items.len());
-                for item in items {
-                     if item.chain != chain { continue; }
-                     match sods_core::pattern::BehavioralPattern::parse(&item.pattern) {
-                         Ok(parsed) => {
-                             targets.push(MonitoringTarget {
-                                 pattern: parsed,
-                                 name: item.name,
-                                 severity: item.severity,
-                                 pattern_str: item.pattern,
-                                 chain: item.chain,
-                                 expires_at,
-                             });
-                         },
-                         Err(e) => eprintln!("⚠️ Skipping invalid pattern '{}': {}", item.name, e),
-                     }
-                }
-            },
-            Err(e) => {
-                output::error(&format!("Failed to fetch threat feed: {}", e));
-                if !p2p_threat_network && targets.is_empty() { return 1; }
-            }
-        }
-    }
+    // 2. HTTP Threat Feed (Fetch after fork or synchronously)
+    // To keep start_daemon synchronous, we now pass threat_feed down.
     
     // 3. Local P2P Rules (Persistence)
     // We load this inside the daemon usually to keep it sync, but loading here to fail fast is ok.
@@ -278,7 +251,7 @@ async fn start_daemon(
             // Let's proceed assuming structure holds.
             
             let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(run_daemon_loop(targets, chain, interval, rpc_url, webhook_url, p2p_threat_network, expire_after_str));
+            rt.block_on(run_daemon_loop(targets, chain, interval, rpc_url, webhook_url, Some(threat_feed), p2p_threat_network, expire_after_str));
             0 
         }
         Err(e) => {
@@ -307,6 +280,7 @@ async fn run_daemon_loop(
     interval_str: String, 
     rpc_url_opt: Option<String>,
     webhook_url: Option<String>,
+    threat_feed: Option<Option<String>>,
     p2p_enabled: bool,
     expire_after_str: String,
 ) {
@@ -347,11 +321,36 @@ async fn run_daemon_loop(
                 None
             }
         }
-    } else {
-        None
     };
 
     let expire_duration = parse_duration(&expire_after_str);
+
+    // --- Fetch Initial Threat Feed (Async) ---
+    if let Some(Some(feed_url)) = threat_feed {
+        println!("Fetching threat feed from {}...", feed_url);
+        match fetch_threat_feed(&feed_url).await {
+            Ok(items) => {
+                println!("Loaded {} patterns from threat feed.", items.len());
+                for item in items {
+                     if item.chain != chain { continue; }
+                     match sods_core::pattern::BehavioralPattern::parse(&item.pattern) {
+                         Ok(parsed) => {
+                             targets.push(MonitoringTarget {
+                                 pattern: parsed,
+                                 name: item.name,
+                                 severity: item.severity,
+                                 pattern_str: item.pattern,
+                                 chain: item.chain,
+                                 expires_at: std::time::SystemTime::now() + expire_duration,
+                             });
+                         },
+                         Err(e) => eprintln!("⚠️ Skipping invalid pattern '{}': {}", item.name, e),
+                     }
+                }
+            },
+            Err(e) => eprintln!("Failed to fetch threat feed: {}", e),
+        }
+    }
 
     // --- Load Persisted Rules ---
     if p2p_enabled {
@@ -433,6 +432,12 @@ async fn run_daemon_loop(
                  // Deduplicate by ID
                  if !current_rules.iter().any(|r| r.id == rule.id) {
                      current_rules.push(rule.clone());
+                     
+                     // Maintenance: Keep only last 1000 rules to prevent disk bloat
+                     if current_rules.len() > 1000 {
+                         current_rules.remove(0);
+                     }
+
                      if let Ok(json) = serde_json::to_string_pretty(&current_rules) {
                          let _ = fs::write(rules_file, json);
                      }
@@ -497,12 +502,21 @@ async fn run_daemon_loop(
 
                                                 // Webhook
                                                 if let Some(ref url) = webhook_url {
-                                                    let pattern_hash = ethers_core::utils::keccak256(target.pattern_str.as_bytes());
+                                                    // Privacy: Salt pattern hash with a boot-time secret to prevent reverse-engineering
+                                                    static SALT: once_cell::sync::Lazy<String> = once_cell::sync::Lazy::new(|| {
+                                                        use rand::Rng;
+                                                        rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(16).map(char::from).collect()
+                                                    });
+
+                                                    let mut payload_seed = target.pattern_str.clone();
+                                                    payload_seed.push_str(&SALT);
+                                                    let pattern_hash = ethers_core::utils::keccak256(payload_seed.as_bytes());
+                                                    
                                                     let payload = json!({
                                                         "alert": "Behavioral pattern detected",
                                                         "chain": chain,
                                                         "block_number": block_num,
-                                                        "pattern_hash": format!("0x{}", hex::encode(pattern_hash)),
+                                                        "pattern_hash_blinded": format!("0x{}", hex::encode(pattern_hash)),
                                                         "threat_name": target.name,
                                                         "severity": target.severity,
                                                         "timestamp": chrono::Utc::now().to_rfc3339(),
@@ -596,9 +610,13 @@ fn check_status() -> bool {
 // -----------------------------------------------------------------------------
 
 pub async fn run(args: DaemonArgs) -> i32 {
+    run_sync(args)
+}
+
+pub fn run_sync(args: DaemonArgs) -> i32 {
     match args.command {
         DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after } => {
-            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after).await
+            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after)
         },
         DaemonCommands::Stop => stop_daemon(),
         DaemonCommands::Status => {

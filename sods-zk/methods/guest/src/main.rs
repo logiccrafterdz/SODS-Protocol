@@ -12,6 +12,7 @@ fn main() {
     // Run SODS core verification INSIDE the zkVM
     let is_valid = sods_core::pattern::matches_str(&input.symbols, &input.pattern);
     
-    // Commit the result to the journal (public output)
-    env::commit(&is_valid);
+    // Commit rich metadata to the journal for on-chain verification
+    // Tuple: (blockNumber, chainId, pattern, result)
+    env::commit(&(input.block_number, input.chain_id, input.pattern, is_valid));
 }

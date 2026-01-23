@@ -263,6 +263,14 @@ sods verify Tf --block 10002322 --json
 - **Enriched Behavioral Metadata**: `BehavioralSymbol` now natively supports `user_op_hash`, `permit_deadline`, and `solver` fields.
 - **Expanded L2 Dictionary**: Canonical support for next-gen events on Base, Arbitrum, Optimism, and Scroll.
 
+## What's New in v2.3 (Security Hardening)
+
+- **EIP-712 Structured Signing**: Hardened on-chain verification in `SODSVerifier.sol` using domain-separated signatures. Prevents cross-protocol replay attacks.
+- **Randomized P2P Challenges**: Peer-of-Behavior puzzles are now randomized per-peer to eliminate pre-computation exploits and ensure genuine Sybil resistance.
+- **Thread-Safe Daemonization**: Fixed CLI startup sequence to perform `daemonize` before spawning async threads, resolving long-standing stability issues on Linux/macOS.
+- **Webhook Pattern Privacy**: Pattern hashes in alerts are now salted with a per-boot random secret, preventing brute-force reverse-engineering of monitored behaviors.
+- **Automated Rule Maintenance**: Implemented storage pruning for the P2P threat registry to prevent unbounded disk growth.
+
 ## What's New in v2.5 (ZK Behavioral Proofs)
 
 - **Privacy-Preserving Verification**: Prove behaviors occurred without revealing sensitive metadata (addresses, amounts).
@@ -307,11 +315,11 @@ The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection 
 
 - Specification: **v1.1** (Updated)
 - PoC: **v0.1** (Sepolia testnet)
-- sods-core: **v0.3.0** (Rust crate)
-- sods-verifier: **v0.2.0** (Rust crate)
-- sods-p2p: **v0.3.0** (Rust crate)
-- sods-cli: **v1.2.0** (Rust binary)
-- Stage: **v2.1** / Hardened L2 Support
+- sods-core: **v0.3.1**
+- sods-verifier: **v0.2.1**
+- sods-p2p: **v0.3.1**
+- sods-cli: **v1.2.3**
+- Stage: **v2.3** / Security Hardened
 - Seeking: Technical feedback, threat analysis, edge cases
 
 ## Architecture

@@ -84,7 +84,8 @@ pub async fn run(args: ZkProveArgs) -> i32 {
     };
 
     // 2. Generate ZK Proof
-    let receipt = match sods_zk::prove_behavior(symbols, &args.pattern) {
+    let chain_id = chain_config.chain_id;
+    let receipt = match sods_zk::prove_behavior(symbols, &args.pattern, args.block, chain_id) {
         Ok(r) => r,
         Err(e) => {
             output::error(&format!("ZK Prover failed: {}", e));
@@ -92,20 +93,28 @@ pub async fn run(args: ZkProveArgs) -> i32 {
         }
     };
 
-    // 3. Extract validity from receipt
-    let valid: bool = match receipt.journal.decode() {
+    // 3. Extract metadata from receipt journal
+    // Tuple: (blockNumber, chainId, pattern, result)
+    let journal_data: (u64, u64, String, bool) = match receipt.journal.decode() {
         Ok(v) => v,
         Err(e) => {
             output::error(&format!("Failed to decode receipt journal: {}", e));
             return 1;
         }
     };
+    let valid = journal_data.3;
 
     // 4. Save artifacts
     let receipt_path = "proof.bin";
+    let journal_path = "journal.bin";
     let receipt_bytes = bincode::serialize(&receipt).unwrap_or_default();
+    
     if let Ok(mut file) = File::create(receipt_path) {
         let _ = file.write_all(&receipt_bytes);
+    }
+    
+    if let Ok(mut file) = File::create(journal_path) {
+        let _ = file.write_all(&receipt.journal.bytes);
     }
 
     let result = ZkProofOutput {
@@ -123,7 +132,8 @@ pub async fn run(args: ZkProveArgs) -> i32 {
     } else {
         output::success("ZK Proof generated successfully!");
         println!("Validity: {}", if valid { "MATCH" } else { "NO MATCH" });
-        println!("Receipt saved to: {}", receipt_path);
+        println!("Receipt: {}", receipt_path);
+        println!("Journal: {} (use for on-chain verification)", journal_path);
         println!("Time taken: {:?}", start.elapsed());
         
         let public_json = "public.json";

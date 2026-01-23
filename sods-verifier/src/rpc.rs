@@ -329,6 +329,10 @@ impl RpcClient {
         let profile_delays = self.backoff_profile.delays();
 
         for _provider_attempt in 0..self.providers.len() {
+            // Only retry 3 times if it's a rate limit. 
+            // If it's a timeout or connection error, try only ONCE or TWICE then move to next provider immediately.
+            let max_retries = profile_delays.len();
+            
             for (attempt, _fixed_delay) in profile_delays.iter().enumerate() {
                 let adaptive = self.adaptive_delay.load(std::sync::atomic::Ordering::Relaxed);
                 if adaptive > MIN_ADAPTIVE_DELAY_MS {
@@ -354,12 +358,19 @@ impl RpcClient {
                         self.update_adaptive_delay(false, msg);
 
                         if !Self::is_transient_error(&error) {
-                            break; // Try next provider
+                            break; // Try next provider immediately
+                        }
+                        
+                        // If it's a timeout or connection error (not a rate limit), 
+                        // we switch provider earlier instead of exhausting all retries on a broken one.
+                        let is_rate_limit = msg.map(|m| m.contains("rate")).unwrap_or(false);
+                        if !is_rate_limit && attempt >= 1 {
+                             break; // Failover sooner for connection issues
                         }
 
                         last_error = Some(error);
 
-                        if attempt < profile_delays.len() - 1 {
+                        if attempt < max_retries - 1 {
                             let jitter = rand::random::<f64>() * JITTER_PERCENT * 2.0 - JITTER_PERCENT;
                             let delay = (profile_delays[attempt] as f64 * (1.0 + jitter)) as u64;
                             sleep(Duration::from_millis(delay)).await;

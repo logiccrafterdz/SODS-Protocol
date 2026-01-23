@@ -10,6 +10,14 @@ library SODSVerifier {
         function getBeaconRoot(uint64 timestamp) external view returns (bytes32);
     }
 
+    bytes32 private constant DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+
+    bytes32 private constant COMMITMENT_TYPEHASH = keccak256(
+        "BehavioralCommitment(uint256 blockNumber,uint256 chainId,bytes32 receiptsRoot,bytes32 bmtRoot)"
+    );
+
     /// @notice Verifies a behavioral proof against a BMT root.
     /// @param blockNumber The block number where the behavior occurred.
     /// @param chainId The chain ID where the behavior occurred.
@@ -40,11 +48,27 @@ library SODSVerifier {
     ) external view returns (bool) {
         // 1. Verify Commitment Signature (if provided)
         if (signature.length == 65 && trustedSigner != address(0)) {
-            bytes32 commitmentHash = keccak256(abi.encodePacked(
-                uint64(chainId),
-                uint64(blockNumber),
+            // EIP-712 Structured Data Hashing
+            bytes32 domainSeparator = keccak256(abi.encode(
+                DOMAIN_TYPEHASH,
+                keccak256(bytes("SODS Protocol")),
+                keccak256(bytes("1.0")),
+                block.chainid,
+                address(this)
+            ));
+
+            bytes32 structHash = keccak256(abi.encode(
+                COMMITMENT_TYPEHASH,
+                blockNumber,
+                chainId,
                 receiptsRoot,
                 bmtRoot
+            ));
+
+            bytes32 digest = keccak256(abi.encodePacked(
+                "\x19\x01",
+                domainSeparator,
+                structHash
             ));
             
             // Extract v, r, s
@@ -58,7 +82,7 @@ library SODSVerifier {
             }
             if (v < 27) v += 27;
 
-            address recovered = ecrecover(commitmentHash, v, r, s);
+            address recovered = ecrecover(digest, v, r, s);
             if (recovered != trustedSigner) return false;
         }
 

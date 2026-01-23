@@ -19,8 +19,25 @@ impl Hasher for KeccakHasher {
 /// Receipts are encoded as:
 /// - Legacy: RLP([status, cumulative_gas, logs_bloom, logs])
 /// - EIP-2718: type_byte || RLP([status, cumulative_gas, logs_bloom, logs])
+///
+/// Note: Arbitrum and Optimism may have additional fields at the end of the list.
 pub fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
-    let mut stream = RlpStream::new_list(4);
+    // Determine the list size. Standard is 4.
+    // L2s might append additional fields.
+    // For Optimism Bedrock: some receipts are standard, others might have depositNonce.
+    // However, `ethers-core`'s TransactionReceipt doesn't expose L2 fields directly.
+    // We use `receipt.other` if available or assume standard for now but prepare the structure.
+    
+    let mut list_size = 4;
+    
+    // Check for L2 specific fields in `other` map (if supported by the provider)
+    let has_l2_fields = !receipt.other.is_empty();
+    if has_l2_fields {
+        // This is a heuristic: if there are extra fields, we might need a longer RLP list.
+        // For Optimism, we often see 4 fields. For Arbitrum, it varies by version.
+    }
+
+    let mut stream = RlpStream::new_list(list_size);
 
     // Status (1 = success, 0 = failure)
     let status = receipt.status.map(|s| s.as_u64()).unwrap_or(1);
@@ -48,12 +65,19 @@ pub fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
         stream.append(&log.data.to_vec());
     }
 
+    // --- L2 Specific Extensions ---
+    // In a full implementation, we would check the chain_id or receipt metadata
+    // to append fields like `depositNonce` (Optimism) or `cumulativeGasUsed` variants (Arbitrum).
+    // For v1.2, we stick to the 4 standard fields but allow extension points.
+
     let rlp_bytes = stream.out().to_vec();
 
     // Handle EIP-2718 typed transactions (Type 1, 2, 3, etc.)
     if let Some(t) = receipt.transaction_type {
         let t_u64 = t.as_u64();
         if t_u64 > 0 {
+            // Type 0x7E is Optimism Deposit
+            // Type 0x64 is Arbitrum
             let mut typed = vec![t_u64 as u8];
             typed.extend(rlp_bytes);
             return typed;

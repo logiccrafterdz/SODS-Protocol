@@ -5,12 +5,16 @@ use anyhow::Result;
 
 pub fn prove_behavior(
     symbols: Vec<BehavioralSymbol>,
-    pattern: &str
+    pattern: &str,
+    block_number: u64,
+    chain_id: u64,
 ) -> Result<Receipt> {
     // 1. Prepare input
     let input = BehavioralProofInput {
         symbols,
         pattern: pattern.to_string(),
+        block_number,
+        chain_id,
     };
 
     // 2. Setup environment for the guest
