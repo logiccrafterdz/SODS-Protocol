@@ -95,17 +95,35 @@ pub async fn run(args: DiscoverArgs) -> i32 {
     }
 
     // 2. Initialize Verifier
-    let verifier = match sods_verifier::BlockVerifier::new(chain_config.default_rpc) {
-        Ok(v) => v,
+    let rpc_urls: Vec<String> = chain_config.rpc_urls.iter().map(|s| s.to_string()).collect();
+    let is_l2 = chain_config.name != "ethereum" && chain_config.name != "sepolia";
+    let profile = if is_l2 {
+        sods_verifier::rpc::BackoffProfile::L2
+    } else {
+        sods_verifier::rpc::BackoffProfile::Ethereum
+    };
+
+    let verifier = match sods_verifier::BlockVerifier::new(&rpc_urls) {
+        Ok(v) => v.with_backoff_profile(profile),
         Err(e) => {
             if args.json {
-                print_json_error(format!("Failed to create verifier: {}", e));
+                print_json_error(format!("Failed to initialize RPCs: {}", e));
             } else {
-                output::error(&format!("Failed to connect to RPC: {}", e));
+                output::error(&format!("Failed to initialize RPCs: {}", e));
             }
             return 1;
         }
     };
+
+    // Pre-flight health check
+    if !verifier.health_check().await {
+        if args.json {
+            print_json_error("All RPC endpoints failed health check.".into());
+        } else {
+            output::error("All primary and fallback RPC endpoints failed health check.");
+        }
+        return 1;
+    }
 
     // 3. Get latest block
     let latest_block = match verifier.get_latest_block().await {

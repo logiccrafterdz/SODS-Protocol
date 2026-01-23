@@ -34,7 +34,7 @@ async fn test_verify_deposit_symbol() {
         return;
     };
 
-    let verifier = BlockVerifier::new(&rpc_url).expect("Failed to create verifier");
+    let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
     
     let result = verifier
         .verify_symbol_in_block("Dep", TEST_BLOCK)
@@ -64,7 +64,7 @@ async fn test_verify_transfer_symbol() {
         return;
     };
 
-    let verifier = BlockVerifier::new(&rpc_url).expect("Failed to create verifier");
+    let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
     
     let result = verifier
         .verify_symbol_in_block("Tf", TEST_BLOCK)
@@ -85,7 +85,7 @@ async fn test_verify_withdrawal_symbol() {
         return;
     };
 
-    let verifier = BlockVerifier::new(&rpc_url).expect("Failed to create verifier");
+    let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
     
     let result = verifier
         .verify_symbol_in_block("Wdw", TEST_BLOCK)
@@ -106,7 +106,7 @@ async fn test_non_existent_symbol() {
         return;
     };
 
-    let verifier = BlockVerifier::new(&rpc_url).expect("Failed to create verifier");
+    let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
     
     // LP+ likely doesn't exist in this block
     let result = verifier
@@ -128,7 +128,7 @@ async fn test_unsupported_symbol() {
         return;
     };
 
-    let verifier = BlockVerifier::new(&rpc_url).expect("Failed to create verifier");
+    let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
     
     let result = verifier
         .verify_symbol_in_block("InvalidSymbol", TEST_BLOCK)
@@ -148,7 +148,7 @@ async fn test_performance_under_2_seconds() {
         return;
     };
 
-    let verifier = BlockVerifier::new(&rpc_url).expect("Failed to create verifier");
+    let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
     
     let result = verifier
         .verify_symbol_in_block("Dep", TEST_BLOCK)

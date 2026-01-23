@@ -121,16 +121,33 @@ pub async fn run(args: MonitorArgs) -> i32 {
     }
     println!("   Status:   Initializing...");
 
-    let rpc_url = args.rpc_url.as_deref().unwrap_or(chain_config.default_rpc);
-
     // 4. Initialize Verifier
-    let mut verifier = match BlockVerifier::new(rpc_url) {
-        Ok(v) => v,
+    let rpc_urls: Vec<String> = if let Some(url) = args.rpc_url {
+        vec![url]
+    } else {
+        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+    };
+
+    let is_l2 = chain_config.name != "ethereum" && chain_config.name != "sepolia";
+    let profile = if is_l2 {
+        sods_verifier::rpc::BackoffProfile::L2
+    } else {
+        sods_verifier::rpc::BackoffProfile::Ethereum
+    };
+
+    let mut verifier = match BlockVerifier::new(&rpc_urls) {
+        Ok(v) => v.with_backoff_profile(profile),
         Err(e) => {
-            output::error(&format!("Failed to connect to RPC: {}", e));
+            output::error(&format!("Failed to initialize RPCs: {}", e));
             return 1;
         }
     };
+
+    // Pre-flight health check
+    if !verifier.health_check().await {
+        output::error("All primary and fallback RPC endpoints failed health check.");
+        return 1;
+    }
 
     // Load Plugins
     if let Ok(plugins) = crate::commands::symbols::load_local_plugins() {

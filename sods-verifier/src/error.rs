@@ -68,6 +68,13 @@ pub enum SodsVerifierError {
     /// Failed to fetch receipts.
     #[error("Failed to fetch receipts for block {0}")]
     ReceiptFetchFailed(u64),
+
+    /// All RPC endpoints failed for a chain.
+    #[error("All RPC endpoints failed for {chain}. Try again later.")]
+    AllRpcEndpointsFailed { 
+        /// The chain name
+        chain: String 
+    },
 }
 
 /// Result type alias for verifier operations.

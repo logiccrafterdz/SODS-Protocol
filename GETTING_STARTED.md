@@ -193,3 +193,13 @@ sods verify "Tf where value > 50 ether" --block 20000000 --chain ethereum
 # Detect large swaps on Base
 sods verify "Sw where value > 10000 gwei" --block 9000000 --chain base
 ```
+## Reliable Operation on L2s (v1.3)
+
+SODS is hardened for unreliable L2 public RPCs (Scroll, Polygon zkEVM, Base, etc.). It automatically ensures uninterrupted operation through:
+
+- **Multi-Endpoint Fallback**: Each supported chain is configured with multiple diverse RPC providers (e.g., official, PublicNode, 1RPC). If one fails, SODS silently fails over to the next.
+- **L2-Aware Backoff**: Specialized exponential backoff profiles for L2s to respect stricter rate limits.
+- **Pre-Flight Health Checks**: SODS validates RPC health before starting long-running `monitor` or `trend` sessions.
+
+### Using Custom RPCs with Fallback
+If you provide a custom RPC URL via `--rpc-url`, SODS will use that as the primary endpoint but still maintain the ability to fallback to public defaults if yours becomes unavailable.

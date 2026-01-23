@@ -146,8 +146,20 @@ pub async fn run(args: VerifyArgs) -> i32 {
         }
     };
 
-    // Determine RPC URL
-    let rpc_url = args.rpc_url.as_deref().unwrap_or(chain_config.default_rpc);
+    // Determine RPC URLs
+    let rpc_urls: Vec<String> = if let Some(url) = args.rpc_url {
+        vec![url]
+    } else {
+        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+    };
+
+    // Determine backoff profile
+    let is_l2 = chain_config.name != "ethereum" && chain_config.name != "sepolia";
+    let profile = if is_l2 {
+        sods_verifier::rpc::BackoffProfile::L2
+    } else {
+        sods_verifier::rpc::BackoffProfile::Ethereum
+    };
 
     if !args.json {
         output::info(&format!(
@@ -161,8 +173,8 @@ pub async fn run(args: VerifyArgs) -> i32 {
     
     // Choose verifier based on --no-header-proof flag
     let verifier: sods_verifier::BlockVerifier = if args.no_header_proof {
-        match sods_verifier::BlockVerifier::new_rpc_only(rpc_url) {
-            Ok(v) => v,
+        match sods_verifier::BlockVerifier::new_rpc_only(&rpc_urls) {
+            Ok(v) => v.with_backoff_profile(profile),
             Err(e) => {
                 if args.json {
                     let output = JsonOutput {
@@ -181,15 +193,15 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     };
                     println!("{}", serde_json::to_string_pretty(&output).unwrap());
                 } else {
-                    output::error(&format!("Failed to connect to RPC: {}", e));
-                    output::hint("Check your network connection or try a different RPC URL.");
+                    output::error(&format!("Failed to initialize RPCs: {}", e));
+                    output::hint("Check your network connection or RPC endpoints.");
                 }
                 return 1;
             }
         }
     } else {
-        match sods_verifier::BlockVerifier::new(rpc_url) {
-            Ok(v) => v,
+        match sods_verifier::BlockVerifier::new(&rpc_urls) {
+            Ok(v) => v.with_backoff_profile(profile),
             Err(e) => {
                 if args.json {
                     let output = JsonOutput {
@@ -208,13 +220,24 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     };
                     println!("{}", serde_json::to_string_pretty(&output).unwrap());
                 } else {
-                    output::error(&format!("Failed to connect to RPC: {}", e));
-                    output::hint("Check your network connection or try a different RPC URL.");
+                    output::error(&format!("Failed to initialize RPCs: {}", e));
+                    output::hint("Check your network connection or RPC endpoints.");
                 }
                 return 1;
             }
         }
     };
+
+    // Pre-flight health check
+    if !verifier.health_check().await {
+         if !args.json { 
+             output::error("All primary and fallback RPC endpoints failed health check.");
+         }
+         // But we try to proceed anyway or fail early? 
+         // For verify, we might want to try once more or fail.
+         // Let's fail if all are dead.
+         return 1;
+    }
 
     match verifier.verify_symbol_in_block(&args.symbol, args.block).await {
         Ok(result) => {
@@ -334,8 +357,16 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
         output::info(&format!("🔍 Verifying pattern '{}' in block {} ({})...", args.symbol, args.block, chain_config.description));
     }
 
-    let verifier = match sods_verifier::BlockVerifier::new(chain_config.default_rpc) {
-        Ok(v) => v,
+    let rpc_urls: Vec<String> = chain_config.rpc_urls.iter().map(|s| s.to_string()).collect();
+    let is_l2 = chain_config.name != "ethereum" && chain_config.name != "sepolia";
+    let profile = if is_l2 {
+        sods_verifier::rpc::BackoffProfile::L2
+    } else {
+        sods_verifier::rpc::BackoffProfile::Ethereum
+    };
+
+    let verifier = match sods_verifier::BlockVerifier::new(&rpc_urls) {
+        Ok(v) => v.with_backoff_profile(profile),
         Err(e) => {
             if !args.json { output::error(&format!("Failed to connect to RPC: {}", e)); }
             return 1;

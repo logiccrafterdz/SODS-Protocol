@@ -68,7 +68,10 @@ assert!(proof.verify(&bmt.root()));
 Local verification using public RPC endpoints. Handles:
 
 - RPC data fetching with LRU caching (100 blocks)
-- Exponential backoff retry (500ms, 1.5s, 4s)
+- Multi-provider failover (Failover across ≥3 diverse endpoints)
+- Adaptive RPC (Exponential backoff for rate limit handling)
+- L2-Aware Resilience (Specialized backoff profiles for L2 chains)
+- Pre-flight health checks
 - Symbol validation
 - End-to-end verification with timing metrics
 
@@ -199,6 +202,13 @@ sods verify Tf --block 10002322 --json
   - `Frontrun` / `Backrun`: MEV pattern presets for frontrun (Tf→Sw) and backrun (Sw→Tf) detection
 - **Production L2 Validation**: Confirmed behavioral symbol extraction on Scroll Mainnet and Polygon zkEVM Mainnet using on-chain blocks.
 - **Deployer Detection**: Advanced infrastructure to identify contract deployers for rug pull detection (`from == deployer` condition) with LRU caching.
+
+## What's New in v1.3 (Current)
+
+- **High-Reliability L2 Service**: Hardened RPC layer for unstable L2 public endpoints.
+- **Multi-Endpoint Fallback**: Automatic failover across multiple diverse RPC providers (e.g., official, PublicNode, 1RPC) to ensure zero downtime.
+- **L2-Aware Backoff Profiles**: Stricter backoff delays specifically tuned for L2 network rate limits.
+- **Connection Health Checks**: Pre-flight validation of RPC health before starting long-running monitoring or trend sessions.
 
 ## Behavioral Dictionary 2.0 (New!)
 

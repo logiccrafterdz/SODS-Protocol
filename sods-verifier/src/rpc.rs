@@ -11,32 +11,52 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::sleep;
 
-use crate::error::{Result, SodsVerifierError};
-
-/// Default cache size (number of blocks).
 const DEFAULT_CACHE_SIZE: usize = 100;
-
-/// Base backoff delays in milliseconds (adaptive).
 const MIN_ADAPTIVE_DELAY_MS: u64 = 100;
 const MAX_ADAPTIVE_DELAY_MS: u64 = 5000;
-
-/// Jitter percentage for backoff (±10%).
 const JITTER_PERCENT: f64 = 0.1;
+
+use crate::error::{Result, SodsVerifierError};
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BackoffProfile {
+    Ethereum, // [500ms, 1500ms, 4000ms]
+    L2,       // [1000ms, 3000ms, 8000ms]
+}
+
+impl BackoffProfile {
+    pub fn delays(&self) -> &'static [u64] {
+        match self {
+            BackoffProfile::Ethereum => &[500, 1500, 4000],
+            BackoffProfile::L2 => &[1000, 3000, 8000],
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct RpcClient {
-    provider: Arc<Provider<Http>>,
+    providers: Vec<Arc<Provider<Http>>>,
+    urls: Vec<String>,
+    current_provider_index: Arc<std::sync::atomic::AtomicUsize>,
     cache: Arc<Mutex<LruCache<u64, Vec<Log>>>>,
-    /// Adaptive delay in milliseconds to be added to requests
     adaptive_delay: Arc<std::sync::atomic::AtomicU64>,
+    backoff_profile: BackoffProfile,
     #[cfg(test)]
     pub(crate) fetch_count: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl RpcClient {
-    pub fn new(rpc_url: &str) -> Result<Self> {
-        let provider = Provider::<Http>::try_from(rpc_url)
-            .map_err(|e| SodsVerifierError::RpcError(format!("Invalid RPC URL: {}", e)))?;
+    pub fn new(rpc_urls: &[String]) -> Result<Self> {
+        if rpc_urls.is_empty() {
+            return Err(SodsVerifierError::RpcError("No RPC URLs provided".to_string()));
+        }
+
+        let mut providers = Vec::new();
+        for url in rpc_urls {
+            let provider = Provider::<Http>::try_from(url.as_str())
+                .map_err(|e| SodsVerifierError::RpcError(format!("Invalid RPC URL {}: {}", url, e)))?;
+            providers.push(Arc::new(provider));
+        }
 
         let cache_size = std::env::var("SODS_RPC_CACHE_SIZE")
             .ok()
@@ -48,12 +68,38 @@ impl RpcClient {
         );
 
         Ok(Self {
-            provider: Arc::new(provider),
+            providers,
+            urls: rpc_urls.to_vec(),
+            current_provider_index: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             cache: Arc::new(Mutex::new(cache)),
             adaptive_delay: Arc::new(std::sync::atomic::AtomicU64::new(MIN_ADAPTIVE_DELAY_MS)),
+            backoff_profile: BackoffProfile::Ethereum, // Default to Ethereum
             #[cfg(test)]
             fetch_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         })
+    }
+
+    /// Set the backoff profile (e.g., L2 for stricter rate limits).
+    pub fn with_profile(mut self, profile: BackoffProfile) -> Self {
+        self.backoff_profile = profile;
+        self
+    }
+
+    fn current_provider(&self) -> Arc<Provider<Http>> {
+        let idx = self.current_provider_index.load(std::sync::atomic::Ordering::Relaxed);
+        self.providers[idx % self.providers.len()].clone()
+    }
+
+
+    fn switch_to_next_provider(&self) {
+        let old_idx = self.current_provider_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let new_idx = (old_idx + 1) % self.providers.len();
+        eprintln!("🔄 RPC Failover: Switching from {} to {}", self.urls[old_idx % self.urls.len()], self.urls[new_idx]);
+    }
+
+    /// Pre-flight health check.
+    pub async fn health_check(&self) -> bool {
+        self.current_provider().get_block_number().await.is_ok()
     }
 
     /// Update adaptive delay based on request outcome.
@@ -61,46 +107,41 @@ impl RpcClient {
         let current = self.adaptive_delay.load(std::sync::atomic::Ordering::Relaxed);
         
         let new_delay = if success {
-            // Decay: Reduce delay by 10% on success, down to Min
             std::cmp::max(MIN_ADAPTIVE_DELAY_MS, (current as f64 * 0.9) as u64)
-        } else {
-            // Increase: specific errors trigger faster backoff
-            if let Some(kind) = error_kind {
-                if kind.contains("rate limit") || kind.contains("too many requests") {
-                    // Double delay on rate limit
-                     std::cmp::min(MAX_ADAPTIVE_DELAY_MS, current * 2)
-                } else if kind.contains("timeout") {
-                     std::cmp::min(MAX_ADAPTIVE_DELAY_MS, (current as f64 * 1.5) as u64)
-                } else {
-                     current // Other errors might not need throttling
-                }
+        } else if let Some(kind) = error_kind {
+            if kind.contains("rate limit") || kind.contains("too many requests") || kind.contains("429") {
+                std::cmp::min(MAX_ADAPTIVE_DELAY_MS, current * 2)
+            } else if kind.contains("timeout") {
+                std::cmp::min(MAX_ADAPTIVE_DELAY_MS, (current as f64 * 1.5) as u64)
             } else {
                 current 
             }
+        } else {
+            current 
         };
 
         if new_delay != current {
-            if new_delay > current {
-                // Only log when increasing significantly to avoid noise
-                 // eprintln!("Backing off RPC: {}ms", new_delay); 
-            }
             self.adaptive_delay.store(new_delay, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
     pub async fn get_latest_block(&self) -> Result<u64> {
-        let result = self.provider.get_block_number().await;
-        
-        match result {
-             Ok(n) => {
-                 self.update_adaptive_delay(true, None);
-                 Ok(n.as_u64())
-             },
-             Err(e) => {
-                 self.update_adaptive_delay(false, Some(&e.to_string().to_lowercase()));
-                 Err(SodsVerifierError::RpcError(e.to_string()))
-             }
+        let mut last_err = None;
+        for _ in 0..self.providers.len() {
+            match self.current_provider().get_block_number().await {
+                Ok(n) => {
+                    self.update_adaptive_delay(true, None);
+                    return Ok(n.as_u64());
+                },
+                Err(e) => {
+                    let err_str = e.to_string().to_lowercase();
+                    self.update_adaptive_delay(false, Some(&err_str));
+                    last_err = Some(SodsVerifierError::RpcError(e.to_string()));
+                    self.switch_to_next_provider();
+                }
+            }
         }
+        Err(last_err.unwrap())
     }
 
     pub async fn fetch_logs_for_block(&self, block_number: u64) -> Result<Vec<Log>> {
@@ -122,62 +163,101 @@ impl RpcClient {
     }
 
     pub async fn fetch_block_transactions(&self, block_number: u64) -> Result<Vec<ethers_core::types::Transaction>> {
-        let block = self.provider
-            .get_block_with_txs(block_number)
-            .await
-            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?
-            .ok_or(SodsVerifierError::BlockOutOfRange(block_number))?;
-            
-        Ok(block.transactions)
+        let mut last_err = None;
+        for _ in 0..self.providers.len() {
+            let provider = self.current_provider();
+            match provider.get_block_with_txs(block_number).await {
+                Ok(Some(b)) => {
+                    self.update_adaptive_delay(true, None);
+                    return Ok(b.transactions);
+                }
+                Ok(None) => return Err(SodsVerifierError::BlockOutOfRange(block_number)),
+                Err(e) => {
+                    let err_str = e.to_string().to_lowercase();
+                    self.update_adaptive_delay(false, Some(&err_str));
+                    last_err = Some(SodsVerifierError::RpcError(e.to_string()));
+                    self.switch_to_next_provider();
+                }
+            }
+        }
+        Err(last_err.unwrap())
     }
 
-    /// Fetch block header containing receiptsRoot and logsBloom.
     pub async fn fetch_block_header(&self, block_number: u64) -> Result<crate::header_anchor::BlockHeader> {
-        let block = self.provider
-            .get_block(block_number)
-            .await
-            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?
-            .ok_or(SodsVerifierError::HeaderFetchFailed(block_number))?;
-
-        Ok(crate::header_anchor::BlockHeader {
-            number: block.number.map(|n| n.as_u64()).unwrap_or(block_number),
-            hash: block.hash.unwrap_or_default(),
-            receipts_root: block.receipts_root,
-            logs_bloom: block.logs_bloom.unwrap_or_default(),
-        })
+        let mut last_err = None;
+        for _ in 0..self.providers.len() {
+            let provider = self.current_provider();
+            match provider.get_block(block_number).await {
+                Ok(Some(block)) => {
+                    self.update_adaptive_delay(true, None);
+                    return Ok(crate::header_anchor::BlockHeader {
+                        number: block.number.map(|n| n.as_u64()).unwrap_or(block_number),
+                        hash: block.hash.unwrap_or_default(),
+                        receipts_root: block.receipts_root,
+                        logs_bloom: block.logs_bloom.unwrap_or_default(),
+                    });
+                }
+                Ok(None) => return Err(SodsVerifierError::HeaderFetchFailed(block_number)),
+                Err(e) => {
+                    let err_str = e.to_string().to_lowercase();
+                    self.update_adaptive_delay(false, Some(&err_str));
+                    last_err = Some(SodsVerifierError::RpcError(e.to_string()));
+                    self.switch_to_next_provider();
+                }
+            }
+        }
+        Err(last_err.unwrap())
     }
 
     pub async fn fetch_contract_deployer(&self, contract_address: ethers_core::types::Address) -> Result<Option<ethers_core::types::Address>> {
-        let code = self.provider
-            .get_code(contract_address, None)
-            .await
-            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?;
+        let mut last_err = None;
+        let mut code_fetched = false;
         
-        if code.is_empty() {
-            return Ok(None);
+        for _ in 0..self.providers.len() {
+            let provider = self.current_provider();
+            match provider.get_code(contract_address, None).await {
+                Ok(code) => {
+                    if code.is_empty() { return Ok(None); }
+                    code_fetched = true;
+                    break;
+                }
+                Err(e) => {
+                    let err_str = e.to_string().to_lowercase();
+                    self.update_adaptive_delay(false, Some(&err_str));
+                    last_err = Some(SodsVerifierError::RpcError(e.to_string()));
+                    self.switch_to_next_provider();
+                }
+            }
         }
 
-        let _ = self.provider
-            .get_transaction_count(contract_address, None)
-            .await
-            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?;
-        
+        if !code_fetched { return Err(last_err.unwrap()); }
+
+        // Search for deployment tx (expensive, limited to first 1000 blocks)
         for block_num in 0..1000u64 {
-            let block = match self.provider.get_block_with_txs(block_num).await {
-                Ok(Some(b)) => b,
-                _ => continue,
-            };
+            let mut block = None;
+            for _ in 0..self.providers.len() {
+                let provider = self.current_provider();
+                match provider.get_block_with_txs(block_num).await {
+                    Ok(res) => { block = res; break; },
+                    Err(_) => self.switch_to_next_provider(),
+                }
+            }
+            
+            let block = match block { Some(b) => b, None => continue };
             
             for tx in block.transactions {
                 if tx.to.is_none() {
-                    let receipt = self.provider
-                        .get_transaction_receipt(tx.hash)
-                        .await
-                        .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?;
+                    let mut receipt = None;
+                    for _ in 0..self.providers.len() {
+                        let provider = self.current_provider();
+                        match provider.get_transaction_receipt(tx.hash).await {
+                            Ok(res) => { receipt = res; break; },
+                            Err(_) => self.switch_to_next_provider(),
+                        }
+                    }
                     
                     if let Some(r) = receipt {
                         if r.contract_address == Some(contract_address) {
-                            self.update_adaptive_delay(true, None);
                             return Ok(Some(tx.from));
                         }
                     }
@@ -188,35 +268,53 @@ impl RpcClient {
         Ok(None)
     }
 
-    /// Fetch all transaction receipts for a block.
     pub async fn fetch_block_receipts(&self, block_number: u64) -> Result<Vec<ethers_core::types::TransactionReceipt>> {
-        // First get all transactions in the block
-        let block = self.provider
-            .get_block(block_number)
-            .await
-            .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?
-            .ok_or(SodsVerifierError::BlockOutOfRange(block_number))?;
+        let mut last_err = None;
+        let mut block_transactions = Vec::new();
 
-        let tx_hashes = block.transactions;
-        if tx_hashes.is_empty() {
+        for _ in 0..self.providers.len() {
+            let provider = self.current_provider();
+            match provider.get_block(block_number).await {
+                Ok(Some(block)) => {
+                    block_transactions = block.transactions;
+                    break;
+                }
+                Ok(None) => return Err(SodsVerifierError::BlockOutOfRange(block_number)),
+                Err(e) => {
+                    let err_str = e.to_string().to_lowercase();
+                    self.update_adaptive_delay(false, Some(&err_str));
+                    last_err = Some(SodsVerifierError::RpcError(e.to_string()));
+                    self.switch_to_next_provider();
+                }
+            }
+        }
+
+        if block_transactions.is_empty() && last_err.is_some() {
+            return Err(last_err.unwrap());
+        }
+
+        if block_transactions.is_empty() {
             return Ok(Vec::new());
         }
 
-        // Fetch all receipts
-        let mut receipts = Vec::with_capacity(tx_hashes.len());
-        for tx_hash in tx_hashes {
-            let receipt = self.provider
-                .get_transaction_receipt(tx_hash)
-                .await
-                .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?
-                .ok_or(SodsVerifierError::ReceiptFetchFailed(block_number))?;
-            receipts.push(receipt);
+        let mut receipts = Vec::with_capacity(block_transactions.len());
+        for tx_hash in block_transactions {
+            let mut matched_receipt = None;
+            for _ in 0..self.providers.len() {
+                let provider = self.current_provider();
+                match provider.get_transaction_receipt(tx_hash).await {
+                    Ok(Some(r)) => { matched_receipt = Some(r); break; },
+                    Ok(None) => return Err(SodsVerifierError::ReceiptFetchFailed(block_number)),
+                    Err(_) => self.switch_to_next_provider(),
+                }
+            }
+            match matched_receipt {
+                Some(r) => receipts.push(r),
+                None => return Err(SodsVerifierError::ReceiptFetchFailed(block_number)),
+            }
         }
 
-        // Sort by transaction index to ensure correct order
         receipts.sort_by_key(|r| r.transaction_index);
-
-        self.update_adaptive_delay(true, None);
         Ok(receipts)
     }
 
@@ -226,53 +324,53 @@ impl RpcClient {
             .to_block(BlockNumber::Number(block_number.into()));
 
         let mut last_error = None;
-        let base_delays = [500, 1500, 4000]; // Fixed retries
+        let profile_delays = self.backoff_profile.delays();
 
-        for (attempt, _fixed_delay) in base_delays.iter().enumerate() {
-            // Apply Adaptive Delay BEFORE request
-            let adaptive = self.adaptive_delay.load(std::sync::atomic::Ordering::Relaxed);
-            if adaptive > MIN_ADAPTIVE_DELAY_MS {
-                sleep(Duration::from_millis(adaptive)).await;
-            }
+        for _provider_attempt in 0..self.providers.len() {
+            for (attempt, _fixed_delay) in profile_delays.iter().enumerate() {
+                let adaptive = self.adaptive_delay.load(std::sync::atomic::Ordering::Relaxed);
+                if adaptive > MIN_ADAPTIVE_DELAY_MS {
+                    sleep(Duration::from_millis(adaptive)).await;
+                }
 
-            #[cfg(test)]
-            {
-                self.fetch_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            }
+                #[cfg(test)]
+                {
+                    self.fetch_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                }
 
-            match self.provider.get_logs(&filter).await {
-                Ok(logs) => {
-                    self.update_adaptive_delay(true, None);
-                    return Ok(logs);
-                },
-                Err(e) => {
-                    let error = self.classify_error(e, block_number);
-                    
-                    // Update adaptive state ON FAILURE
-                    // Extract inner message from classification
-                    let msg = match &error {
-                        SodsVerifierError::RpcError(m) => Some(m.as_str()),
-                        _ => None,
-                    };
-                    self.update_adaptive_delay(false, msg);
+                match self.current_provider().get_logs(&filter).await {
+                    Ok(logs) => {
+                        self.update_adaptive_delay(true, None);
+                        return Ok(logs);
+                    },
+                    Err(e) => {
+                        let error = self.classify_error(e, block_number);
+                        let msg = match &error {
+                            SodsVerifierError::RpcError(m) => Some(m.as_str()),
+                            _ => None,
+                        };
+                        self.update_adaptive_delay(false, msg);
 
-                    if !Self::is_transient_error(&error) {
-                        return Err(error);
-                    }
+                        if !Self::is_transient_error(&error) {
+                            break; // Try next provider
+                        }
 
-                    last_error = Some(error);
+                        last_error = Some(error);
 
-                    if attempt < base_delays.len() - 1 {
-                        let jitter = rand::random::<f64>() * JITTER_PERCENT * 2.0 - JITTER_PERCENT;
-                        let delay = (base_delays[attempt] as f64 * (1.0 + jitter)) as u64;
-                        sleep(Duration::from_millis(delay)).await;
+                        if attempt < profile_delays.len() - 1 {
+                            let jitter = rand::random::<f64>() * JITTER_PERCENT * 2.0 - JITTER_PERCENT;
+                            let delay = (profile_delays[attempt] as f64 * (1.0 + jitter)) as u64;
+                            sleep(Duration::from_millis(delay)).await;
+                        }
                     }
                 }
             }
+            // If all retries on this provider failed, switch to next
+            self.switch_to_next_provider();
         }
 
         Err(last_error.unwrap_or(SodsVerifierError::RpcTimeout {
-            attempts: base_delays.len() as u32,
+            attempts: (profile_delays.len() * self.providers.len()) as u32,
         }))
     }
 
@@ -336,34 +434,45 @@ mod tests {
 
     #[test]
     fn test_invalid_url() {
-        let result = RpcClient::new("not-a-valid-url");
+        let urls = vec!["not-a-valid-url".to_string()];
+        let result = RpcClient::new(&urls);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_valid_url() {
-        let result = RpcClient::new("https://sepolia.infura.io/v3/test");
+        let urls = vec!["https://sepolia.infura.io/v3/test".to_string()];
+        let result = RpcClient::new(&urls);
         assert!(result.is_ok());
     }
 
     #[test]
+    fn test_backoff_profiles() {
+        let eth = BackoffProfile::Ethereum;
+        let l2 = BackoffProfile::L2;
+        
+        assert_eq!(eth.delays()[0], 500);
+        assert_eq!(l2.delays()[0], 1000);
+        assert!(l2.delays()[2] > eth.delays()[2]);
+    }
+
+    #[test]
     fn test_cache_size_default() {
-        let client = RpcClient::new("https://example.com").unwrap();
+        let urls = vec!["https://example.com".to_string()];
+        let client = RpcClient::new(&urls).unwrap();
         assert_eq!(client.cache_len(), 0);
     }
 
     #[tokio::test]
     async fn test_cache_hit() {
-        // This test verifies cache behavior with a mock-like approach
-        let client = RpcClient::new("https://rpc.sepolia.org").unwrap();
+        let urls = vec!["https://rpc.sepolia.org".to_string()];
+        let client = RpcClient::new(&urls).unwrap();
 
-        // Manually insert into cache
         {
             let mut cache = client.cache.lock().unwrap();
-            cache.put(12345, vec![]); // Empty logs for block 12345
+            cache.put(12345, vec![]); 
         }
 
-        // Fetch should return cached value without RPC call
         let result = client.fetch_logs_for_block(12345).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 0);

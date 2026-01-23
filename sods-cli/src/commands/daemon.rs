@@ -293,11 +293,15 @@ async fn run_daemon_loop(
     let interval = Duration::from_secs(interval_secs);
     
     let chain_config = get_chain(&chain).unwrap();
-    let rpc_url = rpc_url_opt.as_deref().unwrap_or(chain_config.default_rpc);
+    let rpc_urls: Vec<String> = if let Some(url) = rpc_url_opt {
+        vec![url]
+    } else {
+        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+    };
     
     // --- P2P Setup ---
     let mut threat_rx = if p2p_enabled {
-        match SodsPeer::new(rpc_url) {
+        match SodsPeer::new(&rpc_urls[0]) { // Use primary RPC for P2P for now
             Ok(mut peer) => {
                 println!("P2P Node Initialized: {}", peer.peer_id());
                 // Listen in background
@@ -345,7 +349,25 @@ async fn run_daemon_loop(
 
     println!("Daemon loop active. Monitoring {} targets on {}", targets.len(), chain);
     
-    let verifier = BlockVerifier::new(rpc_url).expect("Failed to create verifier");
+    let is_l2 = chain != "ethereum" && chain != "sepolia";
+    let profile = if is_l2 {
+        sods_verifier::rpc::BackoffProfile::L2
+    } else {
+        sods_verifier::rpc::BackoffProfile::Ethereum
+    };
+
+    let verifier = match BlockVerifier::new(&rpc_urls) {
+        Ok(v) => v.with_backoff_profile(profile),
+        Err(e) => {
+            eprintln!("Critical Error: Failed to initialize RPCs: {}", e);
+            return;
+        }
+    };
+
+    if !verifier.health_check().await {
+        eprintln!("⚠️ Warning: Initial health check failed for all RPCs. Continuing in hope of recovery.");
+    }
+
     let mut last_scanned_block = verifier.get_latest_block().await.unwrap_or(0);
     // If last_scanned is 0 (RPC fail?), try one more time or wait loop
     if last_scanned_block == 0 {

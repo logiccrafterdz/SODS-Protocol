@@ -12,7 +12,7 @@ use clap::{Parser, Subcommand};
 #[command(name = "sods")]
 #[command(author = "LogicCrafter")]
 #[command(version = "0.1.0")]
-#[command(about = "SODS Protocol - On-chain behavioral verification", long_about = None)]
+#[command(about = "SODS Protocol - On-chain behavioral verification\nNote: Uses multiple RPC endpoints per chain for resilience.", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
     #[command(subcommand)]

@@ -21,7 +21,7 @@ async fn test_trustless_verification_success() {
     };
 
     // Default is trustless (require_header_proof = true)
-    let verifier = BlockVerifier::new(&rpc_url).unwrap();
+    let verifier = BlockVerifier::new(&[rpc_url]).unwrap();
 
     let result = verifier
         .verify_symbol_in_block("Tf", TEST_BLOCK)
@@ -43,7 +43,7 @@ async fn test_rpc_only_mode_success() {
     };
 
     // Explicitly disable header check
-    let verifier = BlockVerifier::new_rpc_only(&rpc_url).unwrap();
+    let verifier = BlockVerifier::new_rpc_only(&[rpc_url]).unwrap();
 
     let result = verifier
         .verify_symbol_in_block("Tf", TEST_BLOCK)

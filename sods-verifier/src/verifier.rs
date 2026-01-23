@@ -102,8 +102,13 @@ impl BlockVerifier {
     /// let verifier = BlockVerifier::new("https://sepolia.infura.io/v3/YOUR_KEY")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn new(rpc_url: &str) -> Result<Self> {
-        let rpc_client = RpcClient::new(rpc_url)?;
+    /// Create a new block verifier with header anchoring enabled.
+    ///
+    /// # Arguments
+    ///
+    /// * `rpc_urls` - List of HTTP RPC endpoint URLs
+    pub fn new(rpc_urls: &[String]) -> Result<Self> {
+        let rpc_client = RpcClient::new(rpc_urls)?;
 
         Ok(Self {
             rpc_client,
@@ -115,11 +120,8 @@ impl BlockVerifier {
     }
 
     /// Create a new verifier that skips header anchoring (RPC-only mode).
-    ///
-    /// **Warning**: This mode trusts the RPC provider completely.
-    /// Use only when the RPC doesn't support the required data.
-    pub fn new_rpc_only(rpc_url: &str) -> Result<Self> {
-        let rpc_client = RpcClient::new(rpc_url)?;
+    pub fn new_rpc_only(rpc_urls: &[String]) -> Result<Self> {
+        let rpc_client = RpcClient::new(rpc_urls)?;
 
         Ok(Self {
             rpc_client,
@@ -133,6 +135,17 @@ impl BlockVerifier {
     /// Set whether header anchoring is required.
     pub fn set_require_header_proof(&mut self, require: bool) {
         self.require_header_proof = require;
+    }
+
+    /// Set the backoff profile for RPC operations.
+    pub fn with_backoff_profile(mut self, profile: crate::rpc::BackoffProfile) -> Self {
+        self.rpc_client = self.rpc_client.with_profile(profile);
+        self
+    }
+
+    /// Run a lightweight health check on the current RPC provider.
+    pub async fn health_check(&self) -> bool {
+        self.rpc_client.health_check().await
     }
 
     /// Verify if a behavioral symbol exists in a block.
@@ -436,13 +449,15 @@ mod tests {
 
     #[test]
     fn test_verifier_creation() {
-        let result = BlockVerifier::new("https://sepolia.infura.io/v3/test");
+        let urls = vec!["https://sepolia.infura.io/v3/test".to_string()];
+        let result = BlockVerifier::new(&urls);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_invalid_verifier_url() {
-        let result = BlockVerifier::new("not-a-url");
+        let urls = vec!["not-a-url".to_string()];
+        let result = BlockVerifier::new(&urls);
         assert!(result.is_err());
     }
 }

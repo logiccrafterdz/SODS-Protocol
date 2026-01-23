@@ -106,27 +106,41 @@ pub async fn run(args: TrendArgs) -> i32 {
         }
     };
 
-    let rpc_url = args.rpc_url.as_deref().unwrap_or(chain_config.default_rpc);
-
-    if !args.json {
-        output::header(&format!("Trend Detection: {}", args.pattern));
-        println!("   Chain:  {}", chain_config.description.cyan());
-        println!("   Window: {} recent blocks", window);
-        println!("   Status: Connecting...");
-    }
-
     // 4. Initialize Verifier
-    let verifier = match BlockVerifier::new(rpc_url) {
-        Ok(v) => v,
+    let rpc_urls: Vec<String> = if let Some(url) = args.rpc_url {
+        vec![url]
+    } else {
+        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+    };
+
+    let is_l2 = chain_config.name != "ethereum" && chain_config.name != "sepolia";
+    let profile = if is_l2 {
+        sods_verifier::rpc::BackoffProfile::L2
+    } else {
+        sods_verifier::rpc::BackoffProfile::Ethereum
+    };
+
+    let verifier = match BlockVerifier::new(&rpc_urls) {
+        Ok(v) => v.with_backoff_profile(profile),
         Err(e) => {
             if args.json {
-                 println!("{{ \"error\": \"Failed to connect to RPC: {}\" }}", e);
+                 println!("{{ \"error\": \"Failed to initialize RPCs: {}\" }}", e);
             } else {
-                output::error(&format!("Failed to connect to RPC: {}", e));
+                output::error(&format!("Failed to initialize RPCs: {}", e));
             }
             return 1;
         }
     };
+
+    // Pre-flight health check
+    if !verifier.health_check().await {
+        if args.json {
+            println!("{{ \"error\": \"All RPC endpoints failed health check.\" }}");
+        } else {
+            output::error("All primary and fallback RPC endpoints failed health check.");
+        }
+        return 1;
+    }
 
     // 5. Get Head Block
     let head_block = match verifier.get_latest_block().await {
