@@ -53,7 +53,7 @@ struct TrendJsonOutput {
 pub async fn run(args: TrendArgs) -> i32 {
     // 1. Validate Window
     let window = if args.window > 50 {
-        output::warn("Max window size is 50. Capping at 50.");
+        output::warning("Max window size is 50. Capping at 50.");
         50
     } else if args.window == 0 {
         output::error("Window size must be > 0.");
@@ -181,7 +181,7 @@ pub async fn run(args: TrendArgs) -> i32 {
         };
 
         // Match pattern
-        if pattern.matches(&symbols).is_some() {
+        if pattern.matches(&symbols, None).is_some() {
             hotspots.push(block_num);
             if !args.json {
                 print!("."); // Progress dot

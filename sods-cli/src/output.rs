@@ -18,8 +18,7 @@ pub fn info(msg: &str) {
 }
 
 /// Print a warning message.
-#[allow(dead_code)]
-pub fn warn(msg: &str) {
+pub fn warning(msg: &str) {
     println!("{} {}", "!".yellow().bold(), msg.yellow());
 }
 

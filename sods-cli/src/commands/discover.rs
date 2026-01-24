@@ -81,7 +81,7 @@ pub async fn run(args: DiscoverArgs) -> i32 {
 
     let max_blocks = 200;
     let scan_count = if args.last > max_blocks {
-        output::warn(&format!("Limiting scan to max {} blocks.", max_blocks));
+        output::warning(&format!("Limiting scan to max {} blocks.", max_blocks));
         max_blocks
     } else {
         args.last

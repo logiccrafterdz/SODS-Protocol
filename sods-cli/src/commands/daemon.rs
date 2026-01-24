@@ -597,7 +597,7 @@ fn check_status() -> bool {
 // -----------------------------------------------------------------------------
 
 #[cfg(not(unix))]
-async fn start_daemon(
+fn start_daemon(
     _pattern: Option<String>, 
     _chain: String, 
     _interval: String, 

@@ -84,7 +84,7 @@ pub async fn run(args: ExportProofArgs) -> i32 {
         }
     };
 
-    if let Some(matched) = pattern.matches(&symbols) {
+    if let Some(matched) = pattern.matches(&symbols, None) {
         // Build Keccak BMT
         let bmt = BehavioralMerkleTree::new_keccak(symbols.clone());
         

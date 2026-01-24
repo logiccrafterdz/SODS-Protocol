@@ -331,7 +331,7 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
     let start = std::time::Instant::now();
 
     // 1. Parse Pattern
-    let pattern = match BehavioralPattern::parse(&args.symbol) {
+    let _pattern = match BehavioralPattern::parse(&args.symbol) {
         Ok(p) => p,
         Err(e) => {
              if args.json {
@@ -428,7 +428,7 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
                 if result.is_verified {
                     println!("✅ Pattern Verified (Optimized Path)!");
                     println!("   Occurrences: {}", result.occurrences);
-                    println!("   Root:        0x{}", hex::encode(result.merkle_root.unwrap_or([0u8; 32])));
+                    println!("   Root:        0x{}", hex::encode(result.merkle_root.as_deref().unwrap_or(&[0u8; 32])));
                     println!("   Time:        {} ms", elapsed);
                     println!("   Mode:        Incremental / Filtered");
                 } else {

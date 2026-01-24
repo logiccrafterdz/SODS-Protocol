@@ -52,6 +52,7 @@ enum Commands {
     HashPattern(commands::hash_pattern::HashPatternArgs),
 
     /// Generate a Zero-Knowledge proof of behavior
+    #[cfg(feature = "zk")]
     ZkProve(commands::zk_prove::ZkProveArgs),
     
     /// Manage the contract deployer registry
@@ -84,6 +85,7 @@ fn main() {
             Commands::Threats(args) => commands::threats::run(args).await,
             Commands::ExportProof(args) => commands::export_proof::run(args).await,
             Commands::HashPattern(args) => commands::hash_pattern::run(args).await,
+            #[cfg(feature = "zk")]
             Commands::ZkProve(args) => commands::zk_prove::run(args).await,
             Commands::Registry(args) => commands::registry::run(args),
             Commands::Daemon(_) => unreachable!(), // Handled above

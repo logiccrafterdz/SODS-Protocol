@@ -1,6 +1,5 @@
 use clap::Args;
 use ethers_core::utils::keccak256;
-use crate::output;
 
 #[derive(Args)]
 pub struct HashPatternArgs {

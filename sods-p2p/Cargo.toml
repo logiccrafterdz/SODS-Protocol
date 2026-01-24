@@ -14,6 +14,7 @@ categories = ["network-programming", "cryptography"]
 # SODS dependencies
 sods-core = { path = "../sods-core" }
 sods-verifier = { path = "../sods-verifier" }
+ethers-core = "2.0"
 
 # P2P networking
 libp2p = { version = "0.54", features = [

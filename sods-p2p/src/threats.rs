@@ -8,6 +8,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use ethers_core::types::Address;
 use sods_core::pattern::BehavioralPattern;
 
 /// Topic for threat intelligence gossip.

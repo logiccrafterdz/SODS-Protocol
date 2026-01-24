@@ -63,3 +63,10 @@ cache/
 # ZK Proofs
 proof.bin
 public.json
+
+# E2E Test Artifacts
+tests/tmp/
+sods-cli/tests/tmp/
+*.log
+sods.pid
+contract_registry.json

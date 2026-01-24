@@ -130,6 +130,9 @@ let receipt = prove_behavior(symbols, "LP+ -> Sw -> LP-")?;
 let valid: bool = receipt.journal.decode()?;
 ```
 
+> [!NOTE]
+> ZK features are now **optional** (`zk` feature flag) to ensure cross-platform buildability on Windows and other non-Unix systems.
+
 ### sods-cli (Layer 3)
 
 Command-line interface for SODS Protocol. Provides:
@@ -213,6 +216,7 @@ sods verify Tf --block 10002322 --json
 - **Predictive Behavioral Shadowing**: Proactively monitor actor states (Shadows) to detect high-risk pattern initiations (`LP+`) and alert on deviations before completion.
 - **Real-Time Mempool Monitoring**: Intercept pending transactions and detect threats before they are mined.
 - **Regression Testing**: Automated CI integration tests for multi-chain support.
+- **E2E CLI Test Suite**: Comprehensive integration tests for all core commands (`verify`, `registry`, `export-proof`, `daemon`) with 100% pass rate on Windows.
 
 ## What's New in v1.2 (Latest)
 
@@ -383,9 +387,17 @@ The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection 
 - sods-core: **v0.2.0**
 - sods-verifier: **v0.2.0**
 - sods-p2p: **v0.2.0**
-- sods-cli: **v1.1.0**
+- sods-cli: **v1.1.0 (v1.2 Stabilized)**
 - Stage: **Pre-Alpha / Research Initiative**
 - Seeking: Technical feedback, threat analysis, edge cases
+
+## Running Tests
+
+To run the full E2E CLI test suite (recommended for Windows stability):
+
+```bash
+cargo test -p sods-cli --no-default-features
+```
 
 ## Architecture
 

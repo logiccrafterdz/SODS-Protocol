@@ -10,5 +10,6 @@ pub mod daemon;
 pub mod threats;
 pub mod export_proof;
 pub mod hash_pattern;
+#[cfg(feature = "zk")]
 pub mod zk_prove;
 pub mod registry;

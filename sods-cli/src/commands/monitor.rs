@@ -100,10 +100,10 @@ pub async fn run(args: MonitorArgs) -> i32 {
     let interval = match parse_duration(&args.interval) {
         Ok(d) => {
              if d.as_secs() < 10 {
-                output::warn("Minimum interval is 10s. Adjusting to 10s.");
+                output::warning("Minimum interval is 10s. Adjusting to 10s.");
                 Duration::from_secs(10)
             } else if d.as_secs() > 300 {
-                output::warn("Maximum interval is 5m. Adjusting to 5m.");
+                output::warning("Maximum interval is 5m. Adjusting to 5m.");
                 Duration::from_secs(300)
             } else {
                 d
@@ -212,7 +212,7 @@ pub async fn run(args: MonitorArgs) -> i32 {
                 match verifier.fetch_block_symbols(block_num).await {
                     Ok(symbols) => {
                         // A. Check for Full Pattern Matches (Reactive)
-                        if let Some(matched_seq) = pattern.matches(&symbols) {
+                        if let Some(matched_seq) = pattern.matches(&symbols, None) {
                             let timestamp = chrono::Utc::now().to_rfc3339();
                             println!();
                             println!("🚨 {} Block #{} on {}", "PATTERN DETECTED!".red().bold(), block_num, args.chain);
