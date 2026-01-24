@@ -9,6 +9,15 @@ use crate::reputation::ReputationTracker;
 /// Default consensus threshold (2/3 majority of reputation).
 pub const DEFAULT_THRESHOLD: f64 = 0.66;
 
+/// Calculate required quorum count based on network size.
+pub fn required_quorum(peer_count: usize) -> usize {
+    match peer_count {
+        0..=10 => peer_count,        // 100% for small networks (bootstrap phase)
+        11..=100 => (peer_count * 2 + 2) / 3, // ~67% 2f+1 style
+        _ => (peer_count * 3 + 4) / 5, // 60% for large networks
+    }
+}
+
 /// Result of consensus evaluation.
 #[derive(Debug, Clone)]
 pub struct ConsensusResult {

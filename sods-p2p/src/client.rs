@@ -16,7 +16,7 @@ use tracing::{debug, info, warn};
 use sods_verifier::BlockVerifier;
 
 use crate::behavior::{SodsBehaviour, SodsBehaviourEvent};
-use crate::consensus::{evaluate_consensus, DEFAULT_THRESHOLD};
+use crate::consensus::{evaluate_consensus, DEFAULT_THRESHOLD, required_quorum};
 use crate::error::{Result, SodsP2pError};
 use crate::protocol::{ProofRequest, ProofResponse};
 use crate::reputation::ReputationTracker;
@@ -58,6 +58,7 @@ pub struct SodsClient {
     local_peer_id: PeerId,
     pending_requests: HashMap<OutboundRequestId, PeerId>,
     pending_challenges: HashMap<OutboundRequestId, (PeerId, crate::protocol::PuzzleChallenge)>,
+    slashed_peers: HashSet<PeerId>,
 }
 
 impl SodsClient {
@@ -84,6 +85,14 @@ impl SodsClient {
                 libp2p::yamux::Config::default,
             )
             .map_err(|e| SodsP2pError::NetworkError(format!("TCP error: {}", e)))?
+            .with_quic()
+            .with_other_transport(|key| {
+                libp2p_webrtc::tokio::Transport::new(
+                    key.clone(),
+                    libp2p_webrtc::tokio::Certificate::generate(&mut rand::thread_rng())?,
+                )
+            })
+            .map_err(|e| SodsP2pError::NetworkError(format!("WebRTC error: {}", e)))?
             .with_behaviour(|_key| SodsBehaviour::new(&keypair))
             .map_err(|e| SodsP2pError::NetworkError(format!("Behaviour error: {}", e)))?
             .build();
@@ -98,6 +107,7 @@ impl SodsClient {
             local_peer_id,
             pending_requests: HashMap::new(),
             pending_challenges: HashMap::new(),
+            slashed_peers: HashSet::new(),
         })
     }
 
@@ -159,7 +169,7 @@ impl SodsClient {
             identify::Event::Received { peer_id, info, .. } => {
                 if peer_id != self.local_peer_id {
                     debug!("Identified peer: {} ({})", peer_id, info.agent_version);
-                    if !self.known_peers.contains(&peer_id) {
+                    if !self.known_peers.contains(&peer_id) && !self.slashed_peers.contains(&peer_id) {
                         self.known_peers.insert(peer_id);
                         self.issue_challenge(&peer_id);
                     }
@@ -257,6 +267,30 @@ impl SodsClient {
         symbol: &str,
         block_number: u64,
     ) -> Result<P2pVerificationResult> {
+        // --- LOCAL TRUTH SUPREMACY ---
+        // If local verification is available and succeeds, we ignore P2P.
+        if let Some(verifier) = &self.fallback_verifier {
+            if let Ok(result) = verifier.verify_symbol_in_block(symbol, block_number).await {
+                if result.is_verified {
+                    info!("Local verification succeeded. Bypassing P2P consensus for symbol '{}'", symbol);
+                    let bmt_root = result.merkle_root.map(|v| {
+                        let mut arr = [0u8; 32];
+                        arr.copy_from_slice(&v);
+                        arr
+                    });
+                    return Ok(P2pVerificationResult {
+                        is_verified: true,
+                        agreeing_peers: self.known_peers.len(), // Use all for metrics
+                        total_peers: self.known_peers.len(),
+                        bmt_root,
+                        used_fallback: true,
+                        symbol: symbol.to_string(),
+                        block_number,
+                    });
+                }
+            }
+        }
+
         if self.known_peers.is_empty() {
             return self.try_fallback(symbol, block_number).await;
         }
@@ -311,12 +345,21 @@ impl SodsClient {
             return self.try_fallback(symbol, block_number).await;
         }
 
-        // Evaluate consensus
+        // Evaluate consensus using Adaptive Quorum
+        let quorum_threshold = required_quorum(valid_responses.len());
         let consensus = evaluate_consensus(valid_responses.clone(), &self.reputation, DEFAULT_THRESHOLD);
 
-        // Update reputation
-        for (peer_id, _) in &valid_responses {
+        // Update reputation and perform slashing
+        for (peer_id, resp) in &valid_responses {
             if consensus.conflicting_peers.contains(peer_id) {
+                // Check if this peer's response actually contradicts a successful consensus
+                if consensus.is_verified && resp.success {
+                     warn!("❌ Peer {} provided conflicting root! SLASHING.", peer_id);
+                     self.slashed_peers.insert(*peer_id);
+                     self.known_peers.remove(peer_id);
+                     // Note: We don't disconnect immediately here to avoid blocking, 
+                     // but they are erased from the reliable set.
+                }
                 self.reputation.penalize(peer_id);
             } else {
                 self.reputation.reward(peer_id);

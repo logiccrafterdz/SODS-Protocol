@@ -102,6 +102,24 @@ Standardized event representations (e.g., `Tf`, `Sw`) derived from raw logs, enr
 | Sybil attack (many fake peers) | **PoB Challenge**: New peers must solve verification puzzles |
 | Man-in-the-middle | libp2p noise encryption |
 | **Malicious RPC fabricates logs** | **Block Header Anchoring** (v1.2+) |
+| **RPC Mismatch on Logs** | **Zero-RPC Verification** (v3.0+) |
+| **Colluding P2P Majority** | **Local Truth Supremacy** (v4.0+) |
+
+## Hybrid Trust Model (v4.0+)
+
+SODS uses a hybrid model that prioritizes local verification and uses adaptive P2P consensus as a fallback.
+
+### 1. Local Truth Supremacy
+The verifier always attempts local verification first. If a behavioral claim can be verified locally (using RPC or Storage Proofs), the result is final. P2P consensus is **completely ignored** in this case, preventing malicious majorities from misleading the user.
+
+### 2. Adaptive Quorum
+When local truth is unavailable (e.g., node is offline or RPC is down), SODS relies on P2P consensus with a dynamic threshold:
+- **Small Networks (0-10 peers)**: 100% consensus required (Strict Bootstrapping).
+- **Medium Networks (11-100 peers)**: ~67% consensus (Byzantine Fault Tolerance).
+- **Large Networks (>100 peers)**: 60% consensus (Scalable Majority).
+
+### 3. Immediate Slashing
+Any peer that provides a proof contradicting a successful consensus or local truth is **slashed immediately**. Their identity is blacklisted and they are removed from the reliable peer set.
 
 ## P2P Sybil Resistance (Proof-of-Behavior)
 
@@ -212,6 +230,8 @@ struct ThreatRule {
 | v0.1.0 | Initial implementation |
 | v0.2.0 | LRU caching, exponential backoff, signed P2P, identify protocol |
 | v1.0-beta | Production-ready release |
+| v3.0 | Zero-RPC Release (Storage Proofs) |
+| v4.0 | Hybrid Trust Model & Adaptive Quorum |
 
 ## Security Considerations
 

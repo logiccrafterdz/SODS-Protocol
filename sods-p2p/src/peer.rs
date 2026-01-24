@@ -57,6 +57,14 @@ impl SodsPeer {
                 libp2p::yamux::Config::default,
             )
             .map_err(|e| SodsP2pError::NetworkError(format!("TCP error: {}", e)))?
+            .with_quic()
+            .with_other_transport(|key| {
+                libp2p_webrtc::tokio::Transport::new(
+                    key.clone(),
+                    libp2p_webrtc::tokio::Certificate::generate(&mut rand::thread_rng())?,
+                )
+            })
+            .map_err(|e| SodsP2pError::NetworkError(format!("WebRTC error: {}", e)))?
             .with_behaviour(|_key| SodsBehaviour::new(&keypair))
             .map_err(|e| SodsP2pError::NetworkError(format!("Behaviour error: {}", e)))?
             .build();
