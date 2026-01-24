@@ -1,5 +1,5 @@
 use libp2p::PeerId;
-use std::collections::HashMap;
+// use std::collections::HashMap;
 
 #[tokio::test]
 async fn test_local_truth_supremacy_vs_malicious_majority() {
@@ -8,8 +8,8 @@ async fn test_local_truth_supremacy_vs_malicious_majority() {
     
     let local_verified = false; // Local RPC result
     let p2p_consensus = true;   // 90% of peers claim YES
-    let peer_count = 10;
-    let malicious_count = 9;
+    let _peer_count = 10;
+    let _malicious_count = 9;
     
     // Logic from sods-p2p/src/client.rs:
     // "If a symbol is verified locally, P2P consensus is ignored, prevents eclipse or collusion attacks."
@@ -33,9 +33,10 @@ async fn test_immediate_slashing_on_proof_mismatch() {
     // Scenario: Peer A provides a proof that contradicts locally verified truth.
     // Peer A MUST be blacklisted immediately.
     
-    let local_truth = true;
-    let peer_proof = false;
-    let peer_id = PeerId::random();
+    let _local_truth = true;
+    let _peer_proof = false;
+    let keypair = libp2p::identity::Keypair::generate_ed25519();
+    let peer_id = PeerId::from(keypair.public());
     
     let mut blacklist = Vec::new();
     

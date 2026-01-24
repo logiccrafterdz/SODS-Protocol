@@ -37,7 +37,7 @@ async fn test_mpt_verification_utility() {
     // Minimal mock MPT proof verification
     // (This is a unit test in an integration test wrapper for CI visibility)
     let root = H256::random();
-    let nodes: Vec<Bytes> = vec![]; // Invalid empty proof
+    let nodes: Vec<Vec<u8>> = vec![]; // Invalid empty proof
     
     let result = MptVerifier::verify_proof(root, &[0x12], None, &nodes);
     assert!(result.is_ok());

@@ -3,6 +3,7 @@
 use libp2p::PeerId;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
+use tracing::warn;
 
 /// Initial score for new peers.
 const INITIAL_SCORE: f32 = 0.0;
@@ -136,7 +137,8 @@ mod tests {
     use super::*;
     
     fn random_peer() -> PeerId {
-        PeerId::random()
+        let keypair = libp2p::identity::Keypair::generate_ed25519();
+        PeerId::from(keypair.public())
     }
 
     #[test]

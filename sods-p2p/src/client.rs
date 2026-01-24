@@ -85,14 +85,6 @@ impl SodsClient {
                 libp2p::yamux::Config::default,
             )
             .map_err(|e| SodsP2pError::NetworkError(format!("TCP error: {}", e)))?
-            .with_quic()
-            .with_other_transport(|key| {
-                libp2p_webrtc::tokio::Transport::new(
-                    key.clone(),
-                    libp2p_webrtc::tokio::Certificate::generate(&mut rand::thread_rng())?,
-                )
-            })
-            .map_err(|e| SodsP2pError::NetworkError(format!("WebRTC error: {}", e)))?
             .with_behaviour(|_key| SodsBehaviour::new(&keypair))
             .map_err(|e| SodsP2pError::NetworkError(format!("Behaviour error: {}", e)))?
             .build();
@@ -189,7 +181,7 @@ impl SodsClient {
         // Randomize challenge block to prevent pre-computation attacks
         let mut block_number = 10002800; // Fallback for PoC
         
-        if let Some(verifier) = &self.fallback_verifier {
+        if let Some(_verifier) = &self.fallback_verifier {
             // In a production environment, we'd fetch the latest block and pick one from the last 100.
             // For now, we use a simple pseudo-random offset if we have a verifier.
             let seed = self.local_peer_id.to_bytes();
@@ -346,7 +338,7 @@ impl SodsClient {
         }
 
         // Evaluate consensus using Adaptive Quorum
-        let quorum_threshold = required_quorum(valid_responses.len());
+        let _quorum_threshold = required_quorum(valid_responses.len());
         let consensus = evaluate_consensus(valid_responses.clone(), &self.reputation, DEFAULT_THRESHOLD);
 
         // Update reputation and perform slashing

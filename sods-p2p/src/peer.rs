@@ -9,7 +9,6 @@ use libp2p::{
     swarm::{Swarm, SwarmEvent},
     Multiaddr, PeerId,
 };
-use rand::rngs::OsRng;
 use tracing::{debug, info, warn};
 use tokio::sync::broadcast;
 
@@ -21,11 +20,13 @@ use crate::cache::{BlockCache, CachedBlock};
 use crate::error::{Result, SodsP2pError};
 use crate::protocol::{ProofRequest, ProofResponse};
 use crate::threats::{ThreatRule, THREATS_TOPIC};
+use crate::reputation::ReputationTracker;
 
 /// A SODS peer that serves behavioral proofs to the network.
 pub struct SodsPeer {
     swarm: Swarm<SodsBehaviour>,
     verifier: BlockVerifier,
+    reputation: ReputationTracker,
     cache: BlockCache,
     local_peer_id: PeerId,
     signing_key: SigningKey,
@@ -42,9 +43,13 @@ impl SodsPeer {
         let verifier = BlockVerifier::new(&[rpc_url.to_string()])?;
         let keypair = Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(keypair.public());
+        let reputation = ReputationTracker::new();
 
         // Generate secp256k1 signing key for message signing
-        let signing_key = SigningKey::random(&mut OsRng);
+        let mut seed = [0u8; 32];
+        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut seed);
+        let signing_key = SigningKey::from_slice(&seed)
+            .map_err(|e| SodsP2pError::NetworkError(format!("Key gen error: {}", e)))?;
 
         // Threat broadcast channel (capacity 100)
         let (threat_tx, _) = broadcast::channel(100);
@@ -57,14 +62,6 @@ impl SodsPeer {
                 libp2p::yamux::Config::default,
             )
             .map_err(|e| SodsP2pError::NetworkError(format!("TCP error: {}", e)))?
-            .with_quic()
-            .with_other_transport(|key| {
-                libp2p_webrtc::tokio::Transport::new(
-                    key.clone(),
-                    libp2p_webrtc::tokio::Certificate::generate(&mut rand::thread_rng())?,
-                )
-            })
-            .map_err(|e| SodsP2pError::NetworkError(format!("WebRTC error: {}", e)))?
             .with_behaviour(|_key| SodsBehaviour::new(&keypair))
             .map_err(|e| SodsP2pError::NetworkError(format!("Behaviour error: {}", e)))?
             .build();
@@ -79,6 +76,7 @@ impl SodsPeer {
         Ok(Self {
             swarm,
             verifier,
+            reputation,
             cache: BlockCache::new(),
             local_peer_id,
             signing_key,
@@ -107,7 +105,7 @@ impl SodsPeer {
     /// Get the top N peers by reputation score.
     pub fn top_peers(&self, count: usize) -> Vec<PeerId> {
         let available: Vec<PeerId> = self.swarm.connected_peers().cloned().collect();
-        self.swarm.behaviour().reputation.select_best_peers(&available, count)
+        self.reputation.select_best_peers(&available, count)
     }
 
     /// Trigger a manual validation of a peer.

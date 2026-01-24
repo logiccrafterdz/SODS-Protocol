@@ -152,7 +152,8 @@ impl RpcClient {
     ) -> Result<EIP1186ProofResponse> {
         let mut last_err = None;
         for _ in 0..self.providers.len() {
-            match self.current_provider().get_proof(address, locations.clone(), block_number).await {
+            let block_id = block_number.map(ethers_core::types::BlockId::Number);
+            match self.current_provider().get_proof(address, locations.clone(), block_id).await {
                 Ok(p) => {
                     self.update_adaptive_delay(true, None);
                     return Ok(p);
@@ -297,7 +298,7 @@ impl RpcClient {
             
             let block = match block { Some(b) => b, None => continue };
             
-            for tx in block.transactions {
+            for (_i, tx) in block.transactions.iter().enumerate() {
                 if tx.to.is_none() {
                     let mut receipt = None;
                     for _ in 0..self.providers.len() {

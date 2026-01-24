@@ -3,7 +3,7 @@ use crate::symbol::BehavioralSymbol;
 use crate::error::{SodsError, Result};
 use std::time::{Instant, Duration};
 
-const MAX_PATTERN_DEPTH: usize = 5;
+// const MAX_PATTERN_DEPTH: usize = 5;
 const MAX_SYMBOLS_PER_PATTERN: usize = 10;
 const PARSING_TIMEOUT_MS: u64 = 10;
 
@@ -453,8 +453,8 @@ mod tests {
                 // and DOES NOT include the injected OR logic
                 for step in p.steps {
                     if let PatternStep::Exact(_, cond) = step {
-                        if let Some(c) = cond {
-                            assert!(!format!("{:?}", c).contains("OR"));
+                        if cond != PatternCondition::None {
+                            assert!(!format!("{:?}", cond).contains("OR"));
                         }
                     }
                 }

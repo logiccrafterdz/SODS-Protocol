@@ -161,9 +161,9 @@ mod tests {
     #[test]
     fn test_weighted_consensus() {
         let mut tracker = ReputationTracker::new();
-        let peer1 = PeerId::random();
-        let peer2 = PeerId::random(); // High rep
-        let peer3 = PeerId::random(); // Malicious low rep
+        let peer1 = PeerId::from(libp2p::identity::Keypair::generate_ed25519().public());
+        let peer2 = PeerId::from(libp2p::identity::Keypair::generate_ed25519().public()); // High rep
+        let peer3 = PeerId::from(libp2p::identity::Keypair::generate_ed25519().public()); // Malicious low rep
 
         // peer1: default 0.1
         // peer2: reward 10x -> high score

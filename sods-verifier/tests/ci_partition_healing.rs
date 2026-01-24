@@ -34,7 +34,8 @@ async fn test_partition_healing_reconnect() {
     
     if was_isolated {
         println!("🔄 Healing: Triggering fresh bootstrapper lookup...");
-        peers.push(PeerId::random()); // Simulated recovery
+        let keypair = libp2p::identity::Keypair::generate_ed25519();
+        peers.push(PeerId::from(keypair.public())); // Simulated recovery
     }
     
     assert!(!peers.is_empty(), "Node MUST recover peers after partition ends");

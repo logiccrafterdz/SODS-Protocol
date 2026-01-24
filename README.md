@@ -284,7 +284,14 @@ sods verify Tf --block 10002322 --json
 - **Local Truth Supremacy**: Absolute priority for local verification results. If a symbol is verified locally, P2P consensus is ignored, preventing eclipse or collusion attacks.
 - **Adaptive Quorum**: Dynamic consensus thresholds that scale with network size (100% for bootstrap, 67% for medium, 60% for large networks).
 - **Immediate Slashing**: Malicious peers providing proofs that contradict verified local truth are automatically blacklisted.
-- **WebRTC Transport**: Support for browser-compatible and mobile-friendly P2P connections via WebRTC.
+- **WebRTC Transport**: Support for browser-compatible and mobile-friendly P2P connections via WebRTC (Standardized in v0.54).
+
+## What's New in v1.6 (ABI v3 - Merkle Fix)
+
+- **Deterministic Merkle Ordering**: Resolved critical path mismatch between Rust and Solidity by adding explicit direction flags (`isLeftPath`).
+- **v3 ABI Upgrade**: Optimized on-chain verification parameter structure to support index-based path reconstruction, bypassing ambiguous hash-comparison logic.
+- **Library Stabilization**: Full warning-free build achieved for `sods-core`, `sods-verifier`, and `sods-p2p` utilizing `libp2p` v0.54.
+- **Hardened Root Anchoring**: Improved block header verification logic in `trustless` mode to detect sophisticated RPC log manipulation.
 
 ## High-Performance Verification Engine
 
@@ -337,10 +344,10 @@ The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection 
 
 - Specification: **v0.2** (Symbolic Primitives)
 - PoC: **v0.5** (Verified Proofs)
-- sods-core: **v0.1.2**
-- sods-verifier: **v0.1.2**
-- sods-p2p: **v0.1.0**
-- sods-cli: **v0.1.5**
+- sods-core: **v0.2.0**
+- sods-verifier: **v0.2.0**
+- sods-p2p: **v0.2.0**
+- sods-cli: **v1.1.0**
 - Stage: **Pre-Alpha / Research Initiative**
 - Seeking: Technical feedback, threat analysis, edge cases
 

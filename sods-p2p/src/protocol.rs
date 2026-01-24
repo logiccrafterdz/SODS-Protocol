@@ -19,12 +19,23 @@ pub struct ProofRequest {
     pub block_number: u64,
 }
 
-/// A Proof-of-Behavior puzzle challenge.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PuzzleChallenge {
     pub chain_id: u64,
     pub block_number: u64,
     pub symbol: String,
+}
+
+impl PuzzleChallenge {
+    pub fn random() -> Self {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        Self {
+            chain_id: 11155111, // Sepolia
+            block_number: 10002000 + rng.gen_range(0..1000),
+            symbol: "Tf".to_string(),
+        }
+    }
 }
 
 /// A solution to a Proof-of-Behavior puzzle.
@@ -184,7 +195,8 @@ impl ProofResponse {
 mod tests {
     use super::*;
     use k256::ecdsa::SigningKey;
-    use rand::rngs::OsRng;
+    use rand::Rng;
+    // use rand::rngs::OsRng;
 
     #[test]
     fn test_request_serialization() {
@@ -217,7 +229,9 @@ mod tests {
 
     #[test]
     fn test_signed_response() {
-        let signing_key = SigningKey::random(&mut OsRng);
+        let mut seed = [0u8; 32];
+        rand::thread_rng().fill(&mut seed);
+        let signing_key = SigningKey::from_slice(&seed).unwrap();
         let resp = ProofResponse::success_signed(vec![1, 2, 3], [0xAB; 32], 5, &signing_key);
 
         assert!(resp.is_signed());
@@ -226,7 +240,9 @@ mod tests {
 
     #[test]
     fn test_tampered_response_fails_verification() {
-        let signing_key = SigningKey::random(&mut OsRng);
+        let mut seed = [0u8; 32];
+        rand::thread_rng().fill(&mut seed);
+        let signing_key = SigningKey::from_slice(&seed).unwrap();
         let mut resp = ProofResponse::success_signed(vec![1, 2, 3], [0xAB; 32], 5, &signing_key);
 
         // Tamper with the response
@@ -237,8 +253,12 @@ mod tests {
 
     #[test]
     fn test_wrong_key_fails_verification() {
-        let signing_key1 = SigningKey::random(&mut OsRng);
-        let signing_key2 = SigningKey::random(&mut OsRng);
+        let mut seed1 = [0u8; 32];
+        let mut seed2 = [0u8; 32];
+        rand::thread_rng().fill(&mut seed1);
+        rand::thread_rng().fill(&mut seed2);
+        let signing_key1 = SigningKey::from_slice(&seed1).unwrap();
+        let signing_key2 = SigningKey::from_slice(&seed2).unwrap();
 
         let mut resp = ProofResponse::success_signed(vec![1, 2, 3], [0xAB; 32], 5, &signing_key1);
 

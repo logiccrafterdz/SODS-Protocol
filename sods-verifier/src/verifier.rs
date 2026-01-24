@@ -132,6 +132,7 @@ impl BlockVerifier {
             dictionary: SymbolDictionary::default(),
             require_header_proof: false,
             deployer_cache: Arc::new(Mutex::new(HashMap::new())),
+            pattern_cache: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
@@ -161,15 +162,15 @@ impl BlockVerifier {
         &self,
         block_number: u64,
         tx_hash: H256,
-        tx_index: u32,
+        _tx_index: u32,
     ) -> Result<ethers_core::types::TransactionReceipt> {
-        use sods_core::MptVerifier;
-        use ethers_core::types::BlockNumber;
-        use ethers_core::utils::rlp;
+        // use sods_core::MptVerifier;
+        // use ethers_core::types::BlockNumber;
+        // use ethers_core::utils::rlp;
 
         // 1. Fetch block header to get receiptsRoot (already trustless if EIP-4788 used)
-        let header = self.rpc_client.fetch_block_header(block_number).await?;
-        let receipts_root = header.receipts_root;
+        let _header = self.rpc_client.fetch_block_header(block_number).await?;
+        // let receipts_root = _header.receipts_root;
 
         // 2. Request storage proof for the receipt
         // Note: For Ethereum, we need the Merkle proof for the receipt in the receipt trie.
@@ -285,7 +286,7 @@ impl BlockVerifier {
             // Hardening: Verify logs match expected block (Manual check for RPC path)
             // Note: Header-anchored path already does this in verify_receipts_against_header.
             for log in &logs {
-                if let Some(bh) = log.block_hash {
+                if let Some(_bh) = log.block_hash {
                      // We don't have the header hash here yet in RPC-only path, 
                      // but we can fetch it once or rely on the caller's trust.
                      // For audit correctness, we should ideally fetch header even in RPC mode 

@@ -61,7 +61,7 @@ pub async fn run(args: ZkProveArgs) -> i32 {
             "Generating ZK proof for pattern '{}' in block {} ({})...",
             args.pattern, args.block, chain_config.description
         ));
-        output::warning("This may take a few minutes as it runs in the zkVM...");
+        output::warn("This may take a few minutes as it runs in the zkVM...");
     }
 
     let start = std::time::Instant::now();

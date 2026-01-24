@@ -39,6 +39,7 @@ hex = "0.4"
 sha3 = "0.10"
 
 [dev-dependencies]
+libp2p = "0.54"
 
 # For timing assertions
 tokio-test = "0.4"

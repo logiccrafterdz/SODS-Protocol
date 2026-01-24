@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 #[tokio::test]
 async fn test_incomplete_receipts_detection() {
-    use crate::sods_verifier::header_anchor::{verify_receipts_against_header, BlockHeader};
+    use sods_verifier::header_anchor::{verify_receipts_against_header, BlockHeader};
     
     // 1. Create valid header
     let header = BlockHeader {
@@ -16,6 +16,8 @@ async fn test_incomplete_receipts_detection() {
         hash: [1u8; 32].into(),
         receipts_root: [2u8; 32].into(), // Assume this is a VALID root for 100 receipts
         logs_bloom: [0u8; 256].into(),
+        parent_beacon_block_root: None,
+        timestamp: 0,
     };
     
     // 2. Provide only 50 receipts (incomplete)
@@ -31,7 +33,7 @@ async fn test_incomplete_receipts_detection() {
 
 #[tokio::test]
 async fn test_corrupted_log_data_rejection() {
-    use crate::sods_verifier::header_anchor::{verify_receipts_against_header, BlockHeader};
+    use sods_verifier::header_anchor::{verify_receipts_against_header, BlockHeader};
     
     // 1. Valid receipt set
     let mut receipt = ethers_core::types::TransactionReceipt::default();
@@ -50,6 +52,8 @@ async fn test_corrupted_log_data_rejection() {
         hash: [1u8; 32].into(),
         receipts_root: [9u8; 32].into(), // Correct root for original logs
         logs_bloom: [0u8; 256].into(),
+        parent_beacon_block_root: None,
+        timestamp: 0,
     };
     
     // 4. Verify modified logs against original root
@@ -70,6 +74,8 @@ async fn test_reorg_detection_logic() {
         hash: H256::from_low_u64_be(0xAAAA),
         receipts_root: H256::zero(),
         logs_bloom: [0u8; 256].into(),
+        parent_beacon_block_root: None,
+        timestamp: 0,
     };
     
     // 2. Logs from Block #2000 but with hash B (Simulating a reorg during fetch)
@@ -92,6 +98,8 @@ async fn test_pre_eip4788_fallback_warning() {
         hash: [1u8; 32].into(),
         receipts_root: [2u8; 32].into(),
         logs_bloom: [0u8; 256].into(),
+        parent_beacon_block_root: None,
+        timestamp: 0,
     };
     
     // 2. Check logic: if parent_beacon_block_root is missing, warn but allow

@@ -25,6 +25,7 @@ library SODSVerifier {
     /// @param logIndices Array of log indices for the symbols.
     /// @param leafHashes Array of Keccak256 leaf hashes.
     /// @param merklePath Siblings in the Merkle path.
+    /// @param isLeftPath Direction for each sibling: true = leaf is left child (sibling on right).
     /// @param bmtRoot The Keccak256 BMT root to verify against.
     /// @param beaconRoot The expected beacon root (untrusted input from proof).
     /// @param timestamp The block timestamp.
@@ -39,6 +40,7 @@ library SODSVerifier {
         uint32[] calldata logIndices,
         bytes32[] calldata leafHashes,
         bytes32[] calldata merklePath,
+        bool[] calldata isLeftPath,
         bytes32 bmtRoot,
         bytes32 beaconRoot,
         uint256 timestamp,
@@ -114,14 +116,20 @@ library SODSVerifier {
             }
         }
 
-        // 4. Verify Merkle Path
+        // 4. Verify Merkle Path with explicit direction flags (v3 ABI)
+        if (merklePath.length != isLeftPath.length) {
+            return false;
+        }
+
         bytes32 computedHash = leafHashes[0];
         
         for (uint256 i = 0; i < merklePath.length; i++) {
             bytes32 sibling = merklePath[i];
-            if (computedHash < sibling) {
+            if (isLeftPath[i]) {
+                // Leaf is left child, sibling is on right: H(current || sibling)
                 computedHash = keccak256(abi.encodePacked(computedHash, sibling));
             } else {
+                // Leaf is right child, sibling is on left: H(sibling || current)
                 computedHash = keccak256(abi.encodePacked(sibling, computedHash));
             }
         }

@@ -161,11 +161,14 @@ impl ThreatRegistry {
 mod tests {
     use super::*;
     use k256::ecdsa::SigningKey;
-    use rand::rngs::OsRng;
+    use rand::Rng;
+    // use rand::rngs::OsRng;
 
     #[test]
     fn test_valid_rule_verification() {
-        let signing_key = SigningKey::random(&mut OsRng);
+        let mut seed = [0u8; 32];
+        rand::thread_rng().fill(&mut seed);
+        let signing_key = SigningKey::from_slice(&seed).unwrap();
         let rule = ThreatRule::new(
             "test-rule-1",
             "Test Rule",
@@ -180,7 +183,9 @@ mod tests {
 
     #[test]
     fn test_tampered_rule_fails() {
-        let signing_key = SigningKey::random(&mut OsRng);
+        let mut seed = [0u8; 32];
+        rand::thread_rng().fill(&mut seed);
+        let signing_key = SigningKey::from_slice(&seed).unwrap();
         let mut rule = ThreatRule::new(
             "test-rule-2",
             "Test Rule",
@@ -197,7 +202,9 @@ mod tests {
 
     #[test]
     fn test_invalid_pattern_fails() {
-        let signing_key = SigningKey::random(&mut OsRng);
+        let mut seed = [0u8; 32];
+        rand::thread_rng().fill(&mut seed);
+        let signing_key = SigningKey::from_slice(&seed).unwrap();
         let rule = ThreatRule::new(
             "test-rule-3",
             "Test Rule",

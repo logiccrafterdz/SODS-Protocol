@@ -154,8 +154,10 @@ pub struct OnChainBehavioralProof {
     pub log_indices: Vec<u32>,
     /// The Keccak256 leaf hashes
     pub leaf_hashes: Vec<[u8; 32]>,
-    /// The shared Merkle path
+    /// The shared Merkle path (sibling hashes)
     pub merkle_path: Vec<[u8; 32]>,
+    /// Direction for each sibling: true = sibling is on right (leaf is left child)
+    pub is_left_path: Vec<bool>,
     /// The BMT root (Keccak256)
     pub bmt_root: [u8; 32],
     /// Beacon root for the block (EIP-4788)
@@ -170,8 +172,9 @@ pub struct OnChainBehavioralProof {
 
 impl OnChainBehavioralProof {
     /// Export the proof as ABI-encoded calldata for `SODSVerifier.verifyBehavior`.
+    /// v3 ABI: includes isLeftPath for explicit Merkle path ordering.
     pub fn to_calldata(&self) -> Vec<u8> {
-        // signature: verifyBehavior(uint256,uint256,string[],uint32[],bytes32[],bytes32[],bytes32,bytes32,uint256,bytes32,bytes,address)
+        // signature: verifyBehavior(uint256,uint256,string[],uint32[],bytes32[],bytes32[],bool[],bytes32,bytes32,uint256,bytes32,bytes,address)
         use ethabi::{encode, Token};
 
         let tokens = vec![
@@ -199,6 +202,13 @@ impl OnChainBehavioralProof {
                 self.merkle_path
                     .iter()
                     .map(|&h| Token::FixedBytes(h.to_vec()))
+                    .collect(),
+            ),
+            // v3 ABI: isLeftPath boolean array for explicit ordering
+            Token::Array(
+                self.is_left_path
+                    .iter()
+                    .map(|&b| Token::Bool(b))
                     .collect(),
             ),
             Token::FixedBytes(self.bmt_root.to_vec()),
@@ -280,7 +290,7 @@ impl CausalProof {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
     use crate::tree::BehavioralMerkleTree;
     use crate::symbol::BehavioralSymbol;
 

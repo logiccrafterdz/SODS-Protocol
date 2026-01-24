@@ -137,3 +137,50 @@ SODSVerifier.verifyBehavior(
 ### 3. Security Notes
 - **Replay Protection**: The commitment includes `chainId` and `blockNumber`.
 - **Integrity**: The signature covers both the block identifiers and the roots, ensuring the BMT matches the specific block logs.
+
+---
+
+## v3 ABI: Explicit Merkle Path Ordering
+
+**New in v3**: Proofs now include an `isLeftPath` boolean array to resolve ordering ambiguity between off-chain (Rust) and on-chain (Solidity) verification.
+
+### Why This Change?
+
+Previously, `SODSVerifier.sol` used hash-comparison (`computedHash < sibling`) to determine ordering. This did not match the index-based ordering in the Rust BMT implementation, causing valid proofs to be rejected on-chain.
+
+### New Parameter
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `isLeftPath` | `bool[]` | Direction for each sibling: `true` = leaf is left child (sibling on right) |
+
+### Updated Function Signature
+
+```solidity
+function verifyBehavior(
+    uint256 blockNumber,
+    uint256 chainId,
+    string[] calldata symbols,
+    uint32[] calldata logIndices,
+    bytes32[] calldata leafHashes,
+    bytes32[] calldata merklePath,
+    bool[] calldata isLeftPath,  // NEW in v3
+    bytes32 bmtRoot,
+    bytes32 beaconRoot,
+    uint256 timestamp,
+    bytes32 receiptsRoot,
+    bytes calldata signature,
+    address trustedSigner
+) external view returns (bool);
+```
+
+### Generating v3 Proofs
+
+```bash
+sods export-proof --pattern "Tf" --block 20000000 --chain ethereum --format calldata
+```
+
+The CLI automatically includes `isLeftPath` in the generated calldata.
+
+> [!IMPORTANT]
+> v3 proofs are **not backward compatible** with v2 contracts. Deploy the updated `SODSVerifier.sol` before submitting v3 proofs.

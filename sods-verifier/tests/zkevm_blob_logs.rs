@@ -37,7 +37,7 @@ async fn test_base_sequencer_reorg_safety() {
     // Base has frequent sub-second reorgs.
     // SODS detects this via block hash mismatch in header_anchor.rs
     
-    use crate::sods_verifier::header_anchor::{BlockHeader, verify_receipts_against_header};
+    use sods_verifier::header_anchor::{BlockHeader, verify_receipts_against_header};
     use ethers_core::types::H256;
     
     let header = BlockHeader {
@@ -45,6 +45,8 @@ async fn test_base_sequencer_reorg_safety() {
         hash: H256::random(), // Current local consensus hash
         receipts_root: H256::random(),
         logs_bloom: [0u8; 256].into(),
+        parent_beacon_block_root: None,
+        timestamp: 0,
     };
     
     // Malicious or reorged RPC return receipts with WRONG block hash

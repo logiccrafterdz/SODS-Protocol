@@ -345,6 +345,7 @@ impl BehavioralMerkleTree {
             log_indices,
             leaf_hashes,
             merkle_path: proof.path,
+            is_left_path: proof.directions,
             bmt_root: self.root,
             beacon_root,
             timestamp,

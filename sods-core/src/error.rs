@@ -36,6 +36,10 @@ pub enum SodsError {
     /// Invalid pattern sequence.
     #[error("Pattern error: {0}")]
     PatternError(String),
+
+    /// Internal error (RLP parsing, MPT verification, etc.)
+    #[error("Internal error: {0}")]
+    InternalError(String),
 }
 
 /// Result type alias for SODS operations.

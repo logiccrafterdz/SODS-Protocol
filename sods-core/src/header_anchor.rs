@@ -28,7 +28,7 @@ pub fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
     // However, `ethers-core`'s TransactionReceipt doesn't expose L2 fields directly.
     // We use `receipt.other` if available or assume standard for now but prepare the structure.
     
-    let mut list_size = 4;
+    let list_size = 4;
     
     // Check for L2 specific fields in `other` map (if supported by the provider)
     let has_l2_fields = !receipt.other.is_empty();
@@ -106,7 +106,7 @@ pub fn compute_receipts_root(receipts: &[TransactionReceipt]) -> H256 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ethers_core::types::{Bloom, Log, TransactionReceipt, H256, U64, U256, Address, Bytes};
+    use ethers_core::types::{Bloom, TransactionReceipt, H256, U64, U256};
 
     #[test]
     fn test_empty_receipts_root() {

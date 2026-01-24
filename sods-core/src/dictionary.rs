@@ -296,8 +296,7 @@ impl SymbolDictionary {
                 // GPv2 Settlement Trade(owner, sellToken, buyToken, sellAmount, buyAmount, feeAmount, orderUid)
                 // Topics[1] is owner. Data contains tokens and amounts.
                 if log.data.len() >= 128 {
-                    // let sell_token = Address::from(H256::from_slice(&log.data[12..32]));
-                    to = Address::from(H256::from_slice(&log.data[44..64])); // buyToken
+                    to = Address::from_slice(&log.data[44..64]); // buyToken
                     value = U256::from_big_endian(&log.data[96..128]); // buyAmount
                 }
 

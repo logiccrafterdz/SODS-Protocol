@@ -23,6 +23,8 @@ async fn test_trustless_mode_detects_tampering() {
         hash: H256::random(),
         receipts_root: tampered_root,
         logs_bloom: Bloom::default(),
+        parent_beacon_block_root: None,
+        timestamp: 0,
     };
     
     let validation = sods_verifier::header_anchor::verify_receipts_against_header(&receipts, &header);

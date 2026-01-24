@@ -1,5 +1,5 @@
-use ethers_core::types::{H256, Bytes};
-use ethers_core::utils::rlp::{self, Rlp};
+use ethers_core::types::H256;
+use ethers_core::utils::rlp::Rlp;
 use sha3::{Digest, Keccak256};
 use crate::error::SodsError;
 
@@ -7,7 +7,7 @@ use crate::error::SodsError;
 pub struct MptVerifier;
 
 impl MptVerifier {
-    /// Verifies an MPT inclusion proof.
+    /// Verify a partial MPT proof.
     ///
     /// # Arguments
     /// * `root` - The expected trie root hash.
@@ -18,18 +18,15 @@ impl MptVerifier {
         root: H256,
         path: &[u8],
         value: Option<&[u8]>,
-        nodes: &[Bytes],
-    ) -> Result<bool, SodsError> {
+        nodes: &[Vec<u8>],
+    ) -> crate::error::Result<bool> {
         let mut current_hash = root;
-        let mut nibbles = Self::to_nibbles(path);
+        let nibbles = Self::to_nibbles(path);
         let mut nibble_index = 0;
 
-        for (i, node_bytes) in nodes.iter().enumerate() {
+        for node_bytes in nodes.iter() {
             let node_hash = H256::from_slice(&Keccak256::digest(node_bytes));
             
-            // The first node must match the root (unless it's the only node and root is a literal?)
-            // Actually, in many implementations the root is the hash of the first node.
-            // If i == 0, current_hash == root.
             if node_hash != current_hash {
                 return Ok(false);
             }
@@ -43,7 +40,6 @@ impl MptVerifier {
                 17 => {
                     // Branch node
                     if nibble_index == nibbles.len() {
-                        // End of path, check value in the last slot
                         let branch_value = rlp.at(16).map_err(|_| SodsError::InternalError("RLP error".into()))?.data().map_err(|_| SodsError::InternalError("RLP error".into()))?;
                         return Ok(value == Some(branch_value));
                     }
@@ -62,7 +58,6 @@ impl MptVerifier {
                     let encoded_path = rlp.at(0).map_err(|_| SodsError::InternalError("RLP error".into()))?.data().map_err(|_| SodsError::InternalError("RLP error".into()))?;
                     let (node_nibbles, is_leaf) = Self::decode_path(encoded_path);
                     
-                    // Match prefix
                     if nibbles[nibble_index..].starts_with(&node_nibbles) {
                         nibble_index += node_nibbles.len();
                         
@@ -71,15 +66,14 @@ impl MptVerifier {
                                 let leaf_value = rlp.at(1).map_err(|_| SodsError::InternalError("RLP error".into()))?.data().map_err(|_| SodsError::InternalError("RLP error".into()))?;
                                 return Ok(value == Some(leaf_value));
                             } else {
-                                return Ok(false); // Leaf reached but path not exhausted
+                                return Ok(false);
                             }
                         } else {
-                            // Extension node
                             let next_node_rlp = rlp.at(1).map_err(|_| SodsError::InternalError("RLP error".into()))?;
                             current_hash = H256::from_slice(next_node_rlp.data().map_err(|_| SodsError::InternalError("RLP error".into()))?);
                         }
                     } else {
-                        return Ok(false); // Prefix mismatch
+                        return Ok(false);
                     }
                 }
                 _ => return Err(SodsError::InternalError("Invalid MPT node: unexpected item count".into())),
