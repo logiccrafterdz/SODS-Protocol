@@ -57,6 +57,9 @@ enum Commands {
     
     /// Manage the contract deployer registry
     Registry(commands::registry::RegistryArgs),
+
+    /// Listen for live behavioral alerts via WebSocket
+    Listen(commands::listen::ListenArgs),
 }
 
 fn main() {
@@ -88,6 +91,7 @@ fn main() {
             #[cfg(feature = "zk")]
             Commands::ZkProve(args) => commands::zk_prove::run(args).await,
             Commands::Registry(args) => commands::registry::run(args),
+            Commands::Listen(args) => commands::listen::run(args).await,
             Commands::Daemon(_) => unreachable!(), // Handled above
         }
     });

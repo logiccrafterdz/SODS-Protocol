@@ -1,6 +1,13 @@
 use clap::{Args, Subcommand};
 use colored::Colorize;
-// use serde::Deserialize;
+use std::sync::Arc;
+use std::collections::HashMap;
+use tokio::sync::{RwLock, mpsc::unbounded_channel, mpsc::UnboundedSender};
+use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio::net::{TcpListener, TcpStream};
+use uuid::Uuid;
+use serde::{Deserialize, Serialize};
+use futures_util::{StreamExt, SinkExt};
 
 #[cfg(unix)]
 use std::fs;
@@ -70,6 +77,10 @@ pub enum DaemonCommands {
         /// Auto-remove rules after duration (e.g. 24h, 30m)
         #[arg(long, default_value = "24h")]
         expire_after: String,
+
+        /// Start a WebSocket server for real-time behavioral alerts
+        #[arg(long)]
+        websocket_port: Option<u16>,
     },
     /// Stop the running daemon
     Stop,
@@ -85,6 +96,133 @@ pub struct ThreatFeedItem {
     pub chain: String,
     pub severity: String,
     pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BehavioralAlert {
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    pub timestamp: String,
+    pub chain_id: u64,
+    pub block_number: u64,
+    pub pattern: String,
+    pub symbols: Vec<AlertSymbol>,
+    pub alert_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlertSymbol {
+    pub symbol: String,
+    pub from: String,
+    pub to: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct Subscription {
+    pub patterns: Vec<String>,
+    pub chains: Vec<u64>,
+}
+
+pub struct WebSocketServer {
+    port: u16,
+    subscribers: Arc<RwLock<HashMap<String, (UnboundedSender<Message>, Arc<RwLock<Subscription>>)>>>,
+}
+
+impl WebSocketServer {
+    pub fn new(port: u16) -> Self {
+        Self {
+            port,
+            subscribers: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub async fn start(self: Arc<Self>) {
+        let addr = format!("0.0.0.0:{}", self.port);
+        let listener = match TcpListener::bind(&addr).await {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("WebSocket Error: Failed to bind to {}: {}", addr, e);
+                return;
+            }
+        };
+
+        println!("WebSocket Server: listening on ws://{}", addr);
+
+        while let Ok((stream, _)) = listener.accept().await {
+            let subscribers = self.subscribers.clone();
+            tokio::spawn(Self::handle_connection(stream, subscribers));
+        }
+    }
+
+    async fn handle_connection(
+        stream: TcpStream,
+        subscribers: Arc<RwLock<HashMap<String, (UnboundedSender<Message>, Arc<RwLock<Subscription>>)>>>,
+    ) {
+        let ws_stream = match tokio_tungstenite::accept_async(stream).await {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+
+        let (mut write, mut read) = ws_stream.split();
+        let client_id = Uuid::new_v4().to_string();
+        let (tx, mut rx) = unbounded_channel();
+        let subscription = Arc::new(RwLock::new(Subscription::default()));
+
+        // Register client
+        subscribers.write().await.insert(client_id.clone(), (tx, subscription.clone()));
+
+        // Writer task
+        let subscribers_inner = subscribers.clone();
+        let client_id_inner = client_id.clone();
+        tokio::spawn(async move {
+            while let Some(msg) = rx.recv().await {
+                if write.send(msg).await.is_err() {
+                    break;
+                }
+            }
+            // Cleanup on disconnect
+            subscribers_inner.write().await.remove(&client_id_inner);
+        });
+
+        // Reader task (Handle subscriptions)
+        while let Some(Ok(msg)) = read.next().await {
+            if let Message::Text(text) = msg {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) {
+                    if val["type"] == "subscribe" {
+                        let mut sub = subscription.write().await;
+                        if let Some(patterns) = val["patterns"].as_array() {
+                            sub.patterns = patterns.iter().filter_map(|p| p.as_str().map(|s| s.to_string())).collect();
+                        }
+                        if let Some(chains) = val["chains"].as_array() {
+                            sub.chains = chains.iter().filter_map(|c| c.as_u64()).collect();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub async fn broadcast_alert(&self, alert: BehavioralAlert) {
+        let json = match serde_json::to_string(&alert) {
+            Ok(j) => j,
+            Err(_) => return,
+        };
+        let msg = Message::Text(json);
+
+        let subs = self.subscribers.read().await;
+        for (tx, sub_lock) in subs.values() {
+            let sub = sub_lock.read().await;
+            
+            // Filtering logic
+            let chain_matches = sub.chains.is_empty() || sub.chains.contains(&alert.chain_id);
+            let pattern_matches = sub.patterns.is_empty() || sub.patterns.contains(&alert.pattern);
+
+            if chain_matches && pattern_matches {
+                let _ = tx.send(msg.clone());
+            }
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -158,13 +296,17 @@ fn start_daemon(
     webhook_url: Option<String>,
     threat_feed: Option<String>,
     p2p_threat_network: bool,
-    expire_after_str: String
+    expire_after_str: String,
+    websocket_port: Option<u16>,
 ) -> i32 {
     let expire_duration = parse_duration(&expire_after_str);
     let expires_at = std::time::SystemTime::now() + expire_duration;
     let sods_dir = get_sods_dir();
     let pid_file = get_pid_file();
     let log_file = get_log_file();
+
+    // WebSocket Server Setup
+    let ws_server = websocket_port.map(|port| Arc::new(WebSocketServer::new(port)));
 
     // Check if running
     if check_status() {
@@ -251,7 +393,14 @@ fn start_daemon(
             // Let's proceed assuming structure holds.
             
             let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(run_daemon_loop(targets, chain, interval, rpc_url, webhook_url, Some(threat_feed), p2p_threat_network, expire_after_str));
+            
+            // Start WS server if enabled
+            if let Some(ref ws) = ws_server {
+                let ws_clone = ws.clone();
+                rt.spawn(ws_clone.start());
+            }
+
+            rt.block_on(run_daemon_loop(targets, chain, interval, rpc_url, webhook_url, Some(threat_feed), p2p_threat_network, expire_after_str, ws_server));
             0 
         }
         Err(e) => {
@@ -283,6 +432,7 @@ async fn run_daemon_loop(
     threat_feed: Option<Option<String>>,
     p2p_enabled: bool,
     expire_after_str: String,
+    ws_server: Option<Arc<WebSocketServer>>,
 ) {
     use sods_verifier::BlockVerifier;
     use crate::config::get_chain;
@@ -508,7 +658,7 @@ async fn run_daemon_loop(
                                     Ok(symbols) => {
                                         // Check all targets
                                         for target in &targets {
-                                            if target.pattern.matches(&symbols).is_some() {
+                                            if let Some(matched_symbols) = target.pattern.matches(&symbols, None) {
                                                 let msg = format!("🚨 {} ({}) detected on Block #{}", target.name, target.severity, block_num);
                                                 println!("{}", msg);
                                                 
@@ -517,6 +667,25 @@ async fn run_daemon_loop(
                                                     .summary("SODS Threat Alert 🚨")
                                                     .body(&msg)
                                                     .show();
+
+                                                // WebSocket Alert
+                                                if let Some(ref ws) = ws_server {
+                                                    let alert = BehavioralAlert {
+                                                        msg_type: "behavioral_alert".into(),
+                                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                                        chain_id: chain_config.chain_id,
+                                                        block_number: block_num,
+                                                        pattern: target.pattern_str.clone(),
+                                                        symbols: matched_symbols.iter().map(|s| AlertSymbol {
+                                                            symbol: s.symbol.clone(),
+                                                            from: format!("{:?}", s.from),
+                                                            to: format!("{:?}", s.to),
+                                                            value: s.value.to_string(),
+                                                        }).collect(),
+                                                        alert_id: format!("alert_{}_{}", block_num, Uuid::new_v4().to_string().split('-').next().unwrap()),
+                                                    };
+                                                    ws.broadcast_alert(alert).await;
+                                                }
 
                                                 // Webhook
                                                 if let Some(ref url) = webhook_url {
@@ -607,6 +776,7 @@ fn start_daemon(
     _threat_feed: Option<String>,
     _p2p_threat_network: bool,
     _expire_after: String,
+    _websocket_port: Option<u16>,
 ) -> i32 {
     output::error("Daemon mode is currently only supported on Linux/macOS.");
     1
@@ -633,8 +803,8 @@ pub async fn run(args: DaemonArgs) -> i32 {
 
 pub fn run_sync(args: DaemonArgs) -> i32 {
     match args.command {
-        DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after } => {
-            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after)
+        DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after, websocket_port } => {
+            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after, websocket_port)
         },
         DaemonCommands::Stop => stop_daemon(),
         DaemonCommands::Status => {

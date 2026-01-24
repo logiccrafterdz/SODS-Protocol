@@ -190,6 +190,12 @@ sods chains
 # Generate ZK Behavioral Proof (New in v2.5)
 sods zk-prove --pattern "Sandwich" --block 20000000 --chain ethereum
 
+# Start WebSocket Alerting Server (New!)
+sods daemon start --websocket-port 8080 --chain optimism
+
+# Listen for Live Alerts (New!)
+sods listen --websocket ws://localhost:8080 --pattern "Sw{3,}"
+
 # JSON output for scripting
 sods verify Tf --block 10002322 --json
 ```
@@ -215,6 +221,7 @@ sods verify Tf --block 10002322 --json
 - **Causal Behavioral Proofs (Roadmap)**: Planned for v8.0. Will verify event sequences by a single actor in order using **Causal Merkle Trees**.
 - **Predictive Behavioral Shadowing**: Proactively monitor actor states (Shadows) to detect high-risk pattern initiations (`LP+`) and alert on deviations before completion.
 - **Real-Time Mempool Monitoring**: Intercept pending transactions and detect threats before they are mined.
+- **WebSocket Intelligence Feed**: Push real-time behavioral alerts to connected clients via WebSocket (`sods listen`).
 - **Regression Testing**: Automated CI integration tests for multi-chain support.
 - **E2E CLI Test Suite**: Comprehensive integration tests for all core commands (`verify`, `registry`, `export-proof`, `daemon`) with 100% pass rate on Windows.
 

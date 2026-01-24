@@ -108,6 +108,53 @@ SODS is designed for 24/7 background operation. To prevent unbounded memory grow
   sods daemon start --expire-after 30m
   ```
 
+## Real-time Alerts via WebSocket (New!)
+
+SODS can now push behavioral alerts in real-time to connected clients. This is ideal for building live dashboards, automated trading triggers, or security monitoring systems.
+
+### 1. Start the WebSocket Server
+
+Start the daemon with a specific port for the WebSocket server:
+
+```bash
+# Start daemon with WebSocket server on port 8080
+sods daemon start --pattern "Sandwich" --chain ethereum --websocket-port 8080
+```
+
+### 2. Listen for Alerts via CLI
+
+Use the `listen` command to connect and view live alerts:
+
+```bash
+# Connect to local daemon
+sods listen --websocket ws://localhost:8080
+
+# Connect and filter for a specific pattern only
+sods listen --websocket ws://localhost:8080 --pattern "LP+ -> Sw"
+```
+
+### 3. Integrate with JavaScript
+
+Integrate SODS alerts into your own applications using a standard WebSocket client:
+
+```javascript
+const ws = new WebSocket('ws://localhost:8080');
+
+ws.onopen = () => {
+    // Optional: Subscribe to specific patterns
+    ws.send(JSON.stringify({
+        type: "subscribe",
+        patterns: ["Sandwich", "Tf where value > 10 ether"],
+        chains: [1]
+    }));
+};
+
+ws.onmessage = (event) => {
+    const alert = JSON.parse(event.data);
+    console.log('🚨 Behavioral Alert detected:', alert);
+};
+```
+
 ## Monitor Community Threat Feeds
 Protect yourself by subscribing to public behavioral blocklists (e.g., known rug pull patterns).
 
