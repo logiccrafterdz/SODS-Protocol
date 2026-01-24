@@ -5,7 +5,7 @@
 //! symbol codes.
 
 use ethers_core::types::{Log, H256};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::symbol::BehavioralSymbol;
 
@@ -149,6 +149,47 @@ impl SymbolDictionary {
             return Some(s);
         }
         self.dynamic_registry.get(&topic).map(|s| s.as_str())
+    }
+
+    /// Look up all event topics associated with a symbol code.
+    pub fn topics_for_symbol(&self, symbol: &str) -> Vec<H256> {
+        let mut topics = Vec::new();
+        
+        // Search static registry
+        for (topic, code) in &self.registry {
+            if *code == symbol {
+                topics.push(*topic);
+            }
+        }
+
+        // Search dynamic registry
+        for (topic, code) in &self.dynamic_registry {
+            if code == symbol {
+                topics.push(*topic);
+            }
+        }
+
+        topics
+    }
+
+    /// Map a behavioral pattern to the set of required Ethereum topic hashes.
+    pub fn pattern_to_required_topics(&self, pattern: &crate::pattern::BehavioralPattern) -> Vec<H256> {
+        use crate::pattern::PatternStep;
+        let mut required_topics = HashSet::new(); // Use HashSet to avoid duplicates
+
+        for step in pattern.steps() {
+            let symbol_code = match step {
+                PatternStep::Exact(s, _) => s,
+                PatternStep::AtLeast(s, _, _) => s,
+                PatternStep::Range(s, _, _, _) => s,
+            };
+            
+            for topic in self.topics_for_symbol(symbol_code) {
+                required_topics.insert(topic);
+            }
+        }
+
+        required_topics.into_iter().collect()
     }
 
     /// Register a custom symbol for a topic.

@@ -83,6 +83,16 @@ impl BehavioralMerkleTree {
         }
     }
 
+    /// Build an incremental Behavioral Merkle Tree from a pre-filtered list of symbols.
+    ///
+    /// This is optimized for pattern matching where only a subset of block logs are fetched.
+    /// The resulting tree is smaller and its root commits ONLY to the provided symbols.
+    pub fn build_incremental(symbols: Vec<BehavioralSymbol>) -> Self {
+        // Since symbols are already filtered, we just use the existing constructor logic.
+        // The term "incremental" here denotes that it builds a partial view of the block's behavior.
+        Self::new(symbols)
+    }
+
     /// Build the Merkle tree layers from leaves to root.
     fn build_tree(leaves: Vec<[u8; 32]>) -> (Vec<Vec<[u8; 32]>>, [u8; 32]) {
         if leaves.is_empty() {

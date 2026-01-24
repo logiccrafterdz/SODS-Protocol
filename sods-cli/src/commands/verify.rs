@@ -383,116 +383,47 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
         }
     };
 
-    // 3. Fetch all symbols in block
-    let symbols = match verifier.fetch_block_symbols(args.block).await {
-        Ok(s) => s,
-        Err(e) => {
+    // 3. Verify Pattern using Optimized Pipeline (Filtering + Incremental BMT)
+    match verifier.verify_pattern_in_block(&args.symbol, args.block).await {
+        Ok(result) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            
             if args.json {
-                // ...
-            } else {
-                 output::error(&format!("Failed to fetch block symbols: {}", e));
-            }
-            return 1;
-        }
-    };
-
-    // 4. Match Pattern
-    if let Some(matched_seq) = pattern.matches(&symbols) {
-        let elapsed = start.elapsed().as_millis() as u64;
-        
-        // --- Causal Verification ---
-        // 1. Build Causal Merkle Tree
-        let cmt = sods_core::CausalMerkleTree::new(symbols.clone()); // CMT sorts by causality
-        let root = cmt.root();
-        
-        // 2. Generate Proofs for matched sequence
-        let mut proofs = Vec::new();
-        let mut proof_generation_success = true;
-        
-        // Clone owned symbols for the proof struct
-        let flow_symbols: Vec<sods_core::BehavioralSymbol> = matched_seq.iter().map(|&s| s.clone()).collect();
-        
-        for sym in &flow_symbols {
-             if let Some(p) = cmt.generate_proof(sym.symbol(), sym.log_index()) {
-                 proofs.push(p);
-             } else {
-                 proof_generation_success = false;
-                 break;
-             }
-        }
-        
-        let causal_verified = if proof_generation_success {
-            let causal_proof = sods_core::proof::CausalProof {
-                root,
-                symbols: flow_symbols.clone(),
-                proofs,
-            };
-            causal_proof.verify(&root)
-        } else {
-            false
-        };
-
-         if args.json {
-                let matched_seq_json: Vec<MatchedSymbol> = matched_seq.iter().map(|s| MatchedSymbol {
-                    symbol: s.symbol.clone(),
-                    log_index: s.log_index,
-                }).collect();
-
                  let output = JsonOutput {
                     success: true,
                     symbol: args.symbol.clone(),
                     block: args.block,
                     chain: args.chain.clone(),
-                    verified: causal_verified, // True only if causal check passes
-                    occurrences: matched_seq.len(),
-                    proof_size_bytes: flow_symbols.len() * 300, // Approx
+                    verified: result.is_verified,
+                    occurrences: result.occurrences,
+                    proof_size_bytes: result.proof_size_bytes,
                     time_ms: elapsed,
-                    method: "causal_pattern".into(),
-                    verification_mode: "rpc_only".into(), // Pattern verification uses RPC path
-                    error: if causal_verified { None } else { Some("Causal verification failed".into()) },
-                    matched_sequence: Some(matched_seq_json),
+                    method: "incremental_pattern".into(),
+                    verification_mode: result.verification_mode.to_string(),
+                    error: result.error,
+                    matched_sequence: None, // Simplified for optimized path
                 };
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
-         } else {
-             if causal_verified {
-                 println!("✅ Causal Pattern Verified!");
-                 if let Some(first) = flow_symbols.first() {
-                     println!("   Actor: {:?}", first.from);
-                     print!("   Flow:  ");
-                     for (i, sym) in flow_symbols.iter().enumerate() {
-                         if i > 0 { print!(" -> "); }
-                         if sym.is_from_deployer { print!("[Deployer] "); }
-                         print!("{} (N:{})", sym.symbol(), sym.nonce);
-                     }
-                     println!();
-                     println!("   Root:  0x{}", hex::encode(root));
-                 }
-             } else {
-                  output::error("Pattern found but failed Causal Verification.");
-                  output::hint("Events may not be contiguous or from same actor.");
-             }
-         }
-         return if causal_verified { 0 } else { 1 };
-    } else {
-        if args.json {
-             let output = JsonOutput {
-                success: true,
-                symbol: args.symbol.clone(),
-                block: args.block,
-                chain: args.chain.clone(),
-                verified: false,
-                occurrences: 0,
-                proof_size_bytes: 0,
-                time_ms: start.elapsed().as_millis() as u64,
-                method: "pattern".into(),
-                verification_mode: "rpc_only".into(),
-                error: Some("Pattern not found".into()),
-                matched_sequence: None,
-            };
-            println!("{}", serde_json::to_string_pretty(&output).unwrap());
-        } else {
-            output::error("Pattern not found in block.");
+            } else {
+                if result.is_verified {
+                    println!("✅ Pattern Verified (Optimized Path)!");
+                    println!("   Occurrences: {}", result.occurrences);
+                    println!("   Root:        0x{}", hex::encode(result.merkle_root.unwrap_or([0u8; 32])));
+                    println!("   Time:        {} ms", elapsed);
+                    println!("   Mode:        Incremental / Filtered");
+                } else {
+                    output::error("Pattern not found in block.");
+                }
+            }
+            return if result.is_verified { 0 } else { 1 };
         }
-        return 1;
+        Err(e) => {
+            if args.json {
+                 // ... json error ...
+            } else {
+                 output::error(&format!("Pattern verification failed: {}", e));
+            }
+            return 1;
+        }
     }
 }

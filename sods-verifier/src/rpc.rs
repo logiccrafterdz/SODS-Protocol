@@ -196,7 +196,7 @@ impl RpcClient {
             }
         }
 
-        let logs = self.fetch_with_backoff(block_number).await?;
+        let logs = self.fetch_with_backoff(block_number, None).await?;
 
         {
             let mut cache = self.cache.lock().unwrap();
@@ -204,6 +204,12 @@ impl RpcClient {
         }
 
         Ok(logs)
+    }
+
+    /// Fetch only logs matching specific topics for a block.
+    pub async fn fetch_filtered_logs(&self, block_number: u64, topics: Vec<H256>) -> Result<Vec<Log>> {
+        // Note: Filtered logs are NOT cached to avoid incomplete cache entries
+        self.fetch_with_backoff(block_number, Some(topics)).await
     }
 
     pub async fn fetch_block_transactions(&self, block_number: u64) -> Result<Vec<ethers_core::types::Transaction>> {
@@ -364,10 +370,14 @@ impl RpcClient {
         Ok(receipts)
     }
 
-    async fn fetch_with_backoff(&self, block_number: u64) -> Result<Vec<Log>> {
-        let filter = Filter::new()
+    async fn fetch_with_backoff(&self, block_number: u64, topics: Option<Vec<H256>>) -> Result<Vec<Log>> {
+        let mut filter = Filter::new()
             .from_block(BlockNumber::Number(block_number.into()))
             .to_block(BlockNumber::Number(block_number.into()));
+
+        if let Some(t) = topics {
+            filter = filter.topic0(t); // Filter by topic0 (event signatures)
+        }
 
         let mut last_error = None;
         let profile_delays = self.backoff_profile.delays();
