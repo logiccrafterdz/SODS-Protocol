@@ -300,6 +300,13 @@ sods verify Tf --block 10002322 --json
 - **Automatic Resource Recovery**: Added periodic background cleanup tasks to purge expired challenges, maintaining a stable memory footprint during peer discovery.
 - **Enhanced Reputation Penalties**: Late solutions now trigger proactive reputation deductions to deter low-priority Sybil nodes.
 
+## What's New in v1.8 (Greedy Pattern Engine)
+
+- **Greedy Range Consumption**: Upgraded the matching engine in `sods-core` to perform greedy consumption for `{min,max}` and `{n,}` quantifiers.
+- **Improved MEV Accuracy**: Patterns like `Tf -> Sw{2,5} -> Tf` now correctly capture the complete sequence of multi-hop swaps instead of stopping at the minimum.
+- **Deterministic Efficiency**: Maintained O(n) linear time complexity for all pattern matching operations, ensuring safety against ReDoS (Regular Expression DoS) attacks.
+- **Enhanced DSL Debugging**: Improved parser feedback for complex nested quantifiers.
+
 ## High-Performance Verification Engine
 
 - **Source-Level Symbol Filtering**: Drastically reduces bandwidth by fetching ONLY the logs relevant to the requested pattern using Ethereum topic filters.

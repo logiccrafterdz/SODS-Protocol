@@ -175,44 +175,48 @@ impl BehavioralPattern {
                     let mut temp_matched = Vec::new();
                     let mut idx = current_sym_idx;
 
-                    while count < *min {
-                         if idx >= symbols.len() {
-                             return None; // Not enough symbols
-                         }
-                         
-                         let sym = &symbols[idx];
-                         if sym.symbol == *target && Self::check_condition(sym, cond) {
-                             temp_matched.push(sym);
-                             idx += 1;
-                             count += 1;
-                         } else {
-                             return None; // Non-matching symbol in middle of quantifier sequence
-                         }
+                    // Greedy consumption for "At Least n"
+                    while idx < symbols.len() {
+                        let sym = &symbols[idx];
+                        if sym.symbol == *target && Self::check_condition(sym, cond) {
+                            temp_matched.push(sym);
+                            idx += 1;
+                            count += 1;
+                        } else {
+                            break;
+                        }
                     }
+
+                    if count < *min {
+                        return None; // Not enough symbols
+                    }
+
                     matched_sequence.extend(temp_matched);
                     current_sym_idx = idx;
                 },
-                PatternStep::Range(target, min, _max, cond) => {
+                PatternStep::Range(target, min, max, cond) => {
                     let mut count = 0;
                     let mut temp_matched = Vec::new();
                     let mut idx = current_sym_idx;
 
-                    while count < *min {
-                         if idx >= symbols.len() {
-                             return None; 
-                         }
-                         
-                         let sym = &symbols[idx];
-                         if sym.symbol == *target && Self::check_condition(sym, cond) {
-                             temp_matched.push(sym);
-                             idx += 1;
-                             count += 1;
-                         } else {
-                             return None; // Non-matching symbol in middle of range
-                         }
+                    // Greedy consumption for Range {min, max}
+                    while count < *max && idx < symbols.len() {
+                        let sym = &symbols[idx];
+                        if sym.symbol == *target && Self::check_condition(sym, cond) {
+                            temp_matched.push(sym);
+                            idx += 1;
+                            count += 1;
+                        } else {
+                            break;
+                        }
                     }
-                     matched_sequence.extend(temp_matched);
-                     current_sym_idx = idx;
+
+                    if count < *min {
+                        return None; 
+                    }
+
+                    matched_sequence.extend(temp_matched);
+                    current_sym_idx = idx;
                 }
             }
         }
