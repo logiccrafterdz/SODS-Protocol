@@ -9,7 +9,7 @@
 
 ## 1. Abstract
 
-The **Symbolic On-Demand Verification over Decentralized Summaries (SODS)** protocol enables zero-cost, zero-trust verification of on-chain behavioral patterns through cryptographic commitments to causally-linked events. By abstracting raw blockchain data into "Behavioral Symbols" and organizing them into "Behavioral Merkle Trees" (BMTs), SODS allows light clients to verify complex event sequences (e.g., *Liquidity Add -> Swap -> Liquidity Remove*) without downloading block bodies or relying on centralized indexers.
+The **Symbolic On-Demand Verification over Decentralized Summaries (SODS)** protocol enables zero-cost, zero-trust verification of on-chain behavioral patterns through cryptographic commitments to behavioral events. By abstracting raw blockchain data into "Behavioral Symbols" and organizing them into "Behavioral Merkle Trees" (BMTs), SODS allows light clients to verify event presence and sequences without downloading block bodies or relying on centralized indexers.
 
 ## 2. Motivation
 
@@ -22,10 +22,10 @@ Current methods for verifying on-chain activity rely on imperfect tradeoffs:
 ### 2.2. The Solution
 SODS introduces a specialized verification layer that:
 1.  **Symbolizes** raw EVM logs into lightweight behavioral primitives.
-2.  **Commits** to these behaviors using a Causal Merkle Tree.
+2.  **Commits** to these behaviors using a Behavioral Merkle Tree (BMT).
 3.  **Verifies** pattern adherence using efficient Merkle proofs (~200 bytes).
 
-This enables "Proof of Behavior" — cryptographic evidence that a specific actor performed a specific sequence of actions, verified purely via math and consensus.
+This enables "Proof of Behavior" — cryptographic evidence that specific events occurred in a block, verified purely via math and consensus. Note: Causal ordering (actor-based) is a planned enhancement.
 
 ## 3. Core Concepts
 
@@ -38,11 +38,11 @@ A standard unit of on-chain activity. Unlike a raw log, a symbol implies *intent
 - **Context**: `from`, `to`, `value`, `nonce`, `tx_hash`.
 - **Metadata**: `is_deployer`, `target_address`.
 
-### 3.2. Causal Behavioral Proof
-A proof that validates not just the existence of an event, but its *causal ordering* relative to other events by the same actor. It proves that *Event A* happened before *Event B* in the same transaction or block scope.
+### 3.2. Causal Behavioral Proof (Planned)
+A future proof type that validates not just the existence of an event, but its *causal ordering* relative to other events by the same actor. It proves that *Event A* happened before *Event B* in the same transaction or block scope. **Current implementation focuses on BMT-based presence and linear sequence verification.**
 
-### 3.3. Behavioral Merkle Tree (BMT)
-A Merkle Tree where leaves are **Behavioral Symbols**, sorted not by hash, but by **Causal Nonce** (transaction nonce + log index). This ensures that the tree structure itself enforces temporal ordering.
+### 3.3. Behavioral Merkle Tree (BMT) - CURRENT
+A Merkle Tree where leaves are **Behavioral Symbols**, sorted canonically by **Log Index**. This ensures that the tree structure itself reflects block-level temporal ordering.
 
 ### 3.4. Behavioral Shadow
 A predictive state machine that monitors incomplete patterns. If an actor initiates a known pattern (e.g., `SandwichStart`), a "Shadow" is spawned to watch for the completion (`SandwichEnd`) or deviation.
@@ -143,7 +143,8 @@ Proofs are compact binary blobs.
 
 ## 7. Implementation Guide
 
-### 7.1. Causal Merkle Tree Structure
+### 7.1. Behavioral Merkle Tree (BMT) Structure - CURRENT
+(Note: Placeholder for future Causal Merkle Tree structure)
 ```mermaid
 graph TD
     Root[Root Hash] --> L[Hash 0-1]

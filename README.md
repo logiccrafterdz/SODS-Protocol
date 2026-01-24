@@ -208,7 +208,8 @@ sods verify Tf --block 10002322 --json
 - **Secure Webhooks**: Forward alerts to ntfy.sh, Discord, or Telegram with privacy guarantees.
 - **Threat Intelligence**: Subscribe to community blocklists via HTTP feeds (v1.1) or **P2P Gossipsub** (New in v1.2).
 - **Sybil Immunity**: Adaptive consensus via **Proof-of-Behavioral-Stake (PoBS)** using decaying reputation.
-- **Causal Behavioral Proofs**: Cryptographically verify that event sequences (`Tf -> Sw`) are executed by a single actor in order using **Causal Merkle Trees**.
+- **Behavioral Merkle Trees (BMT)**: Current proof structure (active v1.0-v7.0).
+- **Causal Behavioral Proofs (Roadmap)**: Planned for v8.0. Will verify event sequences by a single actor in order using **Causal Merkle Trees**.
 - **Predictive Behavioral Shadowing**: Proactively monitor actor states (Shadows) to detect high-risk pattern initiations (`LP+`) and alert on deviations before completion.
 - **Real-Time Mempool Monitoring**: Intercept pending transactions and detect threats before they are mined.
 - **Regression Testing**: Automated CI integration tests for multi-chain support.

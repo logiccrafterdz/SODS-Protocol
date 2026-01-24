@@ -60,16 +60,18 @@ SODS (Symbolic On-Demand Verification over Decentralized Summaries) enables trus
 
 ## Data Structures
 
-### 1. **Behavioral Merkle Trees (BMT)**
+### 1. **Behavioral Merkle Trees (BMT) — CURRENT IMPLEMENTATION**
 Sorted binary Merkle trees containing behavioral symbols.
 - **Leaves**: `H(symbol || metadata)`
 - **Sorting**: Canonical ordering by block position (log index).
 - **Goal**: Provide a unique, deterministic commitment to the block's behavior for simple presence verification.
+- **Current Status**: Active in v1.0 - v7.0.
 
-### 2. **Causal Merkle Trees (CMT)**
+### 2. **Causal Merkle Trees (CMT) — PLANNED FOR V8.0**
 Sorted by `(Origin, Nonce, Sequence)` to reconstruct coherent narratives.
 - **Goal**: Prove that a sequence of events (e.g. `Tf -> Sw -> Tf`) was executed by a single actor in a specific order.
 - **Verification**: Proofs must demonstrate contiguous nonces to be valid.
+- **Current Status**: **Not implemented**. Planned for the v8.0 Roadmap.
 
 ### 3. **Behavioral Symbols**
 Standardized event representations (e.g., `Tf`, `Sw`) derived from raw logs, enriched with causality metadata (`tx_hash`, `nonce`).
@@ -232,6 +234,8 @@ struct ThreatRule {
 | v1.0-beta | Production-ready release |
 | v3.0 | Zero-RPC Release (Storage Proofs) |
 | v4.0 | Hybrid Trust Model & Adaptive Quorum |
+| v7.0 | Implementation Stable (Current) |
+| v8.0 | **Planned**: Causal Merkle Trees (CMT) & Actor Attribution |
 
 ## Security Considerations
 

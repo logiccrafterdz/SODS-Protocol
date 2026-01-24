@@ -21,7 +21,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Verify a behavioral symbol in a block
+    /// Verify behavioral patterns using Behavioral Merkle Trees (BMT). Causal Merkle Trees (CMT) coming in v8.0.
     Verify(commands::verify::VerifyArgs),
     
     /// List supported blockchain chains

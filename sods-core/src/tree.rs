@@ -11,6 +11,10 @@ use crate::symbol::BehavioralSymbol;
 
 /// A binary Merkle tree over behavioral symbols.
 ///
+/// **Note**: This is a Behavioral Merkle Tree (BMT), which sorts symbols by log index.
+/// This is NOT a Causal Merkle Tree (CMT). CMT is planned for v8.0 and will support
+/// actor-based causal ordering.
+///
 /// The tree is constructed from a sorted list of `BehavioralSymbol` instances.
 /// Symbols are automatically sorted by canonical ordering (log_index, then symbol)
 /// before tree construction.
