@@ -193,6 +193,9 @@ sods zk-prove --pattern "Sandwich" --block 20000000 --chain ethereum
 # Start WebSocket Alerting Server (New!)
 sods daemon start --websocket-port 8080 --chain optimism
 
+# Start Prometheus Metrics Server (New!)
+sods daemon start --metrics-port 9090 --chain base
+
 # Listen for Live Alerts (New!)
 sods listen --websocket ws://localhost:8080 --pattern "Sw{3,}"
 
@@ -222,6 +225,7 @@ sods verify Tf --block 10002322 --json
 - **Predictive Behavioral Shadowing**: Proactively monitor actor states (Shadows) to detect high-risk pattern initiations (`LP+`) and alert on deviations before completion.
 - **Real-Time Mempool Monitoring**: Intercept pending transactions and detect threats before they are mined.
 - **WebSocket Intelligence Feed**: Push real-time behavioral alerts to connected clients via WebSocket (`sods listen`).
+- **Operational Observability**: Expose standard Prometheus metrics and visualize with a pre-built Grafana dashboard.
 - **Regression Testing**: Automated CI integration tests for multi-chain support.
 - **E2E CLI Test Suite**: Comprehensive integration tests for all core commands (`verify`, `registry`, `export-proof`, `daemon`) with 100% pass rate on Windows.
 

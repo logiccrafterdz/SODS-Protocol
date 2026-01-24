@@ -48,6 +48,9 @@ reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-feature
 futures-util = "0.3"
 tokio-tungstenite = "0.21"
 uuid = { version = "1.7", features = ["v4", "serde"] }
+prometheus = "0.13"
+axum = "0.7"
+http-body-util = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 daemonize = "0.5"

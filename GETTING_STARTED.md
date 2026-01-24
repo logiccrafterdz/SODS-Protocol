@@ -155,6 +155,37 @@ ws.onmessage = (event) => {
 };
 ```
 
+## Monitoring with Prometheus (New!)
+
+SODS exposes standard Prometheus metrics for professional operations and observability.
+
+### 1. Start the Metrics Server
+
+Enable the metrics production by providing a port:
+
+```bash
+# Start daemon with metrics server on port 9090
+sods daemon start --metrics-port 9090 --chain ethereum
+```
+
+### 2. Configure Prometheus
+
+Add SODS as a scrape target in your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: 'sods'
+    static_configs:
+      - targets: ['localhost:9090']
+```
+
+### 3. Visual Dashboard
+
+Import the provided `sods-grafana-dashboard.json` into your Grafana instance to visualize:
+- **System Health**: Memory usage & active rules.
+- **Performance**: RPC latency & block verification duration.
+- **Detections**: Alert rates & detection frequency.
+
 ## Monitor Community Threat Feeds
 Protect yourself by subscribing to public behavioral blocklists (e.g., known rug pull patterns).
 

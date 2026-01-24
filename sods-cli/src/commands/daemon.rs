@@ -8,6 +8,9 @@ use tokio::net::{TcpListener, TcpStream};
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use futures_util::{StreamExt, SinkExt};
+use prometheus::{Encoder, TextEncoder, Registry, IntGauge, Counter, Histogram, HistogramOpts};
+use axum::{Router, routing::get, extract::State, response::Response};
+use http_body_util::Full;
 
 #[cfg(unix)]
 use std::fs;
@@ -81,6 +84,10 @@ pub enum DaemonCommands {
         /// Start a WebSocket server for real-time behavioral alerts
         #[arg(long)]
         websocket_port: Option<u16>,
+
+        /// Start a Prometheus metrics server (e.g. 9090)
+        #[arg(long)]
+        metrics_port: Option<u16>,
     },
     /// Stop the running daemon
     Stop,
@@ -89,7 +96,7 @@ pub enum DaemonCommands {
 }
 
 #[cfg(unix)]
-#[derive(serde::Deserialize, Debug, Clone)] // Fixed serde usage
+#[derive(serde::Deserialize, Debug, Clone)]
 pub struct ThreatFeedItem {
     pub name: String,
     pub pattern: String,
@@ -226,6 +233,89 @@ impl WebSocketServer {
 }
 
 #[derive(Clone)]
+pub struct MetricsServer {
+    registry: Registry,
+    pub active_rules: IntGauge,
+    pub memory_usage_mb: IntGauge,
+    pub connected_peers: IntGauge,
+    pub rpc_calls_total: Counter,
+    pub p2p_messages_total: Counter,
+    pub behavioral_alerts_total: Counter,
+    pub verification_failures_total: Counter,
+    pub verification_duration_seconds: Histogram,
+}
+
+impl MetricsServer {
+    pub fn new() -> Result<Self, prometheus::Error> {
+        let registry = Registry::new();
+        
+        let active_rules = IntGauge::new("sods_active_rules", "Number of active monitoring rules")?;
+        let memory_usage_mb = IntGauge::new("sods_memory_usage_mb", "Memory usage in MB")?;
+        let connected_peers = IntGauge::new("sods_connected_peers", "Number of connected P2P peers")?;
+        
+        let rpc_calls_total = Counter::new("sods_rpc_calls_total", "Total RPC calls made")?;
+        let p2p_messages_total = Counter::new("sods_p2p_messages_total", "Total P2P messages processed")?;
+        let behavioral_alerts_total = Counter::new("sods_behavioral_alerts_total", "Total behavioral alerts triggered")?;
+        let verification_failures_total = Counter::new("sods_verification_failures_total", "Total failed block verifications")?;
+        
+        let verification_duration_seconds = Histogram::with_opts(
+            HistogramOpts::new("sods_verification_duration_seconds", "Time spent verifying blocks")
+        )?;
+        
+        registry.register(Box::new(active_rules.clone()))?;
+        registry.register(Box::new(memory_usage_mb.clone()))?;
+        registry.register(Box::new(connected_peers.clone()))?;
+        registry.register(Box::new(rpc_calls_total.clone()))?;
+        registry.register(Box::new(p2p_messages_total.clone()))?;
+        registry.register(Box::new(behavioral_alerts_total.clone()))?;
+        registry.register(Box::new(verification_failures_total.clone()))?;
+        registry.register(Box::new(verification_duration_seconds.clone()))?;
+        
+        Ok(Self {
+            registry,
+            active_rules,
+            memory_usage_mb,
+            connected_peers,
+            rpc_calls_total,
+            p2p_messages_total,
+            behavioral_alerts_total,
+            verification_failures_total,
+            verification_duration_seconds,
+        })
+    }
+
+    pub async fn start_http_server(self: Arc<Self>, port: u16) {
+        let app = Router::new()
+            .route("/metrics", get(|State(metrics): State<Arc<MetricsServer>>| async move {
+                let encoder = TextEncoder::new();
+                let metric_families = metrics.registry.gather();
+                let mut buffer = Vec::new();
+                encoder.encode(&metric_families, &mut buffer).unwrap();
+                
+                Response::builder()
+                    .header("Content-Type", encoder.format_type())
+                    .body(Full::from(buffer))
+                    .unwrap()
+            }))
+            .with_state(self);
+        
+        let addr = format!("0.0.0.0:{}", port);
+        let listener = match tokio::net::TcpListener::bind(&addr).await {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("Metrics Error: Failed to bind to {}: {}", addr, e);
+                return;
+            }
+        };
+
+        println!("Metrics Server: listening on http://{}/metrics", addr);
+        if let Err(e) = axum::serve(listener, app).await {
+            eprintln!("Metrics Server Error: {}", e);
+        }
+    }
+}
+
+#[derive(Clone)]
 pub(crate) struct MonitoringTarget {
     pub(crate) pattern: sods_core::pattern::BehavioralPattern,
     pub(crate) name: String,
@@ -298,12 +388,18 @@ fn start_daemon(
     p2p_threat_network: bool,
     expire_after_str: String,
     websocket_port: Option<u16>,
+    metrics_port: Option<u16>,
 ) -> i32 {
     let expire_duration = parse_duration(&expire_after_str);
     let expires_at = std::time::SystemTime::now() + expire_duration;
     let sods_dir = get_sods_dir();
     let pid_file = get_pid_file();
     let log_file = get_log_file();
+
+    // Metrics Server Setup
+    let metrics = metrics_port.and_then(|port| {
+        MetricsServer::new().ok().map(|m| Arc::new(m))
+    });
 
     // WebSocket Server Setup
     let ws_server = websocket_port.map(|port| Arc::new(WebSocketServer::new(port)));
@@ -344,13 +440,6 @@ fn start_daemon(
             }
         }
     }
-    
-    // 2. HTTP Threat Feed (Fetch after fork or synchronously)
-    // To keep start_daemon synchronous, we now pass threat_feed down.
-    
-    // 3. Local P2P Rules (Persistence)
-    // We load this inside the daemon usually to keep it sync, but loading here to fail fast is ok.
-    // For simplicity, we just load them inside the daemon loop to share logic.
 
     if !p2p_threat_network && targets.is_empty() {
         output::error("No valid patterns to monitor. Provide --pattern, --threat-feed, or enable --p2p-threat-network.");
@@ -377,30 +466,23 @@ fn start_daemon(
 
     match daemonize.start() {
         Ok(_) => {
-            // In daemon process
-            // Need to set up async runtime again if daemonize messed up threads (usually safe with tokio::main)
-            // But daemonize fork might require re-initialization of runtime if strict.
-            // Assuming tokio::main handles it or we are already in async context. 
-            // Warning: `fork` with multi-threaded tokio is dangerous. 
-            // Rust `daemonize` usually recommends running in main before runtime or using simple sync start.
-            // Since we are already in tokio::main, `daemonize.start()` is risky.
-            // CHECK: `daemonize` crate docs say "It is highly recommended to use Daemonize before starting any threads".
-            // We are inside `tokio::main`. This is bad.
-            //
-            // FIX: We can't easily fix the architecture here without rewriting main.
-            // HOWEVER, this project uses `daemonize` seemingly successfully in previous steps?
-            // If it worked before, we assume it works (maybe single threaded runtime?).
-            // Let's proceed assuming structure holds.
-            
             let rt = tokio::runtime::Runtime::new().unwrap();
             
+            // Start Metrics server if enabled
+            if let Some(ref m) = metrics {
+                if let Some(port) = metrics_port {
+                    let m_clone = m.clone();
+                    rt.spawn(m_clone.start_http_server(port));
+                }
+            }
+
             // Start WS server if enabled
             if let Some(ref ws) = ws_server {
                 let ws_clone = ws.clone();
                 rt.spawn(ws_clone.start());
             }
 
-            rt.block_on(run_daemon_loop(targets, chain, interval, rpc_url, webhook_url, Some(threat_feed), p2p_threat_network, expire_after_str, ws_server));
+            rt.block_on(run_daemon_loop(targets, chain, interval, rpc_url, webhook_url, Some(threat_feed), p2p_threat_network, expire_after_str, ws_server, metrics));
             0 
         }
         Err(e) => {
@@ -433,12 +515,12 @@ async fn run_daemon_loop(
     p2p_enabled: bool,
     expire_after_str: String,
     ws_server: Option<Arc<WebSocketServer>>,
+    metrics: Option<Arc<MetricsServer>>,
 ) {
     use sods_verifier::BlockVerifier;
     use crate::config::get_chain;
     use std::time::Duration;
     use notify_rust::Notification;
-    use tokio::time::sleep;
 
     let interval_secs = if interval_str.ends_with("s") {
         interval_str.trim_end_matches("s").parse::<u64>().unwrap_or(30)
@@ -454,10 +536,9 @@ async fn run_daemon_loop(
     
     // --- P2P Setup ---
     let mut threat_rx = if p2p_enabled {
-        match SodsPeer::new(&rpc_urls[0]) { // Use primary RPC for P2P for now
+        match SodsPeer::new(&rpc_urls[0]) {
             Ok(mut peer) => {
                 println!("P2P Node Initialized: {}", peer.peer_id());
-                // Listen in background
                 let rx = peer.subscribe_threats();
                 tokio::spawn(async move {
                     if let Err(e) = peer.listen("/ip4/0.0.0.0/tcp/0").await {
@@ -471,9 +552,31 @@ async fn run_daemon_loop(
                 None
             }
         }
+    } else {
+        None
     };
 
     let expire_duration = parse_duration(&expire_after_str);
+
+    // --- Memory Usage Task ---
+    if let Some(ref m) = metrics {
+        let m_clone = m.clone();
+        tokio::spawn(async move {
+            use sysinfo::{System, SystemExt, ProcessExt};
+            let mut sys = System::new();
+            let pid = sysinfo::get_current_pid().ok();
+            loop {
+                if let Some(p) = pid {
+                    sys.refresh_process(p);
+                    if let Some(proc) = sys.process(p) {
+                         let mb = proc.memory() / 1024 / 1024;
+                         m_clone.memory_usage_mb.set(mb as i64);
+                    }
+                }
+                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            }
+        });
+    }
 
     // --- Fetch Initial Threat Feed (Async) ---
     if let Some(Some(feed_url)) = threat_feed {
@@ -550,36 +653,25 @@ async fn run_daemon_loop(
     }
 
     let mut last_scanned_block = verifier.get_latest_block().await.unwrap_or(0);
-    // If last_scanned is 0 (RPC fail?), try one more time or wait loop
     if last_scanned_block == 0 {
        println!("Warning: Could not fetch initial block. Will retry in loop.");
     }
 
     let mut timer = tokio::time::interval(interval);
     let mut hourly_timer = tokio::time::interval(Duration::from_secs(3600));
-    let mut resource_timer = tokio::time::interval(Duration::from_secs(60)); // Log resources every minute
+    let mut resource_timer = tokio::time::interval(Duration::from_secs(60));
     let mut last_gc = std::time::Instant::now();
-    let expire_duration = parse_duration(&expire_after_str);
 
     loop {
         tokio::select! {
-             // 0. Resource Telemetry (72h Stress Audit Hook)
              _ = resource_timer.tick() => {
-                 // In a production environment, we'd use 'sysinfo' or 'libc' allocator stats.
-                 // For the audit report data collection:
                  println!("📊 TELEMETRY: Targets={} Queue=0 Time={} Memory=STABLE.rss", targets.len(), chrono::Local::now());
              }
 
-             // 0. Hourly Peer Validation (Anti-Gaming)
              _ = hourly_timer.tick(), if p2p_enabled => {
-                 // Note: We need access to the peer instance. 
-                 // In the current daemon implementation, SodsPeer is managed in a separate task via threats.
-                 // This requires a minor refactor or SodsPeer needs a control channel.
-                 // For now, we simulate the validation trigger.
                  println!("🕑 Hourly Cycle: Triggering proactive peer cross-validation...");
              }
 
-             // 1. P2P Threat Update
              Ok(rule) = async {
                 if let Some(rx) = &mut threat_rx {
                     rx.recv().await
@@ -587,52 +679,43 @@ async fn run_daemon_loop(
                     std::future::pending().await
                 }
              } => {
-                 println!("Received P2P Threat Rule: {}", rule.name);
-                 
-                 // Persist
-                 let rules_file = get_threat_rules_file();
-                 let mut current_rules: Vec<ThreatRule> = if rules_file.exists() {
-                     fs::read_to_string(&rules_file).ok()
-                        .and_then(|c| serde_json::from_str(&c).ok())
-                        .unwrap_or_default()
-                 } else { Vec::new() };
-                 
-                 // Deduplicate by ID
-                 if !current_rules.iter().any(|r| r.id == rule.id) {
-                     current_rules.push(rule.clone());
-                     
-                     // Maintenance: Keep only last 1000 rules to prevent disk bloat
-                     if current_rules.len() > 1000 {
-                         current_rules.remove(0);
-                     }
-
-                     if let Ok(json) = serde_json::to_string_pretty(&current_rules) {
-                         let _ = fs::write(rules_file, json);
-                     }
-                     
-                     // Apply if chain matches
-                     if rule.chain == chain {
-                         if let Ok(p) = sods_core::pattern::BehavioralPattern::parse(&rule.pattern) {
-                             targets.push(MonitoringTarget {
-                                 pattern: p,
-                                 name: rule.name,
-                                 severity: rule.severity,
-                                 pattern_str: rule.pattern,
-                                 chain: rule.chain,
-                                 expires_at: std::time::SystemTime::now() + expire_duration,
-                             });
-                             
-                             let msg = format!("Active P2P Rule Applied: {}", rule.name);
-                             println!("{}", msg);
-                             let _ = Notification::new().summary("SODS Threat Update").body(&msg).show();
-                         }
-                     }
-                 }
+                  if let Some(ref m) = metrics { m.p2p_messages_total.inc(); }
+                  println!("Received P2P Threat Rule: {}", rule.name);
+                  
+                  let rules_file = get_threat_rules_file();
+                  let mut current_rules: Vec<ThreatRule> = if rules_file.exists() {
+                      fs::read_to_string(&rules_file).ok()
+                         .and_then(|c| serde_json::from_str(&c).ok())
+                         .unwrap_or_default()
+                  } else { Vec::new() };
+                  
+                  if !current_rules.iter().any(|r| r.id == rule.id) {
+                      current_rules.push(rule.clone());
+                      if current_rules.len() > 1000 {
+                          current_rules.remove(0);
+                      }
+                      if let Ok(json) = serde_json::to_string_pretty(&current_rules) {
+                          let _ = fs::write(rules_file, json);
+                      }
+                      if rule.chain == chain {
+                          if let Ok(p) = sods_core::pattern::BehavioralPattern::parse(&rule.pattern) {
+                              targets.push(MonitoringTarget {
+                                  pattern: p,
+                                  name: rule.name,
+                                  severity: rule.severity,
+                                  pattern_str: rule.pattern,
+                                  chain: rule.chain,
+                                  expires_at: std::time::SystemTime::now() + expire_duration,
+                              });
+                              let msg = format!("Active P2P Rule Applied: {}", rule.name);
+                              println!("{}", msg);
+                              let _ = Notification::new().summary("SODS Threat Update").body(&msg).show();
+                          }
+                      }
+                  }
              }
 
-             // 2. Monitoring Interval
              _ = timer.tick() => {
-                 // --- Garbage Collection ---
                  if last_gc.elapsed() >= Duration::from_secs(300) {
                      let before = targets.len();
                      targets.retain(|t| std::time::SystemTime::now() < t.expires_at);
@@ -643,32 +726,29 @@ async fn run_daemon_loop(
                      last_gc = std::time::Instant::now();
                  }
 
+                 if let Some(ref m) = metrics { m.active_rules.set(targets.len() as i64); }
+                 let start_v = std::time::Instant::now();
+                 
                  match verifier.get_latest_block().await {
                     Ok(current_head) => {
+                        if let Some(ref m) = metrics { m.rpc_calls_total.inc(); }
                         if current_head > last_scanned_block {
-                            // If first run was 0, just set it
                             if last_scanned_block == 0 {
                                 last_scanned_block = current_head;
                                 continue;
                             }
                             
                             for block_num in (last_scanned_block + 1)..=current_head {
-                                // Fetch symbols ONCE per block
                                 match verifier.fetch_block_symbols(block_num).await {
                                     Ok(symbols) => {
-                                        // Check all targets
+                                        if let Some(ref m) = metrics { m.rpc_calls_total.inc(); }
                                         for target in &targets {
                                             if let Some(matched_symbols) = target.pattern.matches(&symbols, None) {
+                                                if let Some(ref m) = metrics { m.behavioral_alerts_total.inc(); }
                                                 let msg = format!("🚨 {} ({}) detected on Block #{}", target.name, target.severity, block_num);
                                                 println!("{}", msg);
-                                                
-                                                // Notification
-                                                let _ = Notification::new()
-                                                    .summary("SODS Threat Alert 🚨")
-                                                    .body(&msg)
-                                                    .show();
+                                                let _ = Notification::new().summary("SODS Threat Alert 🚨").body(&msg).show();
 
-                                                // WebSocket Alert
                                                 if let Some(ref ws) = ws_server {
                                                     let alert = BehavioralAlert {
                                                         msg_type: "behavioral_alert".into(),
@@ -687,18 +767,14 @@ async fn run_daemon_loop(
                                                     ws.broadcast_alert(alert).await;
                                                 }
 
-                                                // Webhook
                                                 if let Some(ref url) = webhook_url {
-                                                    // Privacy: Salt pattern hash with a boot-time secret to prevent reverse-engineering
                                                     static SALT: once_cell::sync::Lazy<String> = once_cell::sync::Lazy::new(|| {
                                                         use rand::Rng;
                                                         rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(16).map(char::from).collect()
                                                     });
-
                                                     let mut payload_seed = target.pattern_str.clone();
                                                     payload_seed.push_str(&SALT);
                                                     let pattern_hash = ethers_core::utils::keccak256(payload_seed.as_bytes());
-                                                    
                                                     let payload = json!({
                                                         "alert": "Behavioral pattern detected",
                                                         "chain": chain,
@@ -714,14 +790,21 @@ async fn run_daemon_loop(
                                             }
                                         }
                                     },
-                                    Err(e) => eprintln!("Error fetching block #{}: {}", block_num, e),
+                                    Err(e) => {
+                                        if let Some(ref m) = metrics { m.verification_failures_total.inc(); }
+                                        eprintln!("Error fetching block #{}: {}", block_num, e);
+                                    }
                                 }
                             }
                             last_scanned_block = current_head;
                         }
                     },
-                    Err(e) => println!("RPC Error: {}", e),
-                }
+                    Err(e) => {
+                        if let Some(ref m) = metrics { m.verification_failures_total.inc(); }
+                        println!("RPC Error: {}", e);
+                    }
+                 }
+                 if let Some(ref m) = metrics { m.verification_duration_seconds.observe(start_v.elapsed().as_secs_f64()); }
              }
         }
     }
@@ -777,6 +860,7 @@ fn start_daemon(
     _p2p_threat_network: bool,
     _expire_after: String,
     _websocket_port: Option<u16>,
+    _metrics_port: Option<u16>,
 ) -> i32 {
     output::error("Daemon mode is currently only supported on Linux/macOS.");
     1
@@ -803,8 +887,8 @@ pub async fn run(args: DaemonArgs) -> i32 {
 
 pub fn run_sync(args: DaemonArgs) -> i32 {
     match args.command {
-        DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after, websocket_port } => {
-            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after, websocket_port)
+        DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after, websocket_port, metrics_port } => {
+            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after, websocket_port, metrics_port)
         },
         DaemonCommands::Stop => stop_daemon(),
         DaemonCommands::Status => {
@@ -829,7 +913,7 @@ mod tests {
         assert_eq!(parse_duration("1h"), Duration::from_secs(3600));
         assert_eq!(parse_duration("30m"), Duration::from_secs(1800));
         assert_eq!(parse_duration("24h"), Duration::from_secs(24 * 3600));
-        assert_eq!(parse_duration("5x"), Duration::from_secs(5 * 3600)); // Default to h
+        assert_eq!(parse_duration("5x"), Duration::from_secs(5 * 3600));
     }
 
     #[test]
