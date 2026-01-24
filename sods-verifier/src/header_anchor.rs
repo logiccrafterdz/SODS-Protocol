@@ -146,9 +146,20 @@ pub fn verify_receipts_against_header(
     header: &BlockHeader,
 ) -> AnchorValidation {
     let computed_root = compute_receipts_root(receipts);
+    let mut is_valid = computed_root == header.receipts_root;
+
+    // Hardening: Verify each receipt belongs to the correct block hash
+    for receipt in receipts {
+        if let Some(bh) = receipt.block_hash {
+            if bh != header.hash {
+                is_valid = false;
+                break;
+            }
+        }
+    }
 
     AnchorValidation {
-        is_valid: computed_root == header.receipts_root,
+        is_valid,
         computed_root,
         expected_root: header.receipts_root,
         receipt_count: receipts.len(),
