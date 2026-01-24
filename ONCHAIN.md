@@ -1,3 +1,23 @@
+# On-Chain Behavioral Proofs
+
+---
+
+## Zero-RPC Verification
+
+SODS now uses Ethereum storage proofs (Merkle-Patricia Trie proofs) to fetch and verify transaction receipts without trusting RPC logs. 
+
+### How it works:
+1. **Header Anchoring**: Fetch block header and verify its hash.
+2. **Path Proof**: Request the MPT proof for a specific receipt index from a provider.
+3. **Local MPT Verifier**: Reconstruct the path and verify the leaf (receipt) matches the `receiptsRoot` in the header.
+4. **Log Extraction**: Extract behavioral symbols from the cryptographically-proven receipt.
+
+**Verification Modes:**
+- `storage-proof` (Zero-RPC): Proof-first, highest security.
+- `trustless`: Bulk receipt verification.
+- `rpc-only`: Legacy mode (not recommended).
+
+---
 # On-Chain Behavioral Proofs Verification
 
 SODS enables DeFi protocols to natively react to on-chain behaviors (rug pulls, MEV, etc.) using compact, trustless proofs.

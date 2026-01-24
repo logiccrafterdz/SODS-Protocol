@@ -3,7 +3,7 @@
 //! Wraps `ethers_providers::Provider` with LRU caching,
 //! exponential backoff retry logic, and rate limit handling.
 
-use ethers_core::types::{BlockNumber, Filter, Log};
+use ethers_core::types::{BlockNumber, Filter, Log, Address, H256, EIP1186ProofResponse};
 use ethers_providers::{Http, Middleware, Provider};
 use lru::LruCache;
 use std::num::NonZeroUsize;
@@ -133,6 +133,50 @@ impl RpcClient {
                     self.update_adaptive_delay(true, None);
                     return Ok(n.as_u64());
                 },
+                Err(e) => {
+                    let err_str = e.to_string().to_lowercase();
+                    self.update_adaptive_delay(false, Some(&err_str));
+                    last_err = Some(SodsVerifierError::RpcError(e.to_string()));
+                    self.switch_to_next_provider();
+                }
+            }
+        }
+        Err(last_err.unwrap())
+    }
+
+    pub async fn get_proof(
+        &self,
+        address: Address,
+        locations: Vec<H256>,
+        block_number: Option<BlockNumber>,
+    ) -> Result<EIP1186ProofResponse> {
+        let mut last_err = None;
+        for _ in 0..self.providers.len() {
+            match self.current_provider().get_proof(address, locations.clone(), block_number).await {
+                Ok(p) => {
+                    self.update_adaptive_delay(true, None);
+                    return Ok(p);
+                },
+                Err(e) => {
+                    let err_str = e.to_string().to_lowercase();
+                    self.update_adaptive_delay(false, Some(&err_str));
+                    last_err = Some(SodsVerifierError::RpcError(e.to_string()));
+                    self.switch_to_next_provider();
+                }
+            }
+        }
+        Err(last_err.unwrap())
+    }
+
+    pub async fn fetch_transaction_receipt(&self, tx_hash: H256) -> Result<ethers_core::types::TransactionReceipt> {
+        let mut last_err = None;
+        for _ in 0..self.providers.len() {
+            match self.current_provider().get_transaction_receipt(tx_hash).await {
+                Ok(Some(r)) => {
+                    self.update_adaptive_delay(true, None);
+                    return Ok(r);
+                },
+                Ok(None) => return Err(SodsVerifierError::RpcError("Receipt not found".into())),
                 Err(e) => {
                     let err_str = e.to_string().to_lowercase();
                     self.update_adaptive_delay(false, Some(&err_str));

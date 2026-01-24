@@ -31,6 +31,10 @@ pub enum VerificationMode {
     /// This is trustless verification — the RPC cannot fabricate logs.
     Trustless,
 
+    /// Logs are fetched individually and verified via Merkle-Patricia proofs.
+    /// This eliminates reliance on eth_getLogs and bulk receipt fetching.
+    ZeroRpc,
+
     /// Logs are accepted from RPC without cryptographic proof.
     /// This requires trusting the RPC provider.
     RpcOnly,
@@ -40,6 +44,7 @@ impl std::fmt::Display for VerificationMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Trustless => write!(f, "Trustless — Block Header Anchored"),
+            Self::ZeroRpc => write!(f, "Zero-RPC — Storage Proof Verified"),
             Self::RpcOnly => write!(f, "RPC Only — Requires Trust in Provider"),
         }
     }

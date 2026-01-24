@@ -60,3 +60,5 @@ pub mod ssz;
 pub mod commitment;
 pub use commitment::BehavioralCommitment;
 pub use plugins::SymbolPlugin;
+pub mod mpt;
+pub use mpt::MptVerifier;

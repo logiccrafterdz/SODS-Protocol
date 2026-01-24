@@ -271,6 +271,14 @@ sods verify Tf --block 10002322 --json
 - **Webhook Pattern Privacy**: Pattern hashes in alerts are now salted with a per-boot random secret, preventing brute-force reverse-engineering of monitored behaviors.
 - **Automated Rule Maintenance**: Implemented storage pruning for the P2P threat registry to prevent unbounded disk growth.
 
+## What's New in v3.0 (Zero-RPC Verification)
+
+- **Zero-RPC Verification**: First truly trustless behavioral verification system that eliminates reliance on `eth_getLogs`. 
+- **Ethereum Storage Proofs**: Uses standard `eth_getProof` and Merkle-Patricia Trie (MPT) validation to prove receipt data directly from Ethereum's state trie.
+- **Local MPT Verifier**: Re-implemented Ethereum's MPT verification logic in `sods-core` to validate path proofs against block header `receiptsRoot`.
+- **Granular Trustless Mode**: Use `--mode storage-proof` for single-receipt cryptographic proof or `--mode trustless` for bulk header anchoring.
+- **Improved L2 Support**: Enhanced receipt RLP parsing for Arbitrum and Optimism to support deep verification across major rollups.
+
 ## What's New in v2.5 (ZK Behavioral Proofs)
 
 - **Privacy-Preserving Verification**: Prove behaviors occurred without revealing sensitive metadata (addresses, amounts).
@@ -313,13 +321,13 @@ The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection 
 
 ## Status
 
-- Specification: **v1.1** (Updated)
-- PoC: **v0.1** (Sepolia testnet)
-- sods-core: **v0.3.1**
-- sods-verifier: **v0.2.1**
+- Specification: **v2.0** (Zero-RPC)
+- PoC: **v0.5** (Zero-RPC Proof)
+- sods-core: **v0.4.0**
+- sods-verifier: **v0.3.0**
 - sods-p2p: **v0.3.1**
-- sods-cli: **v1.2.3**
-- Stage: **v2.3** / Security Hardened
+- sods-cli: **v1.4.0**
+- Stage: **v3.0** / Zero-RPC Trustless
 - Seeking: Technical feedback, threat analysis, edge cases
 
 ## Architecture

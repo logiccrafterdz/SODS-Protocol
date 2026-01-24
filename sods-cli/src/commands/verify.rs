@@ -16,8 +16,10 @@ pub enum Mode {
     P2p,
     /// RPC only
     Rpc,
-    /// Cryptographically anchored verification (Trustless)
+    /// Cryptographically anchored verification (Bulk)
     Trustless,
+    /// Fully trustless verification via Ethereum storage proofs (Zero-RPC)
+    StorageProof,
 }
 
 /// Arguments for the verify command.
