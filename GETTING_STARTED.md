@@ -237,3 +237,17 @@ sods export-proof --pattern "Sandwich" --block 20000000 --chain ethereum --forma
 ```
 
 **[Read the On-Chain Verification Guide](ONCHAIN.md)**
+
+## Network Compatibility
+
+SODS automatically adapts to the security capabilities of the underlying network.
+
+| Network | Beacon Root Support | Security Level |
+|---------|---------------------|----------------|
+| Ethereum (post-Dencun) | ✅ Full (EIP-4788) | Highest |
+| Ethereum (pre-Dencun) | ⚠️ Fallback | Medium |
+| L2s (Arbitrum, Base, etc.) | ⚠️ Fallback | Medium |
+| Testnets | ⚠️ Fallback | Medium |
+
+> [!NOTE]
+> Fallback mode skips beacon root verification but continues full behavioral Merkle proof analysis. This ensures functionality on all EVM chains while maintaining transparency about reduced block header anchoring guarantees.

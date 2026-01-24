@@ -114,6 +114,28 @@ impl RpcClient {
         }
     }
 
+    /// Probe for EIP-4788 Beacon Root support.
+    pub async fn check_beacon_support(&self) -> bool {
+        // Attempt to call getBeaconRoot(0) on the precompile address
+        // Address: 0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02
+        let beacon_roots_address: Address = "0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02".parse().unwrap();
+        
+        // Calldata for getBeaconRoot(0): 00...00 (32 bytes of zeros)
+        let tx = ethers_core::types::TransactionRequest::default()
+            .to(beacon_roots_address)
+            .data(ethers_core::types::Bytes::from(vec![0u8; 32]));
+
+        match self.current_provider().call(&tx.into(), None).await {
+            Ok(_) => true,
+            Err(e) => {
+                let err_str = e.to_string().to_lowercase();
+                // If it's a revert or "method not found", it's likely unsupported.
+                // If it returns data (even if 0), it's supported.
+                !err_str.contains("execution reverted") && !err_str.contains("not found")
+            }
+        }
+    }
+
     pub async fn get_latest_block(&self) -> Result<u64> {
         let mut last_err = None;
         for _ in 0..self.providers.len() {

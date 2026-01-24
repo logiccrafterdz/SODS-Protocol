@@ -43,3 +43,7 @@ libp2p = "0.54"
 
 # For timing assertions
 tokio-test = "0.4"
+
+[[test]]
+name = "ci_beacon_fallback"
+path = "../tests/ci_beacon_fallback.rs"

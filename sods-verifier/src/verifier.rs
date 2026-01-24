@@ -15,6 +15,27 @@ use crate::query::QueryParser;
 use crate::result::VerificationResult;
 use crate::rpc::RpcClient;
 
+/// Network support level for EIP-4788 Beacon Roots.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BeaconRootSupport {
+    /// EIP-4788 is fully supported (Ethereum post-Dencun).
+    Supported,
+    /// EIP-4788 is explicitly unsupported or contract missing.
+    Unsupported(String),
+    /// Support status could not be determined.
+    Unknown,
+}
+
+impl std::fmt::Display for BeaconRootSupport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Supported => write!(f, "Supported"),
+            Self::Unsupported(reason) => write!(f, "Unsupported ({})", reason),
+            Self::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
 /// Block verifier for SODS behavioral symbol verification.
 ///
 /// The main entry point for verifying symbols in on-chain blocks.
@@ -149,6 +170,15 @@ impl BlockVerifier {
     pub fn with_backoff_profile(mut self, profile: crate::rpc::BackoffProfile) -> Self {
         self.rpc_client = self.rpc_client.with_profile(profile);
         self
+    }
+
+    /// Detect if the current network supports EIP-4788 beacon roots.
+    pub async fn detect_beacon_support(&self) -> BeaconRootSupport {
+        if self.rpc_client.check_beacon_support().await {
+            BeaconRootSupport::Supported
+        } else {
+            BeaconRootSupport::Unsupported("Beacon roots contract unavailable or EIP-4788 not implemented".to_string())
+        }
     }
 
     /// Run a lightweight health check on the current RPC provider.

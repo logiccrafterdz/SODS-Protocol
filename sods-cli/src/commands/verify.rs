@@ -249,6 +249,16 @@ pub async fn run(args: VerifyArgs) -> i32 {
          return 1;
     }
 
+    // Beacon Support Warning
+    if !args.json {
+        let beacon_support = verifier.detect_beacon_support().await;
+        if let sods_verifier::verifier::BeaconRootSupport::Unsupported(reason) = beacon_support {
+            output::warning(&format!("Beacon root anchoring unavailable ({}).", reason));
+            output::info("Verification will proceed without block header anchoring.");
+            output::info("This reduces security guarantees on this network.");
+        }
+    }
+
     match verifier.verify_symbol_in_block(&args.symbol, args.block).await {
         Ok(result) => {
             let elapsed = start.elapsed().as_millis() as u64;
@@ -382,6 +392,16 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
             return 1;
         }
     };
+
+    // Beacon Support Warning
+    if !args.json {
+        let beacon_support = verifier.detect_beacon_support().await;
+        if let sods_verifier::verifier::BeaconRootSupport::Unsupported(reason) = beacon_support {
+            output::warning(&format!("Beacon root anchoring unavailable ({}).", reason));
+            output::info("Verification will proceed without block header anchoring.");
+            output::info("This reduces security guarantees on this network.");
+        }
+    }
 
     // 3. Verify Pattern using Optimized Pipeline (Filtering + Incremental BMT)
     match verifier.verify_pattern_in_block(&args.symbol, args.block).await {

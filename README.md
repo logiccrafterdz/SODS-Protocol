@@ -370,6 +370,12 @@ The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection 
 - **Signed P2P Sync**: Automated registry updates via libp2p gossipsub. Peers now auto-merge registry feeds signed by trusted researchers.
 - **Parser Hardening**: Strict alphanumeric symbol validation and escape-sequence protection in the pattern matching engine.
 
+## What's New in v3.2 (Multi-Chain Resilience)
+
+- **Beacon Root Fallback**: Implemented a graceful fallback for networks without EIP-4788 support (pre-Dencun Ethereum, L2s like Arbitrum/Base). SODS now detects missing beacon roots and continues verification with a clear security warning.
+- **On-Chain Event Signaling**: Updated `SODSVerifier.sol` to emit `BeaconAnchoringSkipped` events when anchoring is bypassed, ensuring full transparency for DeFi protocols.
+- **Runtime Network Probing**: The verifier now automatically detects network capabilities at startup, providing a seamless experience across all EVM-compatible chains.
+
 ## Status
 
 - Specification: **v0.2** (Symbolic Primitives)

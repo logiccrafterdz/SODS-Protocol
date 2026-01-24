@@ -101,6 +101,17 @@ bool valid = SODSVerifier.verifyBehavior(
 > [!TIP]
 > This requires a post-Dencun block on a network that supports the EIP-4788 precompile (0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02).
 
+## On-Chain Fallback Mode
+
+For networks without EIP-4788 support (pre-Dencun or legacy L2s), the `SODSVerifier` library implements a graceful fallback:
+
+1. **Attempt Lookup**: The library tries to fetch the beacon root.
+2. **Catch Failure**: If the precompile is missing or reverts, it catches the error.
+3. **Emit Event**: A `BeaconAnchoringSkipped(uint256 blockNumber, string reason)` event is emitted.
+4. **Proceed**: Verification continues using the provided `bmtRoot` and Merkle proof.
+
+This allows your contract to remain functional across all EVM chains while receiving on-chain notifications about reduced anchoring guarantees.
+
 ## Signed Behavioral Commitments
 
 For maximal security, SODS can sign a commitment that binds the BMT root to the block's `receiptsRoot`. This prevents any tampering with the BMT structure off-chain.
