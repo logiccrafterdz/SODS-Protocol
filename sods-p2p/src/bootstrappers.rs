@@ -31,31 +31,66 @@ impl BootstrapperRegistry {
     }
 
     pub async fn fetch_trusted_peers(&self) -> Result<Vec<PeerId>> {
-        let mut all_peers = Vec::new();
+        let mut all_lists = Vec::new();
 
         for source in &self.sources {
-            let response = reqwest::get(source).await?;
-            if !response.status().is_success() {
-                continue;
-            }
-
-            let list: BootstrapperList = response.json().await?;
-            
-            // Verify signature
-            if self.verify_list(&list).is_ok() {
-                for peer_str in list.peers {
-                    if let Ok(peer_id) = PeerId::from_str(&peer_str) {
-                        all_peers.push(peer_id);
+            match reqwest::get(source).await {
+                Ok(response) if response.status().is_success() => {
+                    if let Ok(list) = response.json::<BootstrapperList>().await {
+                        if self.verify_list(&list).is_ok() {
+                            all_lists.push((source.clone(), list));
+                        }
                     }
+                }
+                _ => continue,
+            }
+        }
+
+        if all_lists.is_empty() {
+            return Err(anyhow!("No trusted peers found or all lists failed verification"));
+        }
+
+        // Cross-validation: If we have multiple sources, check for consensus
+        if all_lists.len() >= 2 {
+            self.detect_compromised_sources(&all_lists);
+        }
+
+        let mut all_peers = Vec::new();
+        for (_, list) in all_lists {
+            for peer_str in list.peers {
+                if let Ok(peer_id) = PeerId::from_str(&peer_str) {
+                    all_peers.push(peer_id);
                 }
             }
         }
 
-        if all_peers.is_empty() {
-            return Err(anyhow!("No trusted peers found or all lists failed verification"));
+        Ok(all_peers)
+    }
+
+    fn detect_compromised_sources(&self, lists: &[(String, BootstrapperList)]) {
+        use std::collections::HashSet;
+        
+        let mut peer_counts = std::collections::HashMap::new();
+        for (source, list) in lists {
+            let unique_peers: HashSet<_> = list.peers.iter().collect();
+            peer_counts.insert(source, unique_peers);
         }
 
-        Ok(all_peers)
+        // Simple heuristic: if a source returns 0 overlap with others while others overlap, mark it.
+        // For this audit implementation, we log warnings and suggest rotation.
+        for (source, peers) in &peer_counts {
+            let mut has_overlap = false;
+            for (other_source, other_peers) in &peer_counts {
+                if source == other_source { continue; }
+                if !peers.is_disjoint(other_peers) {
+                    has_overlap = true;
+                    break;
+                }
+            }
+            if !has_overlap && lists.len() > 2 {
+                eprintln!("⚠️ Warning: Potential bootstrapper compromise detected at source: {}", source);
+            }
+        }
     }
 
     fn verify_list(&self, list: &BootstrapperList) -> Result<()> {
