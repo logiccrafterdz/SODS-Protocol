@@ -36,6 +36,75 @@ pub struct ThreatRule {
     pub author_pubkey: Vec<u8>,
 }
 
+/// A contract deployer entry in a registry update.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContractEntry {
+    pub address: Address,
+    pub deployer: Address,
+    pub block: u64,
+}
+
+/// A collection of contract registry updates signed by a researcher.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistryUpdate {
+    /// List of contracts to add/update
+    pub contracts: Vec<ContractEntry>,
+    /// Timestamp of creation
+    pub timestamp: u64,
+    /// ECDSA signature (64 bytes)
+    #[serde(with = "serde_bytes")]
+    pub signature: Vec<u8>,
+    /// Public key of the author
+    #[serde(with = "serde_bytes")]
+    pub author_pubkey: Vec<u8>,
+}
+
+impl RegistryUpdate {
+    pub fn new(contracts: Vec<ContractEntry>, signing_key: &SigningKey) -> Self {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let mut update = Self {
+            contracts,
+            timestamp,
+            signature: Vec::new(),
+            author_pubkey: signing_key.verifying_key().to_sec1_bytes().to_vec(),
+        };
+        update.sign(signing_key);
+        update
+    }
+
+    fn compute_hash(&self) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        for entry in &self.contracts {
+            hasher.update(entry.address.as_bytes());
+            hasher.update(entry.deployer.as_bytes());
+            hasher.update(&entry.block.to_le_bytes());
+        }
+        hasher.update(&self.timestamp.to_le_bytes());
+        hasher.finalize().into()
+    }
+
+    pub fn sign(&mut self, signing_key: &SigningKey) {
+        let hash = self.compute_hash();
+        let signature: Signature = signing_key.sign(&hash);
+        self.signature = signature.to_bytes().to_vec();
+    }
+
+    pub fn verify(&self) -> bool {
+        if self.signature.len() != 64 || self.author_pubkey.is_empty() {
+            return false;
+        }
+        let Ok(sig) = Signature::from_slice(&self.signature) else { return false; };
+        let Ok(pubkey) = VerifyingKey::from_sec1_bytes(&self.author_pubkey) else { return false; };
+        
+        let hash = self.compute_hash();
+        pubkey.verify(&hash, &sig).is_ok()
+    }
+}
+
 mod serde_bytes {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     pub fn serialize<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
@@ -116,6 +185,8 @@ impl ThreatRule {
 pub struct ThreatRegistry {
     rules: HashMap<String, ThreatRule>,
     trusted_keys: Vec<Vec<u8>>,
+    /// Local contract registry to merge updates into
+    contract_registry: sods_core::deployer::ContractRegistry,
 }
 
 impl ThreatRegistry {
@@ -123,6 +194,8 @@ impl ThreatRegistry {
         Self {
             rules: HashMap::new(),
             trusted_keys: Vec::new(),
+            contract_registry: sods_core::deployer::ContractRegistry::load_local()
+                .unwrap_or_else(|_| sods_core::deployer::ContractRegistry::new()),
         }
     }
 
@@ -132,23 +205,28 @@ impl ThreatRegistry {
 
     /// Add a rule if it is valid and from a trusted author.
     pub fn add_rule(&mut self, rule: ThreatRule) -> bool {
-        // Check if author is trusted
-        if !self.trusted_keys.contains(&rule.author_pubkey) {
-             // For PoC/Testing we might want to allow this if no specific keys are configured?
-             // But prompt says "Trusted Researchers Only".
-             // We'll enforce it if trusted_keys is not empty.
-             if !self.trusted_keys.is_empty() {
-                 return false;
-             }
-             // If empty, maybe accept all (open mode) or reject?
-             // Prompt says "Ship with 2-3 default public keys".
+        if !self.trusted_keys.is_empty() && !self.trusted_keys.contains(&rule.author_pubkey) {
+            return false;
         }
-
         if !rule.verify() {
             return false;
         }
-
         self.rules.insert(rule.id.clone(), rule);
+        true
+    }
+
+    /// Process a registry update and merge it into the local contract registry.
+    pub fn process_registry_update(&mut self, update: RegistryUpdate) -> bool {
+        if !self.trusted_keys.is_empty() && !self.trusted_keys.contains(&update.author_pubkey) {
+            return false;
+        }
+        if !update.verify() {
+            return false;
+        }
+        for entry in update.contracts {
+            self.contract_registry.add(entry.address, entry.deployer, entry.block);
+        }
+        let _ = self.contract_registry.save_local();
         true
     }
 

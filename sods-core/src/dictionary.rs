@@ -306,8 +306,10 @@ impl SymbolDictionary {
         }
         
         // Construct Symbol
-        Some(BehavioralSymbol::new(symbol_code, log_index)
-            .with_context(from, to, value, token_id))
+        let mut sym = BehavioralSymbol::new(symbol_code, log_index)
+            .with_context(from, to, value, token_id);
+        sym.contract_address = log.address;
+        Some(sym)
     }
 
 

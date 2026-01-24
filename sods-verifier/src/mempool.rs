@@ -142,7 +142,7 @@ impl MempoolMonitor {
                 }
                 
                 // Check Pattern
-                if let Some(matched) = pattern.matches(&symbols) {
+                if let Some(matched) = pattern.matches(&symbols, None) {
                     let seq_str: Vec<String> = matched.iter().map(|s| s.symbol.clone()).collect();
                     
                     let alert = PendingAlert {

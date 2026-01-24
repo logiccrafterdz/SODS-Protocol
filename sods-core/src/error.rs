@@ -40,6 +40,10 @@ pub enum SodsError {
     /// Internal error (RLP parsing, MPT verification, etc.)
     #[error("Internal error: {0}")]
     InternalError(String),
+
+    /// Configuration or persistence error.
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
 }
 
 /// Result type alias for SODS operations.

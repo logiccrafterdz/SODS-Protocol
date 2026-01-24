@@ -19,7 +19,7 @@ fn test_complex_mev_sandwich_greedy() {
     
     // Greedy pattern: Sw{2, 5} should capture all middle swaps
     let pattern = BehavioralPattern::parse("Tf -> Sw{2,5} -> Tf").unwrap();
-    let result = pattern.matches(&symbols).unwrap();
+    let result = pattern.matches(&symbols, None).unwrap();
     
     assert_eq!(result.len(), 5);
     assert_eq!(result[0].symbol(), "Tf");
@@ -43,7 +43,7 @@ fn test_greedy_at_least_mev() {
     ];
     
     let pattern = BehavioralPattern::parse("Sw{5,}").unwrap();
-    let result = pattern.matches(&symbols).unwrap();
+    let result = pattern.matches(&symbols, None).unwrap();
     
     assert_eq!(result.len(), 6); // Should consume all 6 swaps
 }

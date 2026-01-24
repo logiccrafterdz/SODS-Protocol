@@ -53,6 +53,9 @@ enum Commands {
 
     /// Generate a Zero-Knowledge proof of behavior
     ZkProve(commands::zk_prove::ZkProveArgs),
+    
+    /// Manage the contract deployer registry
+    Registry(commands::registry::RegistryArgs),
 }
 
 fn main() {
@@ -82,6 +85,7 @@ fn main() {
             Commands::ExportProof(args) => commands::export_proof::run(args).await,
             Commands::HashPattern(args) => commands::hash_pattern::run(args).await,
             Commands::ZkProve(args) => commands::zk_prove::run(args).await,
+            Commands::Registry(args) => commands::registry::run(args),
             Commands::Daemon(_) => unreachable!(), // Handled above
         }
     });

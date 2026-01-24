@@ -44,6 +44,7 @@ pub mod symbol;
 pub mod tree;
 pub mod pattern;
 pub mod causal_tree;
+pub mod deployer;
 
 // Re-export main types for convenience
 pub use dictionary::SymbolDictionary;
@@ -52,6 +53,7 @@ pub use proof::Proof;
 pub use symbol::BehavioralSymbol;
 pub use tree::BehavioralMerkleTree;
 pub use causal_tree::CausalMerkleTree;
+pub use deployer::ContractRegistry;
 pub mod shadow;
 pub use shadow::BehavioralShadow;
 pub mod plugins;

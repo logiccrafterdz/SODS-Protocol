@@ -45,6 +45,9 @@ pub struct BehavioralSymbol {
     /// Receiver address (context)
     pub to: Address,
 
+    /// Source contract address (where this log originated)
+    pub contract_address: Address,
+
     /// Value or Amount involved (context)
     pub value: U256,
 
@@ -84,6 +87,7 @@ impl BehavioralSymbol {
             log_index,
             from: Address::zero(),
             to: Address::zero(),
+            contract_address: Address::zero(),
             value: U256::zero(),
             token_id: None,
             is_from_deployer: false,

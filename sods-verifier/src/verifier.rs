@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use ethers_core::types::{Address, H256};
-use sods_core::{BehavioralMerkleTree, BehavioralSymbol, SymbolDictionary};
+use sods_core::{BehavioralMerkleTree, BehavioralSymbol, SymbolDictionary, ContractRegistry};
 
 use crate::error::{Result, SodsVerifierError};
 use crate::query::QueryParser;
@@ -81,6 +81,8 @@ pub struct BlockVerifier {
     require_header_proof: bool,
     /// Cache for contract deployer addresses (contract_address -> deployer_address).
     deployer_cache: Arc<Mutex<HashMap<Address, Option<Address>>>>,
+    /// Local contract registry for persistent deployer mapping.
+    registry: ContractRegistry,
     /// Cache for pattern verification results (block_number, pattern -> result)
     pattern_cache: Arc<Mutex<HashMap<(u64, String), VerificationResult>>>,
 }
@@ -118,6 +120,7 @@ impl BlockVerifier {
             dictionary: SymbolDictionary::default(),
             require_header_proof: true,
             deployer_cache: Arc::new(Mutex::new(HashMap::new())),
+            registry: ContractRegistry::load_local().unwrap_or_else(|_| ContractRegistry::new()),
             pattern_cache: Arc::new(Mutex::new(HashMap::new())),
         })
     }
@@ -132,6 +135,7 @@ impl BlockVerifier {
             dictionary: SymbolDictionary::default(),
             require_header_proof: false,
             deployer_cache: Arc::new(Mutex::new(HashMap::new())),
+            registry: ContractRegistry::load_local().unwrap_or_else(|_| ContractRegistry::new()),
             pattern_cache: Arc::new(Mutex::new(HashMap::new())),
         })
     }
@@ -429,7 +433,7 @@ impl BlockVerifier {
         let root = bmt.root();
 
         // 5. Match Pattern
-        let matched = pattern.matches(&symbols);
+        let matched = pattern.matches(&symbols, Some(&self.registry));
         let result = if let Some(matched_seq) = matched {
             // Find first symbol of match to generate proof
             let first_sym = matched_seq[0];
@@ -500,6 +504,11 @@ impl BlockVerifier {
                          if sym.from == ethers_core::types::Address::zero() {
                              sym.from = *from;
                          }
+
+                         // Enrich with deployer flag from registry
+                         if let Some(deployer) = self.registry.get_deployer(&sym.contract_address) {
+                            sym.is_from_deployer = sym.from == deployer;
+                         }
                     }
                 }
                 Some(sym)
@@ -547,7 +556,12 @@ impl BlockVerifier {
     /// 
     /// Uses cache to avoid repeated RPC calls. Returns false if lookup fails.
     pub async fn is_deployer(&self, contract_address: Address, from_address: Address) -> bool {
-        // Check cache first
+        // 0. Check Persistent Registry first
+        if let Some(deployer) = self.registry.get_deployer(&contract_address) {
+            return deployer == from_address;
+        }
+
+        // 1. Check in-memory cache
         {
             let cache = self.deployer_cache.lock().unwrap();
             if let Some(cached_deployer) = cache.get(&contract_address) {
@@ -583,24 +597,7 @@ impl BlockVerifier {
             .map(|tx| (tx.hash, (tx.nonce, tx.from)))
             .collect();
 
-        let mut symbols = self.parse_logs_to_symbols(&logs, &tx_map);
-
-        // Enrich with deployer detection for each unique contract
-        for sym in &mut symbols {
-            if sym.from != Address::zero() {
-                // Check if sym.from is the deployer of the log's contract address
-                // For this, we'd need the contract address from the original log
-                // Since we don't pass it through, we check if sym matches known patterns
-                // like LP- (liquidity removal) which are high-risk for rug pulls
-                if sym.symbol() == "LP-" || sym.symbol() == "LP+" {
-                    // For LP events, we'd ideally check against the pool's deployer
-                    // For simplicity, mark as deployer if the from address is consistent
-                    // In production, this would be enhanced with actual contract lookups
-                }
-            }
-        }
-
-        Ok(symbols)
+        Ok(self.parse_logs_to_symbols(&logs, &tx_map))
     }
 }
 

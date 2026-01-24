@@ -1,6 +1,7 @@
 use ethers_core::types::U256;
 use crate::symbol::BehavioralSymbol;
 use crate::error::{SodsError, Result};
+use crate::deployer::ContractRegistry;
 use std::time::{Instant, Duration};
 
 // const MAX_PATTERN_DEPTH: usize = 5;
@@ -69,12 +70,13 @@ impl BehavioralPattern {
             _ => {}
         }
 
-        let parts: Vec<&str> = input.split("->").map(|s| s.trim()).collect();
+        let parts: Vec<&str> = input.split("->").collect();
         let mut steps = Vec::new();
 
         for part in parts {
+            let part = part.trim();
             if part.is_empty() {
-                continue;
+                return Err(SodsError::PatternError("Empty pattern segment".into()));
             }
 
             // Parse condition if present ("... where ...")
@@ -124,10 +126,13 @@ impl BehavioralPattern {
                 } else {
                     return Err(SodsError::PatternError(format!("Unmatched '{{' in pattern: {}", part_base)));
                 }
-            } else if part_base.contains('→') {
-                 return Err(SodsError::PatternError(format!("Invalid character in symbol (did you mean '->'?): {}", part_base)));
             } else {
                 // Single symbol
+                // Validation: Symbol name must be alphanumeric + simple chars (+, -, _) 
+                // and MUST NOT contain control characters or null bytes.
+                if part_base.is_empty() || part_base.chars().any(|c| c.is_control() || c == '\0' || (!c.is_alphanumeric() && c != '+' && c != '-' && c != '_')) {
+                    return Err(SodsError::PatternError(format!("Invalid symbol name: {:?}", part_base)));
+                }
                 steps.push(PatternStep::Exact(part_base.to_string(), condition));
             }
 
@@ -150,7 +155,11 @@ impl BehavioralPattern {
 
     /// Check if the pattern matches the given sorted symbols.
     /// Returns the sequence of matched symbols if found, or None.
-    pub fn matches<'a>(&self, symbols: &'a [BehavioralSymbol]) -> Option<Vec<&'a BehavioralSymbol>> {
+    pub fn matches<'a>(
+        &self, 
+        symbols: &'a [BehavioralSymbol],
+        registry: Option<&ContractRegistry>
+    ) -> Option<Vec<&'a BehavioralSymbol>> {
         let mut matched_sequence = Vec::new();
         let mut current_sym_idx = 0;
 
@@ -163,7 +172,7 @@ impl BehavioralPattern {
                 PatternStep::Exact(target, cond) => {
                     // Find first occurrence of target starting from current_sym_idx that satisfies condition
                     let found_idx = symbols[current_sym_idx..].iter().position(|s| {
-                        s.symbol == *target && Self::check_condition(s, cond)
+                        s.symbol == *target && Self::check_condition(s, cond, registry)
                     })?;
                     let absolute_idx = current_sym_idx + found_idx;
                     
@@ -178,7 +187,7 @@ impl BehavioralPattern {
                     // Greedy consumption for "At Least n"
                     while idx < symbols.len() {
                         let sym = &symbols[idx];
-                        if sym.symbol == *target && Self::check_condition(sym, cond) {
+                        if sym.symbol == *target && Self::check_condition(sym, cond, registry) {
                             temp_matched.push(sym);
                             idx += 1;
                             count += 1;
@@ -202,7 +211,7 @@ impl BehavioralPattern {
                     // Greedy consumption for Range {min, max}
                     while count < *max && idx < symbols.len() {
                         let sym = &symbols[idx];
-                        if sym.symbol == *target && Self::check_condition(sym, cond) {
+                        if sym.symbol == *target && Self::check_condition(sym, cond, registry) {
                             temp_matched.push(sym);
                             idx += 1;
                             count += 1;
@@ -224,51 +233,99 @@ impl BehavioralPattern {
         Some(matched_sequence)
     }
 
-    fn check_condition(symbol: &BehavioralSymbol, condition: &PatternCondition) -> bool {
+    fn check_condition(
+        symbol: &BehavioralSymbol, 
+        condition: &PatternCondition,
+        registry: Option<&ContractRegistry>
+    ) -> bool {
         match condition {
             PatternCondition::None => true,
-            PatternCondition::FromDeployer => symbol.is_from_deployer,
+            PatternCondition::FromDeployer => {
+                // Primary: Check Dynamic Registry
+                if let Some(reg) = registry {
+                    if let Some(deployer) = reg.get_deployer(&symbol.contract_address) {
+                        return symbol.from == deployer;
+                    }
+                }
+                // Fallback: Check heuristic flag on symbol
+                symbol.is_from_deployer
+            }
             PatternCondition::ValueGreaterThan(threshold) => symbol.value > *threshold,
         }
     }
 }
 
 /// Helper function for ZK guest or simple matching
-pub fn matches_str(symbols: &[BehavioralSymbol], pattern_str: &str) -> bool {
+pub fn matches_str(symbols: &[BehavioralSymbol], pattern_str: &str, registry: Option<&ContractRegistry>) -> bool {
     if let Ok(p) = BehavioralPattern::parse(pattern_str) {
-        p.matches(symbols).is_some()
+        p.matches(symbols, registry).is_some()
     } else {
         false
     }
 }
 
-fn parse_amount(input: &str) -> Result<U256> {
+pub fn parse_amount(input: &str) -> Result<U256> {
     let parts: Vec<&str> = input.split_whitespace().collect();
     if parts.is_empty() {
         return Err(SodsError::PatternError("Empty amount".to_string()));
     }
 
-    if parts.len() == 1 {
-        // Raw integer
-        return U256::from_dec_str(parts[0])
-            .map_err(|e| SodsError::PatternError(format!("Invalid amount: {}", e)));
+    let (amount_str, unit) = if parts.len() == 2 {
+        (parts[0], parts[1].to_lowercase())
+    } else if parts.len() == 1 {
+        (parts[0], "wei".to_string()) // Default to wei
+    } else {
+        return Err(SodsError::PatternError(format!("Malformed amount: {}", input)));
+    };
+
+    // Split amount into integer and decimal parts
+    let amount_parts: Vec<&str> = amount_str.split('.').collect();
+    if amount_parts.len() > 2 {
+        return Err(SodsError::PatternError(format!("Invalid amount format (multiple dots): {}", amount_str)));
     }
 
-    if parts.len() == 2 {
-        let value = parts[0].parse::<f64>()
-            .map_err(|_| SodsError::PatternError(format!("Invalid number: {}", parts[0])))?;
-        let unit = parts[1].to_lowercase();
+    let base_str = amount_parts[0];
+    let decimals_str = if amount_parts.len() > 1 { amount_parts[1] } else { "" };
 
-        let multiplier = match unit.as_str() {
-            "ether" => 1_000_000_000_000_000_000f64,
-            "gwei" => 1_000_000_000f64,
-            _ => return Err(SodsError::PatternError(format!("Unsupported unit: {}", unit))),
-        };
+    // Determine target decimals based on unit
+    let target_decimals = match unit.as_str() {
+        "ether" => 18,
+        "gwei" => 9,
+        "wei" => 0,
+        _ => return Err(SodsError::PatternError(format!("Unsupported unit: {}", unit))),
+    };
 
-        return Ok(U256::from((value * multiplier) as u128));
+    // Parse integer part
+    let mut result = if base_str.is_empty() {
+        U256::zero()
+    } else {
+        U256::from_dec_str(base_str)
+            .map_err(|e| SodsError::PatternError(format!("Invalid integer part: {}", e)))?
+    };
+
+    // Handle decimal part if target_decimals > 0
+    if target_decimals > 0 {
+        // Scale integer part by 10^target_decimals
+        result = result.saturating_mul(U256::from(10u64).pow(U256::from(target_decimals)));
+
+        if !decimals_str.is_empty() {
+            let decimals_len = decimals_str.len().min(target_decimals as usize);
+            let decimal_part_str = &decimals_str[..decimals_len];
+            
+            let decimal_part = U256::from_dec_str(decimal_part_str)
+                .map_err(|e| SodsError::PatternError(format!("Invalid decimal part: {}", e)))?;
+            
+            // Add scaled decimal part
+            let decimal_scale = U256::from(10u64).pow(U256::from(target_decimals as u32 - decimals_len as u32));
+            result = result.saturating_add(decimal_part.saturating_mul(decimal_scale));
+        }
+    } else if !decimals_str.is_empty() {
+        return Err(SodsError::PatternError("Decimals not allowed for 'wei' unit".into()));
+    } else {
+        // Non-ether/gwei path (wei or raw), already matches U256 format or handled above
     }
 
-    Err(SodsError::PatternError(format!("Malformed amount: {}", input)))
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -315,12 +372,12 @@ mod tests {
         let symbols = vec![sym1, sym2.clone()];
         
         let p = BehavioralPattern::parse("Tf where from == deployer -> Sw").unwrap();
-        assert!(p.matches(&symbols).is_some());
+        assert!(p.matches(&symbols, None).is_some());
 
         // Test fail condition
         let sym3 = mock_sym("Tf", 0); // is_from_deployer = false by default
         let symbols_fail = vec![sym3, sym2];
-         assert!(p.matches(&symbols_fail).is_none());
+         assert!(p.matches(&symbols_fail, None).is_none());
     }
 
     #[test]
@@ -355,14 +412,14 @@ mod tests {
     fn test_frontrun_match() {
         let symbols = vec![mock_sym("Tf", 0), mock_sym("Sw", 1)];
         let p = BehavioralPattern::parse("Frontrun").unwrap();
-        assert!(p.matches(&symbols).is_some());
+        assert!(p.matches(&symbols, None).is_some());
     }
 
     #[test]
     fn test_backrun_match() {
         let symbols = vec![mock_sym("Sw", 0), mock_sym("Tf", 1)];
         let p = BehavioralPattern::parse("Backrun").unwrap();
-        assert!(p.matches(&symbols).is_some());
+        assert!(p.matches(&symbols, None).is_some());
     }
 
     #[test]
@@ -388,9 +445,9 @@ mod tests {
         let p = BehavioralPattern::parse("Tf where value > 1 ether").unwrap();
         
         // High value matches
-        assert!(p.matches(&vec![sym_high]).is_some());
+        assert!(p.matches(&vec![sym_high], None).is_some());
         // Low value fails
-        assert!(p.matches(&vec![sym_low]).is_none());
+        assert!(p.matches(&vec![sym_low], None).is_none());
     }
 
     #[test]
@@ -412,9 +469,9 @@ mod tests {
             mock_sym("Sw", 1),
             mock_sym("Tf", 2),
         ];
-        assert!(matches_str(&symbols, "Tf -> Sw"));
-        assert!(matches_str(&symbols, "Sandwich"));
-        assert!(!matches_str(&symbols, "Dep"));
+        assert!(matches_str(&symbols, "Tf -> Sw", None));
+        assert!(matches_str(&symbols, "Sandwich", None));
+        assert!(!matches_str(&symbols, "Dep", None));
     }
 
     #[test]
@@ -436,10 +493,10 @@ mod tests {
         // So they MUST be adjacent.
         
         let p = BehavioralPattern::parse("Sw{2}").unwrap();
-        assert!(p.matches(&vec![mock_sym("Sw", 0), mock_sym("Sw", 1)]).is_some());
+        assert!(p.matches(&vec![mock_sym("Sw", 0), mock_sym("Sw", 1)], None).is_some());
         
         // This MUST FAIL now per objective audit
-        assert!(p.matches(&symbols).is_none()); 
+        assert!(p.matches(&symbols, None).is_none()); 
     }
 
     #[test]
@@ -469,8 +526,8 @@ mod tests {
 
     #[test]
     fn test_case_sensitivity_consistency() {
-        assert!(matches_str(&vec![mock_sym("Tf", 0)], "Tf"));
-        assert!(!matches_str(&vec![mock_sym("Tf", 0)], "tf")); // Case sensitive
-        assert!(!matches_str(&vec![mock_sym("Tf", 0)], "TF"));
+        assert!(matches_str(&vec![mock_sym("Tf", 0)], "Tf", None));
+        assert!(!matches_str(&vec![mock_sym("Tf", 0)], "tf", None)); // Case sensitive
+        assert!(!matches_str(&vec![mock_sym("Tf", 0)], "TF", None));
     }
 }

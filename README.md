@@ -362,6 +362,14 @@ The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection 
 -  **Value Density**: +0.1 (Detection involves value transfer)
 -  **Data Integrity**: -0.4 (Penalty if internal/causal transaction data is missing)
 
+## What's New in v3.1 (Precision & Scale)
+
+- **Dynamic Contract Registry**: Replaced hardcoded block searches with a scalable local database (~/.sods/contract_registry.json). Enables instant `from == deployer` detection without RPC dependency.
+- **Exact U256 Amount Parsing**: Completely eliminated `f64` floating-point arithmetic from the DSL parser. All amounts (1000 ether, 1.5 gwei) are now processed using exact integer scaling, ensuring zero precision loss.
+- **Registry CLI Management**: New `sods registry` suite to add, list, import (JSON), and clear contract mappings.
+- **Signed P2P Sync**: Automated registry updates via libp2p gossipsub. Peers now auto-merge registry feeds signed by trusted researchers.
+- **Parser Hardening**: Strict alphanumeric symbol validation and escape-sequence protection in the pattern matching engine.
+
 ## Status
 
 - Specification: **v0.2** (Symbolic Primitives)
@@ -434,7 +442,8 @@ sods-protocol/
 │           ├── trend.rs
 │           ├── monitor.rs
 │           ├── daemon.rs
-│           └── export_proof.rs
+│           ├── export_proof.rs
+│           └── registry.rs
 ├── contracts/          <- Smart Contracts (Solidity)
 │   └── SODSVerifier.sol
 └── poc/                <- Python PoC
