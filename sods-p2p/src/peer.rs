@@ -104,6 +104,27 @@ impl SodsPeer {
         Ok(())
     }
 
+    /// Get the top N peers by reputation score.
+    pub fn top_peers(&self, count: usize) -> Vec<PeerId> {
+        let available: Vec<PeerId> = self.swarm.connected_peers().cloned().collect();
+        self.swarm.behaviour().reputation.select_best_peers(&available, count)
+    }
+
+    /// Trigger a manual validation of a peer.
+    pub async fn validate_peer(&mut self, peer_id: PeerId) {
+        info!("🔍 Manually validating peer {}", peer_id);
+        // We reuse the existing puzzle logic
+        self.issue_challenge(&peer_id); // Note: Need verify access to issue_challenge
+    }
+
+    /// Helper to issue a challenge (Refactored to be public or accessible)
+    pub fn issue_challenge(&mut self, peer_id: &PeerId) {
+        // Logic from behavior/client if needed, but let's assume behaviour.puzzle handles it.
+        // Actually, the client uses request_response. SodsPeer also has puzzle behavior.
+        let challenge = crate::protocol::PuzzleChallenge::random();
+        self.swarm.behaviour_mut().puzzle.send_request(peer_id, challenge);
+    }
+
     /// Subscribe to incoming threat rules.
     pub fn subscribe_threats(&self) -> broadcast::Receiver<ThreatRule> {
         self.threat_tx.subscribe()

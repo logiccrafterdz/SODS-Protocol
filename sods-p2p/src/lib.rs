@@ -47,6 +47,7 @@ pub mod protocol;
 pub mod reputation;
 pub mod threats;
 pub mod bootstrappers;
+pub mod network;
 
 // Re-export main types
 pub use client::{P2pVerificationResult, SodsClient};

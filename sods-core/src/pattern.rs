@@ -1,6 +1,11 @@
 use ethers_core::types::U256;
 use crate::symbol::BehavioralSymbol;
 use crate::error::{SodsError, Result};
+use std::time::{Instant, Duration};
+
+const MAX_PATTERN_DEPTH: usize = 5;
+const MAX_SYMBOLS_PER_PATTERN: usize = 10;
+const PARSING_TIMEOUT_MS: u64 = 10;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PatternCondition {
@@ -34,6 +39,12 @@ impl BehavioralPattern {
     /// - "LP+ where from == deployer": Context filter
     /// - "Sandwich": Preset for "Tf -> Sw -> Tf"
     pub fn parse(input: &str) -> Result<Self> {
+        let start_time = Instant::now();
+
+        if input.len() > 500 {
+            return Err(SodsError::PatternError("Pattern string too long (max 500 chars)".into()));
+        }
+
         // 1. Check Presets
         match input {
             "Sandwich" => return Ok(Self {
@@ -118,6 +129,15 @@ impl BehavioralPattern {
             } else {
                 // Single symbol
                 steps.push(PatternStep::Exact(part_base.to_string(), condition));
+            }
+
+            // Check Limits
+            if steps.len() > MAX_SYMBOLS_PER_PATTERN {
+                return Err(SodsError::PatternError(format!("Pattern too complex (max {} symbols)", MAX_SYMBOLS_PER_PATTERN)));
+            }
+
+            if start_time.elapsed() > Duration::from_millis(PARSING_TIMEOUT_MS) {
+                return Err(SodsError::PatternError("Pattern parsing timed out (DoS Protection)".into()));
             }
         }
 

@@ -17,6 +17,7 @@ const DECAY_FACTOR: f32 = 0.95;
 #[derive(Debug, Clone)]
 pub struct ReputationTracker {
     scores: HashMap<PeerId, f32>,
+    last_validation: HashMap<PeerId, Instant>,
     last_decay: Instant,
 }
 
@@ -31,7 +32,30 @@ impl ReputationTracker {
     pub fn new() -> Self {
         Self {
             scores: HashMap::new(),
+            last_validation: HashMap::new(),
             last_decay: Instant::now(),
+        }
+    }
+
+    /// Mark a peer as validated (solved a fresh puzzle).
+    pub fn validate_peer(&mut self, peer: PeerId) {
+        self.last_validation.insert(peer, Instant::now());
+        // Boosting score as a reward for successful validation
+        self.reward(&peer);
+    }
+
+    /// Reset reputation for peers that haven't been validated within the last 24h.
+    pub fn reset_stale_validations(&mut self) {
+        let now = Instant::now();
+        let stale_threshold = Duration::from_secs(86400); // 24 hours
+
+        for (peer, last_time) in self.last_validation.iter() {
+            if now.duration_since(*last_time) > stale_threshold {
+                if let Some(score) = self.scores.get_mut(peer) {
+                    warn!("Resetting reputation for peer {} due to stale validation (24h+)", peer);
+                    *score = INITIAL_SCORE;
+                }
+            }
         }
     }
 
