@@ -308,6 +308,13 @@ sods verify Tf --block 10002322 --json
 - **Deterministic Efficiency**: Maintained O(n) linear time complexity for all pattern matching operations, ensuring safety against ReDoS (Regular Expression DoS) attacks.
 - **Enhanced DSL Debugging**: Improved parser feedback for complex nested quantifiers.
 
+## What's New in v1.9 (Cache Stampede Prevention)
+
+- **Concurrency Safety**: Re-engineered the RPC layer in `sods-verifier` using `tokio::sync::RwLock` and double-checked locking.
+- **Zero Redundant Calls**: Ensures that hundreds of concurrent requests for the same block number trigger exactly ONE network call to the RPC provider.
+- **Resource Preservation**: Significantly reduces the risk of rate-limiting (429 errors) during high-load behavioral monitoring or trend analysis.
+- **Safe Failover**: RPC errors are not cached, allowing immediate failover and retry on subsequent requests.
+
 ## High-Performance Verification Engine
 
 - **Source-Level Symbol Filtering**: Drastically reduces bandwidth by fetching ONLY the logs relevant to the requested pattern using Ethereum topic filters.

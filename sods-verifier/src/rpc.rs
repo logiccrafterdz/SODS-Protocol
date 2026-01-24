@@ -5,13 +5,12 @@
 
 use ethers_core::types::{BlockNumber, Filter, Log, Address, H256, EIP1186ProofResponse};
 use ethers_providers::{Http, Middleware, Provider};
-use lru::LruCache;
-use std::num::NonZeroUsize;
-use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use std::time::Duration;
 use tokio::time::sleep;
 
-const DEFAULT_CACHE_SIZE: usize = 100;
 const MIN_ADAPTIVE_DELAY_MS: u64 = 100;
 const MAX_ADAPTIVE_DELAY_MS: u64 = 5000;
 const JITTER_PERCENT: f64 = 0.1;
@@ -38,11 +37,11 @@ pub struct RpcClient {
     providers: Vec<Arc<Provider<Http>>>,
     urls: Vec<String>,
     current_provider_index: Arc<std::sync::atomic::AtomicUsize>,
-    cache: Arc<Mutex<LruCache<u64, Vec<Log>>>>,
+    cache: Arc<RwLock<HashMap<u64, Vec<Log>>>>,
     adaptive_delay: Arc<std::sync::atomic::AtomicU64>,
     backoff_profile: BackoffProfile,
-    #[cfg(test)]
-    pub(crate) fetch_count: Arc<std::sync::atomic::AtomicUsize>,
+    /// Total RPC fetch operations. Primarily for testing synchronization.
+    pub fetch_count: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl RpcClient {
@@ -58,23 +57,13 @@ impl RpcClient {
             providers.push(Arc::new(provider));
         }
 
-        let cache_size = std::env::var("SODS_RPC_CACHE_SIZE")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(DEFAULT_CACHE_SIZE);
-
-        let cache = LruCache::new(
-            NonZeroUsize::new(cache_size).unwrap_or(NonZeroUsize::new(1).unwrap()),
-        );
-
         Ok(Self {
             providers,
             urls: rpc_urls.to_vec(),
             current_provider_index: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
-            cache: Arc::new(Mutex::new(cache)),
+            cache: Arc::new(RwLock::new(HashMap::new())),
             adaptive_delay: Arc::new(std::sync::atomic::AtomicU64::new(MIN_ADAPTIVE_DELAY_MS)),
-            backoff_profile: BackoffProfile::Ethereum, // Default to Ethereum
-            #[cfg(test)]
+            backoff_profile: BackoffProfile::Ethereum,
             fetch_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         })
     }
@@ -190,19 +179,27 @@ impl RpcClient {
     }
 
     pub async fn fetch_logs_for_block(&self, block_number: u64) -> Result<Vec<Log>> {
+        // 1. First check: Read lock (allows multiple concurrent readers)
         {
-            let mut cache = self.cache.lock().unwrap();
+            let cache = self.cache.read().await;
             if let Some(logs) = cache.get(&block_number) {
                 return Ok(logs.clone());
             }
         }
 
+        // 2. Second check: Write lock with double-check (Stampede Prevention)
+        let mut cache = self.cache.write().await;
+        
+        // Double-check: another request might have filled the cache while we were waiting for write lock
+        if let Some(logs) = cache.get(&block_number) {
+            return Ok(logs.clone());
+        }
+
+        // 3. Fetch from RPC (only one request per block reaches here)
         let logs = self.fetch_with_backoff(block_number, None).await?;
 
-        {
-            let mut cache = self.cache.lock().unwrap();
-            cache.put(block_number, logs.clone());
-        }
+        // 4. Populate cache
+        cache.insert(block_number, logs.clone());
 
         Ok(logs)
     }
@@ -394,10 +391,7 @@ impl RpcClient {
                     sleep(Duration::from_millis(adaptive)).await;
                 }
 
-                #[cfg(test)]
-                {
-                    self.fetch_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                }
+                self.fetch_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
                 match self.current_provider().get_logs(&filter).await {
                     Ok(logs) => {
@@ -443,8 +437,8 @@ impl RpcClient {
     }
 
     /// Get the current cache size (for testing/monitoring).
-    pub fn cache_len(&self) -> usize {
-        self.cache.lock().unwrap().len()
+    pub async fn cache_len(&self) -> usize {
+        self.cache.read().await.len()
     }
 
     /// Get the current adaptive delay in milliseconds.
@@ -452,9 +446,14 @@ impl RpcClient {
         self.adaptive_delay.load(std::sync::atomic::Ordering::Relaxed)
     }
 
+    /// Get the fetch count (total RPC calls). Primarily for internal verification.
+    pub fn get_fetch_count(&self) -> usize {
+        self.fetch_count.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
     /// Clear the cache.
-    pub fn clear_cache(&self) {
-        self.cache.lock().unwrap().clear();
+    pub async fn clear_cache(&self) {
+        self.cache.write().await.clear();
     }
 
     /// Classify an ethers error into our error type.
@@ -537,8 +536,8 @@ mod tests {
         let client = RpcClient::new(&urls).unwrap();
 
         {
-            let mut cache = client.cache.lock().unwrap();
-            cache.put(12345, vec![]); 
+            let mut cache = client.cache.write().await;
+            cache.insert(12345, vec![]); 
         }
 
         let result = client.fetch_logs_for_block(12345).await;

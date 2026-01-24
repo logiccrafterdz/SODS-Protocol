@@ -225,6 +225,14 @@ struct ThreatRule {
 }
 ```
 
+## Concurrency Safety
+
+The RPC layer implements **Cache Stampede Prevention** using double-checked locking with `tokio::sync::RwLock`. This ensures that even under high concurrent load (e.g., hundreds of simultaneous requests for the same block), only a single RPC call is dispatched to the provider. 
+
+- **Read Phase**: Concurrent threads can check the cache simultaneously using a read lock.
+- **Write Phase**: If the cache is cold, a write lock is acquired, and the cache is double-checked (to account for race conditions) before performing the network request.
+- **Failover Safety**: RPC errors are not cached, allowing subsequent requests to retry or failover to other providers immediately.
+
 ## Version History
 
 | Version | Changes |
@@ -236,6 +244,8 @@ struct ThreatRule {
 | v4.0 | Hybrid Trust Model & Adaptive Quorum |
 | v7.0 | Implementation Stable (Current) |
 | v8.0 | **Planned**: Causal Merkle Trees (CMT) & Actor Attribution |
+
+## Version History
 
 ## Security Considerations
 
