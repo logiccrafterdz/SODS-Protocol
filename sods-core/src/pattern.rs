@@ -179,15 +179,14 @@ impl BehavioralPattern {
                          if idx >= symbols.len() {
                              return None; // Not enough symbols
                          }
-                         if let Some(found_idx) = symbols[idx..].iter().position(|s| {
-                             s.symbol == *target && Self::check_condition(s, cond)
-                         }) {
-                             let absolute_idx = idx + found_idx;
-                             temp_matched.push(&symbols[absolute_idx]);
-                             idx = absolute_idx + 1;
+                         
+                         let sym = &symbols[idx];
+                         if sym.symbol == *target && Self::check_condition(sym, cond) {
+                             temp_matched.push(sym);
+                             idx += 1;
                              count += 1;
                          } else {
-                             return None; // Cannot find enough
+                             return None; // Non-matching symbol in middle of quantifier sequence
                          }
                     }
                     matched_sequence.extend(temp_matched);
@@ -202,15 +201,14 @@ impl BehavioralPattern {
                          if idx >= symbols.len() {
                              return None; 
                          }
-                         if let Some(found_idx) = symbols[idx..].iter().position(|s| {
-                             s.symbol == *target && Self::check_condition(s, cond)
-                         }) {
-                             let absolute_idx = idx + found_idx;
-                             temp_matched.push(&symbols[absolute_idx]);
-                             idx = absolute_idx + 1;
+                         
+                         let sym = &symbols[idx];
+                         if sym.symbol == *target && Self::check_condition(sym, cond) {
+                             temp_matched.push(sym);
+                             idx += 1;
                              count += 1;
                          } else {
-                             return None; 
+                             return None; // Non-matching symbol in middle of range
                          }
                     }
                      matched_sequence.extend(temp_matched);
@@ -413,5 +411,40 @@ mod tests {
         assert!(matches_str(&symbols, "Tf -> Sw"));
         assert!(matches_str(&symbols, "Sandwich"));
         assert!(!matches_str(&symbols, "Dep"));
+    }
+
+    #[test]
+    fn test_rigorous_quantifier_matching() {
+        let symbols = vec![
+            mock_sym("Sw", 0),
+            mock_sym("Tf", 1),
+            mock_sym("Sw", 2),
+        ];
+        
+        // Exact {2} should FAIL because Tf is in the middle (it looks for EXACT SEQUENCE of Sw then Sw)
+        // Wait, the current implementation of position(|s| s.symbol == *target) allows intermediate symbols.
+        // Let's check the objective: "'Sw{2}' Valid: [Sw, Sw], Invalid: [Sw, Tf, Sw]"
+        // My current 'matches' logic uses .iter().position(...) which finds the NEXT occurrence, 
+        // essentially treating it as "contains sequence" rather than "exact adjacent sequence".
+        
+        // RE-AUDIT: If the objective requires [Sw, Tf, Sw] to FAIL for Sw{2}, I need to fix the logic.
+        // The objective says "Invalid Sequence" for Sw{2} is [Sw, Tf, Sw].
+        // So they MUST be adjacent.
+        
+        let p = BehavioralPattern::parse("Sw{2}").unwrap();
+        assert!(p.matches(&vec![mock_sym("Sw", 0), mock_sym("Sw", 1)]).is_some());
+        
+        // This MUST FAIL now per objective audit
+        assert!(p.matches(&symbols).is_none()); 
+    }
+
+    #[test]
+    fn test_order_precision() {
+        let symbols = vec![
+            mock_sym("Sw", 0),
+            mock_sym("LP+", 1),
+        ];
+        // LP+ -> Sw should fail because order is reversed
+        assert!(matches_str(&symbols, "LP+ -> Sw") == false);
     }
 }
