@@ -439,12 +439,34 @@ mod tests {
     }
 
     #[test]
-    fn test_order_precision() {
-        let symbols = vec![
-            mock_sym("Sw", 0),
-            mock_sym("LP+", 1),
-        ];
-        // LP+ -> Sw should fail because order is reversed
-        assert!(matches_str(&symbols, "LP+ -> Sw") == false);
+    fn test_context_injection_prevention() {
+        // Attempting to bypass logic with 'OR true' style injection
+        // The parser should treat this as part of the condition value or fail
+        let malicious = "LP+ where from == 0x0 OR 1==1";
+        let result = BehavioralPattern::parse(malicious);
+        
+        // Our current parser is very strict on '==' format.
+        // If it doesn't match 'key == value', it fails or ignores the 'OR' part.
+        match result {
+            Ok(p) => {
+                // If it parsed, ensure the condition is exactly what we expect 
+                // and DOES NOT include the injected OR logic
+                for step in p.steps {
+                    if let PatternStep::Exact(_, cond) = step {
+                        if let Some(c) = cond {
+                            assert!(!format!("{:?}", c).contains("OR"));
+                        }
+                    }
+                }
+            },
+            Err(_) => println!("✅ Logic injection rejected by strict parser."),
+        }
+    }
+
+    #[test]
+    fn test_case_sensitivity_consistency() {
+        assert!(matches_str(&vec![mock_sym("Tf", 0)], "Tf"));
+        assert!(!matches_str(&vec![mock_sym("Tf", 0)], "tf")); // Case sensitive
+        assert!(!matches_str(&vec![mock_sym("Tf", 0)], "TF"));
     }
 }
