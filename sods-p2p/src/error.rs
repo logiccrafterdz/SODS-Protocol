@@ -42,6 +42,10 @@ pub enum SodsP2pError {
     #[error("Verifier error: {0}")]
     Verifier(#[from] sods_verifier::SodsVerifierError),
 
+    /// Puzzle challenge expired.
+    #[error("Puzzle challenge expired")]
+    ChallengeExpired,
+
     /// I/O error.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),

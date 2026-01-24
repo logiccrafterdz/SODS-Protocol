@@ -293,6 +293,13 @@ sods verify Tf --block 10002322 --json
 - **Library Stabilization**: Full warning-free build achieved for `sods-core`, `sods-verifier`, and `sods-p2p` utilizing `libp2p` v0.54.
 - **Hardened Root Anchoring**: Improved block header verification logic in `trustless` mode to detect sophisticated RPC log manipulation.
 
+## What's New in v1.7 (P2P Sybil Hardening)
+
+- **Strict Puzzle Timeouts**: Implemented a mandatory 30-second expiration for Proof-of-Behavior challenges. Prevents attackers from batching or delaying solutions.
+- **Real-Time Validation**: Updated `SodsClient` to perform immediate monotonic clock checks on received solutions, ensuring integrity in high-latency environments.
+- **Automatic Resource Recovery**: Added periodic background cleanup tasks to purge expired challenges, maintaining a stable memory footprint during peer discovery.
+- **Enhanced Reputation Penalties**: Late solutions now trigger proactive reputation deductions to deter low-priority Sybil nodes.
+
 ## High-Performance Verification Engine
 
 - **Source-Level Symbol Filtering**: Drastically reduces bandwidth by fetching ONLY the logs relevant to the requested pattern using Ethereum topic filters.

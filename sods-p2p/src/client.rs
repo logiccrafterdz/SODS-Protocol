@@ -57,7 +57,7 @@ pub struct SodsClient {
     known_peers: HashSet<PeerId>,
     local_peer_id: PeerId,
     pending_requests: HashMap<OutboundRequestId, PeerId>,
-    pending_challenges: HashMap<OutboundRequestId, (PeerId, crate::protocol::PuzzleChallenge)>,
+    pending_challenges: HashMap<OutboundRequestId, (PeerId, crate::protocol::BehavioralPuzzle)>,
     slashed_peers: HashSet<PeerId>,
 }
 
@@ -199,7 +199,7 @@ impl SodsClient {
         };
 
         let request_id = self.swarm.behaviour_mut().puzzle.send_request(peer_id, challenge.clone());
-        self.pending_challenges.insert(request_id, (*peer_id, challenge));
+        self.pending_challenges.insert(request_id, (*peer_id, crate::protocol::BehavioralPuzzle::new(challenge)));
     }
 
     /// Handle puzzle solution events.
@@ -220,9 +220,16 @@ impl SodsClient {
     async fn verify_solution(
         &mut self, 
         peer_id: PeerId, 
-        challenge: crate::protocol::PuzzleChallenge, 
+        puzzle: crate::protocol::BehavioralPuzzle, 
         solution: crate::protocol::PuzzleSolution
     ) {
+        if puzzle.is_expired() {
+            warn!("Puzzle solution received after expiration from {}", peer_id);
+            self.reputation.penalize(&peer_id);
+            return;
+        }
+
+        let challenge = puzzle.challenge;
         let Some(verifier) = &self.fallback_verifier else {
             warn!("No fallback verifier available to verify PoB solution. Assuming malicious.");
             return;
@@ -382,31 +389,44 @@ impl SodsClient {
     async fn collect_responses(&mut self, expected_count: usize) -> Vec<(PeerId, ProofResponse)> {
         let mut responses = Vec::new();
 
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
+
         let collection = timeout(REQUEST_TIMEOUT, async {
-            while responses.len() < expected_count {
-                match self.swarm.select_next_some().await {
-                    SwarmEvent::Behaviour(SodsBehaviourEvent::RequestResponse(event)) => {
-                        if let request_response::Event::Message {
-                            peer,
-                            message:
-                                request_response::Message::Response {
-                                    response,
-                                    request_id,
-                                    ..
-                                },
-                        } = event
-                        {
-                            self.pending_requests.remove(&request_id);
-                            responses.push((peer, response));
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        self.cleanup_expired_challenges();
+                    }
+                    event = self.swarm.select_next_some() => {
+                        match event {
+                            SwarmEvent::Behaviour(SodsBehaviourEvent::RequestResponse(event)) => {
+                                if let request_response::Event::Message {
+                                    peer,
+                                    message:
+                                        request_response::Message::Response {
+                                            response,
+                                            request_id,
+                                            ..
+                                        },
+                                } = event
+                                {
+                                    self.pending_requests.remove(&request_id);
+                                    responses.push((peer, response));
+                                }
+                            }
+                            SwarmEvent::Behaviour(SodsBehaviourEvent::Puzzle(event)) => {
+                                self.handle_puzzle_event(event).await;
+                            }
+                            SwarmEvent::Behaviour(SodsBehaviourEvent::Identify(event)) => {
+                                self.handle_identify_event(event);
+                            }
+                            _ => {}
                         }
                     }
-                    SwarmEvent::Behaviour(SodsBehaviourEvent::Puzzle(event)) => {
-                        self.handle_puzzle_event(event).await;
-                    }
-                    SwarmEvent::Behaviour(SodsBehaviourEvent::Identify(event)) => {
-                        self.handle_identify_event(event);
-                    }
-                    _ => {}
+                }
+                
+                if responses.len() >= expected_count {
+                    break;
                 }
             }
         });
@@ -455,6 +475,16 @@ impl SodsClient {
     /// Get the number of known peers.
     pub fn known_peer_count(&self) -> usize {
         self.known_peers.len()
+    }
+
+    /// Cleanup expired behavioral puzzles to prevent memory leaks.
+    pub fn cleanup_expired_challenges(&mut self) {
+        let before = self.pending_challenges.len();
+        self.pending_challenges.retain(|_, (_, puzzle)| !puzzle.is_expired());
+        let saved = before - self.pending_challenges.len();
+        if saved > 0 {
+            debug!("Cleaned up {} expired behavioral puzzles", saved);
+        }
     }
 }
 

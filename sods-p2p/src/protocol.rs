@@ -38,6 +38,31 @@ impl PuzzleChallenge {
     }
 }
 
+/// A behavioral puzzle with timing information.
+#[derive(Debug, Clone)]
+pub struct BehavioralPuzzle {
+    pub challenge: PuzzleChallenge,
+    pub issued_at: std::time::SystemTime,
+    pub expires_after: std::time::Duration,
+}
+
+impl BehavioralPuzzle {
+    pub fn new(challenge: PuzzleChallenge) -> Self {
+        Self {
+            challenge,
+            issued_at: std::time::SystemTime::now(),
+            expires_after: std::time::Duration::from_secs(30),
+        }
+    }
+
+    pub fn is_expired(&self) -> bool {
+        self.issued_at
+            .elapsed()
+            .map(|elapsed| elapsed > self.expires_after)
+            .unwrap_or(true) // Treat clock errors as expired
+    }
+}
+
 /// A solution to a Proof-of-Behavior puzzle.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PuzzleSolution {
