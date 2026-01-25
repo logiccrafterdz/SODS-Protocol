@@ -1,4 +1,4 @@
-# SODS Protocol: Trustless Behavioral Verification
+﻿# SODS Protocol: Trustless Behavioral Verification
 
 SODS is NOT a blockchain indexer. It is a trustless behavioral verifier that answers one question: "Did this specific behavioral pattern occur in a given block?"
 
