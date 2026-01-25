@@ -1,0 +1,12 @@
+target/
+.git/
+.sods/
+brain/
+poc/
+scripts/
+tests/
+*.md
+.gitignore
+.dockerignore
+.github/
+Cargo.lock

@@ -38,11 +38,14 @@ sods export-proof --pattern "LP+" --block 20000000 --format calldata
 ## Installation Methods
 
 ```bash
+# Using Docker (Recommended for quick start)
+docker run --rm ghcr.io/logiccrafterdz/sods:latest verify "Sandwich" --block 20000000 --chain ethereum
+
+# Mount configuration directory for daemon mode
+docker run --rm -v $(pwd)/.sods:/root/.sods ghcr.io/logiccrafterdz/sods:latest daemon start --pattern "Tf"
+
 # From source (Rust)
 cargo install sods-cli
-
-# Using Docker
-docker run ghcr.io/[your-username]/sods:latest verify "Sandwich" --block 20000000 --chain ethereum
 
 # Using npm (wrapper)
 npx sods-cli verify "Sandwich" --block 20000000 --chain ethereum
