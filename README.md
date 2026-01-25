@@ -5,9 +5,11 @@ SODS is NOT a blockchain indexer. It is a trustless behavioral verifier that ans
 Unlike indexers that store and query all data, SODS generates cryptographic proofs for predefined behavioral patterns without centralized infrastructure or archival nodes.
 
 ## 📺 Educational Demo
-Watch how SODS detects a real-world MEV sandwich attack in under 5 minutes:
+-------------------
 
-[![SODS MEV Detection Demo](https://img.youtube.com/vi/dhE_uNHLjec/0.jpg)](https://www.youtube.com/watch?v=dhE_uNHLjec)
+[![SODS MEV Sandwich Demo](https://img.youtube.com/vi/dhE_uNHLjec/hqdefault.jpg)](https://www.youtube.com/watch?v=dhE_uNHLjec)
+
+Watch how SODS detects a real-world MEV sandwich attack in under 5 minutes.
 
 ## When to Use SODS vs Alternatives
 
