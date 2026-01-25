@@ -1,6 +1,6 @@
 # Builder stage
-# Using rustlang/rust:nightly-slim for guaranteed nightly toolchain access
-FROM rustlang/rust:nightly-slim AS builder
+# Using rustlang/rust:nightly-bookworm-slim to ensure GLIBC 2.36 compatibility with Debian 12 runtime
+FROM rustlang/rust:nightly-bookworm-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
