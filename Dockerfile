@@ -1,6 +1,6 @@
 # Builder stage
-# Using nightly to support Rust 2024 edition requirements in dependencies
-FROM rust:nightly-slim AS builder
+# Using rustlang/rust:nightly-slim for guaranteed nightly toolchain access
+FROM rustlang/rust:nightly-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -13,15 +13,16 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Debug: Print toolchain versions
-RUN rustc --version && cargo --version
+# Ensure we are using nightly and check version
+RUN rustup default nightly && rustc --version && cargo --version
 
 # Copy the entire workspace
 COPY . .
 
 # Build the binary in release mode
+# Using cargo +nightly to be explicit about the toolchain for Edition 2024 support
 # Disabling ZK for stability. Explicitly targeting sods-cli.
-RUN cargo build --release -p sods-cli --bin sods --no-default-features
+RUN cargo +nightly build --release -p sods-cli --bin sods --no-default-features
 
 # Runtime stage
 FROM gcr.io/distroless/cc-debian12
