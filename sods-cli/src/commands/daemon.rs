@@ -748,6 +748,7 @@ async fn run_daemon_loop(
 
                   #[cfg(feature = "metrics")]
                  if let Some(ref m) = metrics { m.active_rules.set(targets.len() as i64); }
+                  #[cfg(feature = "metrics")]
                  let start_v = std::time::Instant::now();
                  
                  match verifier.get_latest_block().await {
