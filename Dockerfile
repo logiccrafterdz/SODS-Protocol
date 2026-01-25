@@ -1,6 +1,6 @@
 # Builder stage
-# BUILD_ID: 20260125-1630
-FROM rust:latest-bookworm AS builder
+# Using nightly to support Rust 2024 edition requirements in dependencies
+FROM rust:nightly-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \

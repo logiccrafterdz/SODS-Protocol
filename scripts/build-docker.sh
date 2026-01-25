@@ -8,7 +8,7 @@ set -e
 IMAGE_NAME="ghcr.io/logiccrafterdz/sods:latest"
 
 echo "Building SODS Docker image: $IMAGE_NAME..."
-docker build -t "$IMAGE_NAME" .
+docker build --pull -t "$IMAGE_NAME" .
 
 echo "Running basic functionality test..."
 docker run --rm "$IMAGE_NAME" --help || { echo "Help command failed"; exit 1; }
