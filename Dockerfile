@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y \
     musl-tools \
     pkg-config \
     libssl-dev \
+    libdbus-1-dev \
+    cmake \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -14,9 +16,8 @@ WORKDIR /app
 COPY . .
 
 # Build the binary in release mode
-# Use no-default-features to ensure ZK is handled as per configuration if needed, 
-# but here we build the main CLI.
-RUN cargo build --release --bin sods
+# Explicitly build the sods-cli package
+RUN cargo build --release -p sods-cli --bin sods
 
 # Runtime stage  
 FROM gcr.io/distroless/cc-debian12

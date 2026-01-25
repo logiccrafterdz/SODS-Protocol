@@ -2,9 +2,9 @@ name: Docker Build and Publish
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
@@ -30,8 +30,15 @@ jobs:
 
       - name: Build and test Docker image
         run: |
+          # Fix potential CRLF issues in the build script
+          sed -i 's/\r$//' scripts/build-docker.sh
           chmod +x scripts/build-docker.sh
           ./scripts/build-docker.sh
+
+      - name: Inspect Image
+        run: |
+          docker inspect ghcr.io/logiccrafterdz/sods:latest
+          docker images ghcr.io/logiccrafterdz/sods:latest
 
       - name: Push Docker image
         if: github.event_name != 'pull_request'
