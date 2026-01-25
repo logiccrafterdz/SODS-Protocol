@@ -698,6 +698,7 @@ async fn run_daemon_loop(
                     std::future::pending().await
                 }
              } => {
+                  #[cfg(feature = "metrics")]
                   if let Some(ref m) = metrics { m.p2p_messages_total.inc(); }
                   println!("Received P2P Threat Rule: {}", rule.name);
                   
@@ -745,11 +746,13 @@ async fn run_daemon_loop(
                      last_gc = std::time::Instant::now();
                  }
 
+                  #[cfg(feature = "metrics")]
                  if let Some(ref m) = metrics { m.active_rules.set(targets.len() as i64); }
                  let start_v = std::time::Instant::now();
                  
                  match verifier.get_latest_block().await {
                     Ok(current_head) => {
+                        #[cfg(feature = "metrics")]
                         if let Some(ref m) = metrics { m.rpc_calls_total.inc(); }
                         if current_head > last_scanned_block {
                             if last_scanned_block == 0 {
@@ -760,9 +763,11 @@ async fn run_daemon_loop(
                             for block_num in (last_scanned_block + 1)..=current_head {
                                 match verifier.fetch_block_symbols(block_num).await {
                                     Ok(symbols) => {
+                                        #[cfg(feature = "metrics")]
                                         if let Some(ref m) = metrics { m.rpc_calls_total.inc(); }
                                         for target in &targets {
                                             if let Some(matched_symbols) = target.pattern.matches(&symbols, None) {
+                                                #[cfg(feature = "metrics")]
                                                 if let Some(ref m) = metrics { m.behavioral_alerts_total.inc(); }
                                                 let msg = format!("🚨 {} ({}) detected on Block #{}", target.name, target.severity, block_num);
                                                 println!("{}", msg);
