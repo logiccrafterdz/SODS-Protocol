@@ -1,12 +1,52 @@
-# SODS Protocol
+# SODS Protocol: Trustless Behavioral Verification
 
-**Symbolic On-Demand Verification over Decentralized Summaries**
+SODS is NOT a blockchain indexer. It is a trustless behavioral verifier that answers one question: "Did this specific behavioral pattern occur in a given block?"
 
-SODS is an experimental protocol proposal that explores a new way to *read* blockchains.
+Unlike indexers that store and query all data, SODS generates cryptographic proofs for predefined behavioral patterns without centralized infrastructure or archival nodes.
 
-Instead of indexing or scraping raw on-chain data, SODS proposes verifying **behavioral claims**
-(e.g. swaps, liquidity events) using symbolic commitments and Merkle proofs —
-without relying on centralized indexers or archive nodes.
+## When to Use SODS vs Alternatives
+
+| Use Case | SODS | The Graph | Tenderly |
+|----------|------|-----------|----------|
+| Detect sandwich MEV attacks | Yes | No (overkill) | Yes (paid) |
+| Monitor for rug pulls continuously | Yes | No (expensive) | Yes (paid) |
+| Prove behavior on-chain with 202-byte proof | Yes | No | No |
+| Query historical NFT trades | No | Yes | No |
+
+SODS excels at verifying specific behavioral claims. Use indexers for general-purpose data queries.
+
+## Quick Start Examples
+
+```bash
+# Verify if a sandwich attack occurred
+sods verify "Sandwich" --block 20000000 --chain ethereum
+
+# Monitor for large transfers continuously
+sods daemon start --pattern "Tf where value > 1000 ether" --chain base
+
+# Generate on-chain verifiable proof
+sods export-proof --pattern "LP+" --block 20000000 --format calldata
+```
+
+## Core Principles
+
+- **Zero Cost**: Operates using public RPC endpoints; no archive node required
+- **Trustless Verification**: Uses cryptographic proofs anchored to block headers
+- **Privacy-Preserving**: Zero-knowledge proofs reveal only behavioral validity
+- **P2P Resilient**: Hybrid trust model prevents single points of failure
+
+## Installation Methods
+
+```bash
+# From source (Rust)
+cargo install sods-cli
+
+# Using Docker
+docker run ghcr.io/[your-username]/sods:latest verify "Sandwich" --block 20000000 --chain ethereum
+
+# Using npm (wrapper)
+npx sods-cli verify "Sandwich" --block 20000000 --chain ethereum
+```
 
 ---
 
@@ -391,16 +431,11 @@ The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection 
 - **On-Chain Event Signaling**: Updated `SODSVerifier.sol` to emit `BeaconAnchoringSkipped` events when anchoring is bypassed, ensuring full transparency for DeFi protocols.
 - **Runtime Network Probing**: The verifier now automatically detects network capabilities at startup, providing a seamless experience across all EVM-compatible chains.
 
-## Status
+## Project Status
 
-- Specification: **v0.2** (Symbolic Primitives)
-- PoC: **v0.5** (Verified Proofs)
-- sods-core: **v0.2.0**
-- sods-verifier: **v0.2.0**
-- sods-p2p: **v0.2.0**
-- sods-cli: **v1.1.0 (v1.2 Stabilized)**
-- Stage: **Pre-Alpha / Research Initiative**
-- Seeking: Technical feedback, threat analysis, edge cases
+Status: Production Ready (v7.0)
+License: CC0 1.0 Universal
+Documentation: See /docs directory and inline code comments
 
 ## Running Tests
 
