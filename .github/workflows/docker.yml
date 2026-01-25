@@ -28,6 +28,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Debug Dockerfile
+        run: cat Dockerfile
+
       - name: Build and test Docker image
         run: |
           # Fix potential CRLF issues in the build script
