@@ -88,7 +88,7 @@ pub enum DaemonCommands {
         #[arg(long)]
         websocket_port: Option<u16>,
 
-        /// Start a Prometheus metrics server (e.g. 9090)
+        /// Start a Prometheus _metrics server (e.g. 9090)
         #[arg(long)]
         metrics_port: Option<u16>,
     },
@@ -295,9 +295,9 @@ impl MetricsServer {
 
     pub async fn start_http_server(self: Arc<Self>, port: u16) {
         let app = Router::new()
-            .route("/metrics", get(|State(metrics): State<Arc<MetricsServer>>| async move {
+            .route("/_metrics", get(|State(_metrics): State<Arc<MetricsServer>>| async move {
                 let encoder = TextEncoder::new();
-                let metric_families = metrics.registry.gather();
+                let metric_families = _metrics.registry.gather();
                 let mut buffer = Vec::new();
                 encoder.encode(&metric_families, &mut buffer).unwrap();
                 
@@ -312,19 +312,19 @@ impl MetricsServer {
         let listener = match tokio::net::TcpListener::bind(&addr).await {
             Ok(l) => l,
             Err(e) => {
-                eprintln!("Metrics Error: Failed to bind to {}: {}", addr, e);
+                eprintln!("_metrics Error: Failed to bind to {}: {}", addr, e);
                 return;
             }
         };
 
-        println!("Metrics Server: listening on http://{}/metrics", addr);
+        println!("_metrics Server: listening on http://{}/_metrics", addr);
         if let Err(e) = axum::serve(listener, app).await {
-            eprintln!("Metrics Server Error: {}", e);
+            eprintln!("_metrics Server Error: {}", e);
         }
     }
 }
 
-// Stub for optional metrics
+// Stub for optional _metrics
 #[cfg(not(feature = "metrics"))]
 #[derive(Clone)]
 pub struct MetricsServer;
@@ -410,8 +410,8 @@ fn start_daemon(
     let pid_file = get_pid_file();
     let log_file = get_log_file();
 
-    // Metrics Server Setup
-    let metrics = metrics_port.and_then(|_port| {
+    // _metrics Server Setup
+    let _metrics = metrics_port.and_then(|_port| {
         #[cfg(feature = "metrics")]
         { MetricsServer::new().ok().map(|m| Arc::new(m)) }
         #[cfg(not(feature = "metrics"))]
@@ -485,9 +485,9 @@ fn start_daemon(
         Ok(_) => {
             let rt = tokio::runtime::Runtime::new().unwrap();
             
-            // Start Metrics server if enabled
+            // Start _metrics server if enabled
             #[cfg(feature = "metrics")]
-            if let Some(ref m) = metrics {
+            if let Some(ref m) = _metrics {
                 if let Some(port) = metrics_port.as_ref() {
                     let m_clone = m.clone();
                     rt.spawn(m_clone.start_http_server(*port));
@@ -500,7 +500,7 @@ fn start_daemon(
                 rt.spawn(ws_clone.start());
             }
 
-            rt.block_on(run_daemon_loop(targets.clone(), chain.clone(), interval.clone(), rpc_url.clone(), webhook_url.clone(), Some(threat_feed.clone()), p2p_threat_network, expire_after_str.clone(), ws_server.clone(), metrics.clone()));
+            rt.block_on(run_daemon_loop(targets.clone(), chain.clone(), interval.clone(), rpc_url.clone(), webhook_url.clone(), Some(threat_feed.clone()), p2p_threat_network, expire_after_str.clone(), ws_server.clone(), _metrics.clone()));
             0 
         }
         Err(e) => {
@@ -533,7 +533,7 @@ async fn run_daemon_loop(
     p2p_enabled: bool,
     expire_after_str: String,
     ws_server: Option<Arc<WebSocketServer>>,
-    metrics: Option<Arc<MetricsServer>>,
+    _metrics: Option<Arc<MetricsServer>>, // renamed usage below to _metrics if needed
 ) {
     use sods_verifier::BlockVerifier;
     use crate::config::get_chain;
@@ -578,7 +578,7 @@ async fn run_daemon_loop(
 
     // --- Memory Usage Task ---
     #[cfg(feature = "metrics")]
-    if let Some(ref m) = metrics {
+    if let Some(ref m) = _metrics {
         let m_clone = m.clone();
         tokio::spawn(async move {
             use sysinfo::{System, SystemExt, ProcessExt};
@@ -636,10 +636,10 @@ async fn run_daemon_loop(
                              if let Ok(p) = sods_core::pattern::BehavioralPattern::parse(&rule.pattern) {
                                  targets.push(MonitoringTarget {
                                      pattern: p,
-                                     name: rule.name,
-                                     severity: rule.severity,
-                                     pattern_str: rule.pattern,
-                                     chain: rule.chain,
+                                     name: rule.name.clone(),
+                                     severity: rule.severity.clone(),
+                                     pattern_str: rule.pattern.clone(),
+                                     chain: rule.chain.clone(),
                                      expires_at: std::time::SystemTime::now() + expire_duration,
                                  });
                              }
@@ -699,7 +699,7 @@ async fn run_daemon_loop(
                 }
              } => {
                   #[cfg(feature = "metrics")]
-                  if let Some(ref m) = metrics { m.p2p_messages_total.inc(); }
+                  if let Some(ref m) = _metrics { m.p2p_messages_total.inc(); }
                   println!("Received P2P Threat Rule: {}", rule.name);
                   
                   let rules_file = get_threat_rules_file();
@@ -721,10 +721,10 @@ async fn run_daemon_loop(
                           if let Ok(p) = sods_core::pattern::BehavioralPattern::parse(&rule.pattern) {
                               targets.push(MonitoringTarget {
                                   pattern: p,
-                                  name: rule.name,
-                                  severity: rule.severity,
-                                  pattern_str: rule.pattern,
-                                  chain: rule.chain,
+                                  name: rule.name.clone(),
+                                  severity: rule.severity.clone(),
+                                  pattern_str: rule.pattern.clone(),
+                                  chain: rule.chain.clone(),
                                   expires_at: std::time::SystemTime::now() + expire_duration,
                               });
                               let msg = format!("Active P2P Rule Applied: {}", rule.name);
@@ -747,14 +747,14 @@ async fn run_daemon_loop(
                  }
 
                   #[cfg(feature = "metrics")]
-                 if let Some(ref m) = metrics { m.active_rules.set(targets.len() as i64); }
+                 if let Some(ref m) = _metrics { m.active_rules.set(targets.len() as i64); }
                   #[cfg(feature = "metrics")]
                  let start_v = std::time::Instant::now();
                  
                  match verifier.get_latest_block().await {
                     Ok(current_head) => {
                         #[cfg(feature = "metrics")]
-                        if let Some(ref m) = metrics { m.rpc_calls_total.inc(); }
+                        if let Some(ref m) = _metrics { m.rpc_calls_total.inc(); }
                         if current_head > last_scanned_block {
                             if last_scanned_block == 0 {
                                 last_scanned_block = current_head;
@@ -765,11 +765,11 @@ async fn run_daemon_loop(
                                 match verifier.fetch_block_symbols(block_num).await {
                                     Ok(symbols) => {
                                         #[cfg(feature = "metrics")]
-                                        if let Some(ref m) = metrics { m.rpc_calls_total.inc(); }
+                                        if let Some(ref m) = _metrics { m.rpc_calls_total.inc(); }
                                         for target in &targets {
                                             if let Some(matched_symbols) = target.pattern.matches(&symbols, None) {
                                                 #[cfg(feature = "metrics")]
-                                                if let Some(ref m) = metrics { m.behavioral_alerts_total.inc(); }
+                                                if let Some(ref m) = _metrics { m.behavioral_alerts_total.inc(); }
                                                 let msg = format!("🚨 {} ({}) detected on Block #{}", target.name, target.severity, block_num);
                                                 println!("{}", msg);
                                                 let _ = Notification::new().summary("SODS Threat Alert 🚨").body(&msg).show();
@@ -817,7 +817,7 @@ async fn run_daemon_loop(
                                     },
                                     Err(e) => {
                                         #[cfg(feature = "metrics")]
-                                        if let Some(ref m) = metrics { m.verification_failures_total.inc(); }
+                                        if let Some(ref m) = _metrics { m.verification_failures_total.inc(); }
                                         eprintln!("Error fetching block #{}: {}", block_num, e);
                                     }
                                 }
@@ -827,12 +827,12 @@ async fn run_daemon_loop(
                     },
                     Err(e) => {
                         #[cfg(feature = "metrics")]
-                        if let Some(ref m) = metrics { m.verification_failures_total.inc(); }
+                        if let Some(ref m) = _metrics { m.verification_failures_total.inc(); }
                         println!("RPC Error: {}", e);
                     }
                  }
                  #[cfg(feature = "metrics")]
-                 if let Some(ref m) = metrics { m.verification_duration_seconds.observe(start_v.elapsed().as_secs_f64()); }
+                 if let Some(ref m) = _metrics { m.verification_duration_seconds.observe(start_v.elapsed().as_secs_f64()); }
              }
         }
     }
