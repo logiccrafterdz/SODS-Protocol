@@ -8,8 +8,11 @@ use tokio::net::{TcpListener, TcpStream};
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use futures_util::{StreamExt, SinkExt};
+#[cfg(feature = "metrics")]
 use prometheus::{Encoder, TextEncoder, Registry, IntGauge, Counter, Histogram, HistogramOpts};
+#[cfg(feature = "metrics")]
 use axum::{Router, routing::get, extract::State, response::Response};
+#[cfg(feature = "metrics")]
 use http_body_util::Full;
 
 #[cfg(unix)]
@@ -210,6 +213,7 @@ impl WebSocketServer {
         }
     }
 
+    #[cfg(feature = "metrics")]
     pub async fn broadcast_alert(&self, alert: BehavioralAlert) {
         let json = match serde_json::to_string(&alert) {
             Ok(j) => j,
@@ -230,8 +234,12 @@ impl WebSocketServer {
             }
         }
     }
+
+    #[cfg(not(feature = "metrics"))]
+    pub async fn broadcast_alert(&self, _alert: BehavioralAlert) {}
 }
 
+#[cfg(feature = "metrics")]
 #[derive(Clone)]
 pub struct MetricsServer {
     registry: Registry,
@@ -245,6 +253,7 @@ pub struct MetricsServer {
     pub verification_duration_seconds: Histogram,
 }
 
+#[cfg(feature = "metrics")]
 impl MetricsServer {
     pub fn new() -> Result<Self, prometheus::Error> {
         let registry = Registry::new();
@@ -314,6 +323,11 @@ impl MetricsServer {
         }
     }
 }
+
+// Stub for optional metrics
+#[cfg(not(feature = "metrics"))]
+#[derive(Clone)]
+pub struct MetricsServer;
 
 #[derive(Clone)]
 pub(crate) struct MonitoringTarget {
@@ -397,8 +411,11 @@ fn start_daemon(
     let log_file = get_log_file();
 
     // Metrics Server Setup
-    let metrics = metrics_port.and_then(|port| {
-        MetricsServer::new().ok().map(|m| Arc::new(m))
+    let metrics = metrics_port.and_then(|_port| {
+        #[cfg(feature = "metrics")]
+        { MetricsServer::new().ok().map(|m| Arc::new(m)) }
+        #[cfg(not(feature = "metrics"))]
+        { None }
     });
 
     // WebSocket Server Setup
@@ -469,10 +486,11 @@ fn start_daemon(
             let rt = tokio::runtime::Runtime::new().unwrap();
             
             // Start Metrics server if enabled
+            #[cfg(feature = "metrics")]
             if let Some(ref m) = metrics {
-                if let Some(port) = metrics_port {
+                if let Some(port) = metrics_port.as_ref() {
                     let m_clone = m.clone();
-                    rt.spawn(m_clone.start_http_server(port));
+                    rt.spawn(m_clone.start_http_server(*port));
                 }
             }
 
@@ -559,6 +577,7 @@ async fn run_daemon_loop(
     let expire_duration = parse_duration(&expire_after_str);
 
     // --- Memory Usage Task ---
+    #[cfg(feature = "metrics")]
     if let Some(ref m) = metrics {
         let m_clone = m.clone();
         tokio::spawn(async move {
@@ -791,6 +810,7 @@ async fn run_daemon_loop(
                                         }
                                     },
                                     Err(e) => {
+                                        #[cfg(feature = "metrics")]
                                         if let Some(ref m) = metrics { m.verification_failures_total.inc(); }
                                         eprintln!("Error fetching block #{}: {}", block_num, e);
                                     }
@@ -800,10 +820,12 @@ async fn run_daemon_loop(
                         }
                     },
                     Err(e) => {
+                        #[cfg(feature = "metrics")]
                         if let Some(ref m) = metrics { m.verification_failures_total.inc(); }
                         println!("RPC Error: {}", e);
                     }
                  }
+                 #[cfg(feature = "metrics")]
                  if let Some(ref m) = metrics { m.verification_duration_seconds.observe(start_v.elapsed().as_secs_f64()); }
              }
         }
