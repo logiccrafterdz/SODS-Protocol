@@ -6,7 +6,7 @@ Unlike indexers that store and query all data, SODS generates cryptographic proo
 
 ## 📺 Educational Demo
 Watch how SODS detects a real-world MEV sandwich attack in under 5 minutes:
-![SODS MEV Detection Demo](file:///C:/Users/Hp/Desktop/SODS-Protocol/scripts/educational-demo/TEST.mp4)
+![SODS MEV Detection Demo](scripts/educational-demo/TEST.mp4)
 
 ## When to Use SODS vs Alternatives
 
