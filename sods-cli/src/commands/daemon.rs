@@ -500,7 +500,7 @@ fn start_daemon(
                 rt.spawn(ws_clone.start());
             }
 
-            rt.block_on(run_daemon_loop(targets, chain, interval, rpc_url, webhook_url, Some(threat_feed), p2p_threat_network, expire_after_str, ws_server, metrics));
+            rt.block_on(run_daemon_loop(targets.clone(), chain.clone(), interval.clone(), rpc_url.clone(), webhook_url.clone(), Some(threat_feed.clone()), p2p_threat_network, expire_after_str.clone(), ws_server.clone(), metrics.clone()));
             0 
         }
         Err(e) => {
