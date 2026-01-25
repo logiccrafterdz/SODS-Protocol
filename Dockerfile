@@ -16,8 +16,9 @@ WORKDIR /app
 COPY . .
 
 # Build the binary in release mode
-# Explicitly build the sods-cli package
-RUN cargo build --release -p sods-cli --bin sods
+# Explicitly build the sods-cli package without default features (disables ZK)
+# to avoid heavy RISC Zero build-time dependencies in the slim builder env.
+RUN cargo build --release -p sods-cli --bin sods --no-default-features
 
 # Runtime stage  
 FROM gcr.io/distroless/cc-debian12
