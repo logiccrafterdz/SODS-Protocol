@@ -1,5 +1,9 @@
 ﻿# SODS Protocol: Trustless Behavioral Verification
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![npm version](https://img.shields.io/npm/v/sods-cli.svg)](https://www.npmjs.com/package/sods-cli)
+[![Docker](https://img.shields.io/badge/docker-stable-blue.svg)](https://www.docker.com/)
+
 SODS is NOT a blockchain indexer. It is a trustless behavioral verifier that answers one question: "Did this specific behavioral pattern occur in a given block?"
 
 Unlike indexers that store and query all data, SODS generates cryptographic proofs for predefined behavioral patterns without centralized infrastructure or archival nodes.
@@ -45,7 +49,10 @@ sods export-proof --pattern "LP+" --block 20000000 --format calldata
 ## Installation Methods
 
 ```bash
-# Using Docker (Recommended for quick start)
+# Using npx (Recommended for JS/Node developers)
+npx sods-cli verify "Sandwich" --block 20000000 --chain ethereum
+
+# Using Docker
 docker run --rm ghcr.io/logiccrafterdz/sods:latest verify "Sandwich" --block 20000000 --chain ethereum
 
 # Mount configuration directory for daemon mode

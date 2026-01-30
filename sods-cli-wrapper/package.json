@@ -1,0 +1,23 @@
+{
+  "name": "sods-cli",
+  "version": "1.0.0",
+  "description": "Trustless behavioral verification for blockchain data",
+  "bin": {
+    "sods": "./bin/sods.js"
+  },
+  "keywords": [
+    "blockchain",
+    "mev",
+    "verification",
+    "ethereum"
+  ],
+  "author": "logiccrafterdz",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/logiccrafterdz/SODS-Protocol.git"
+  },
+  "engines": {
+    "node": ">=12.0.0"
+  }
+}
