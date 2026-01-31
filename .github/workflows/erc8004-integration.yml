@@ -1,0 +1,31 @@
+name: ERC-8004 Integration Tests
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+jobs:
+    erc8004-sepolia:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install Rust
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Cache dependencies
+              uses: swatinem/rust-cache@v2
+
+            - name: Run ERC-8004 Integration Tests
+              env:
+                  SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+                  TEST_PRIVATE_KEY: ${{ secrets.TEST_PRIVATE_KEY }}
+                  CLIENT_PRIVATE_KEY: ${{ secrets.CLIENT_PRIVATE_KEY }}
+                  SEPOLIA_IDENTITY_REGISTRY_ADDR: "0x8004000000000000000000000000000000000001"
+                  SEPOLIA_REPUTATION_REGISTRY_ADDR: "0x8004000000000000000000000000000000000002"
+                  SEPOLIA_VALIDATION_REGISTRY_ADDR: "0x8004000000000000000000000000000000000003"
+              run: |
+                  # Note: Tests will use Anvil if RPC is missing
+                  cargo test --package sods-cli --test erc8004_integration

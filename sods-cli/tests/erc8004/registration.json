@@ -1,0 +1,18 @@
+{
+    "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+    "name": "SODS Causal Verifier",
+    "description": "Trustless behavioral verification for AI agents using Causal Merkle Trees",
+    "services": [
+        {
+            "name": "REST API",
+            "endpoint": "https://api.sods.xyz"
+        }
+    ],
+    "supportedTrust": [
+        "reputation",
+        "zk-proofs"
+    ],
+    "extensions": {
+        "behavioralProof": "https://api.sods.xyz/causal/proof/{agentId}"
+    }
+}
