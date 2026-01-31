@@ -61,7 +61,7 @@ pub fn run(args: RegistryArgs) -> i32 {
                 }
             };
 
-            registry.add(contract_addr, deployer_addr, block);
+            registry.add(contract_addr, deployer_addr, block, None);
             if let Err(e) = registry.save_local() {
                 output::error(&format!("Failed to save registry: {}", e));
                 return 1;
@@ -96,7 +96,7 @@ pub fn run(args: RegistryArgs) -> i32 {
                         val.get("block").and_then(|v| v.as_u64())
                     ) {
                         if let Ok(deployer_addr) = Address::from_str(deployer_str) {
-                            registry.add(addr, deployer_addr, block);
+                            registry.add(addr, deployer_addr, block, None);
                             count += 1;
                         }
                     }
@@ -119,8 +119,8 @@ pub fn run(args: RegistryArgs) -> i32 {
                 output::info(&format!("Registry contains {} entries:", registry.contracts.len()));
                 println!("{:<44} | {:<44} | {:<10}", "Contract", "Deployer", "Block");
                 println!("{:-<44}-+-{:-<44}-+-{:-<10}", "", "", "");
-                for (contract, (deployer, block)) in &registry.contracts {
-                    println!("{:<44} | {:<44} | {:<10}", format!("{:?}", contract), format!("{:?}", deployer), block);
+                for (contract, entry) in &registry.contracts {
+                    println!("{:<44} | {:<44} | {:<10}", format!("{:?}", contract), format!("{:?}", entry.deployer), entry.block);
                 }
             }
         }

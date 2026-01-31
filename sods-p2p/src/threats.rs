@@ -225,7 +225,7 @@ impl ThreatRegistry {
             return false;
         }
         for entry in update.contracts {
-            self.contract_registry.add(entry.address, entry.deployer, entry.block);
+            self.contract_registry.add(entry.address, entry.deployer, entry.block, None);
         }
         let _ = self.contract_registry.save_local();
         true
