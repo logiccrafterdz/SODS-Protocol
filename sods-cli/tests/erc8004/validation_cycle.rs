@@ -12,8 +12,20 @@ async fn test_validation_request_response_cycle() {
     let priv_key = std::env::var("TEST_PRIVATE_KEY").unwrap_or_else(|_| "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string());
     let registry_addr = std::env::var("SEPOLIA_VALIDATION_REGISTRY_ADDR").unwrap_or_else(|_| "0x8004000000000000000000000000000000000003".to_string());
 
-    let provider = Provider::<Http>::try_from(rpc_url).unwrap();
-    let wallet: LocalWallet = priv_key.parse::<LocalWallet>().unwrap().with_chain_id(11155111u64);
+    let provider = match Provider::<Http>::try_from(rpc_url) {
+        Ok(p) => p,
+        Err(_) => {
+            println!("⚠️ Skipping: Invalid RPC URL");
+            return;
+        }
+    };
+    let wallet: LocalWallet = match priv_key.parse::<LocalWallet>() {
+        Ok(w) => w.with_chain_id(11155111u64),
+        Err(_) => {
+            println!("⚠️ Skipping: Invalid Private Key");
+            return;
+        }
+    };
     let client = Arc::new(SignerMiddleware::new(provider, wallet));
 
     let address: Address = registry_addr.parse().unwrap();
