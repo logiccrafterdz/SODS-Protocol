@@ -1,0 +1,27 @@
+[package]
+name = "sods-causal"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["LogicCrafter <logiccrafterdz@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "SODS Protocol: Causal Event Model for Agent Registry"
+repository = "https://github.com/logiccrafterdz/sods-protocol"
+keywords = ["ethereum", "evm", "causal", "agents", "verification"]
+categories = ["cryptography", "data-structures"]
+
+[dependencies]
+# Ethereum types: Address, H256
+ethers = "2.0"
+
+# Serialization for events
+serde = { version = "1.0", features = ["derive"] }
+
+# Clean error handling
+thiserror = "1.0"
+
+# JSON serialization (used in error types)
+serde_json = "1.0"
+
+[dev-dependencies]
+# No additional dev dependencies needed

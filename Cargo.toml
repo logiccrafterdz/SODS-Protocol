@@ -6,4 +6,5 @@ members = [
     "sods-p2p",
     "sods-cli",
     "sods-zk",
+    "sods-causal",
 ]
