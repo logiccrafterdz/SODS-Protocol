@@ -42,7 +42,8 @@ sods export-proof --pattern "LP+" --block 20000000 --format calldata
 ## Core Principles
 
 - **Zero Cost**: Operates using public RPC endpoints; no archive node required
-- **Trustless Verification**: Uses cryptographic proofs anchored to block headers
+- **Zero-RPC Mode**: Cryptographically verify logs via EIP-1186 storage proofs—no trust in RPC log data
+- **Trustless Verification**: Uses cryptographic proofs anchored to block headers (Receipts Root validation)
 - **Privacy-Preserving**: Zero-knowledge proofs reveal only behavioral validity
 - **P2P Resilient**: Hybrid trust model prevents single points of failure
 
@@ -128,9 +129,10 @@ assert!(proof.verify(&bmt.root()));
 Local verification using public RPC endpoints. Handles:
 
 - RPC data fetching with LRU caching (100 blocks)
+- **Zero-RPC Mode**: Optional verification via EIP-1186 storage proofs (No-Log mode)
 - Multi-provider failover (Failover across ≥3 diverse endpoints)
 - Adaptive RPC (Exponential backoff for rate limit handling)
-- L2-Aware Resilience (Specialized backoff profiles for L2 chains)
+- L2-Aware Resilience (Verified RLP encoding for Arbitrum/Optimism receipts roots)
 - Pre-flight health checks
 - Symbol validation
 - End-to-end verification with timing metrics
