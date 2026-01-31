@@ -35,6 +35,7 @@ use ethers::types::Address;
 
 use crate::error::{CausalError, Result};
 use crate::event::CausalEvent;
+use crate::tree::CausalMerkleTree;
 
 /// In-memory recorder for causal events across multiple agents.
 ///
@@ -161,6 +162,18 @@ impl CausalEventRecorder {
 
         Ok(())
     }
+
+    /// Builds a `CausalMerkleTree` for the specified agent.
+    ///
+    /// # Errors
+    /// Returns `CausalError` if the agent has no events.
+    pub fn build_merkle_tree(&self, agent_id: &Address) -> Result<CausalMerkleTree> {
+        let events = self.events.get(agent_id).ok_or_else(|| {
+            CausalError::InvalidAgentAddress(format!("No events found for agent {}", agent_id))
+        })?;
+
+        CausalMerkleTree::new(events.clone())
+    }
 }
 
 #[cfg(test)]
@@ -271,5 +284,16 @@ mod tests {
 
         assert_eq!(recorder.agent_count(), 2);
         assert_eq!(recorder.total_events(), 2);
+    }
+
+    #[test]
+    fn test_build_merkle_tree() {
+        let mut recorder = CausalEventRecorder::new();
+        let agent = test_address();
+        recorder.record_event(create_event(agent, 0, 0)).unwrap();
+        recorder.record_event(create_event(agent, 0, 1)).unwrap();
+
+        let tree = recorder.build_merkle_tree(&agent).unwrap();
+        assert_eq!(tree.events().len(), 2);
     }
 }
