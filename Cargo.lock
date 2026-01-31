@@ -6433,6 +6433,7 @@ dependencies = [
  "serde",
  "sha3",
  "sods-core",
+ "sods-p2p",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
@@ -6443,18 +6444,10 @@ name = "sods-zk"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "risc0-build",
  "risc0-zkvm",
  "serde",
  "sods-core",
- "sods-zk-methods",
-]
-
-[[package]]
-name = "sods-zk-methods"
-version = "0.1.0"
-dependencies = [
- "risc0-build",
- "risc0-zkvm",
 ]
 
 [[package]]

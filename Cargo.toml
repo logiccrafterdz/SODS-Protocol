@@ -5,6 +5,7 @@ members = [
     "sods-verifier",
     "sods-p2p",
     "sods-cli",
-    "sods-zk",
     "sods-causal", "demo/defi-protocol",
 ]
+# sods-zk requires RISC Zero toolchain; excluded from default workspace builds
+exclude = ["sods-zk"]

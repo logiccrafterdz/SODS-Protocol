@@ -40,6 +40,7 @@ sha3 = "0.10"
 
 [dev-dependencies]
 libp2p = "0.54"
+sods-p2p = { path = "../sods-p2p" }
 
 # For timing assertions
 tokio-test = "0.4"

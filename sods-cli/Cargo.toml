@@ -67,7 +67,7 @@ wiremock = "0.6"
 serde_json = "1.0"
 
 [features]
-default = ["zk", "metrics", "api"]
+default = ["metrics", "api"]
 zk = ["dep:sods-zk"]
 metrics = ["dep:prometheus", "dep:axum", "dep:http-body-util"]
 api = ["dep:axum"]

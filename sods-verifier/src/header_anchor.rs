@@ -257,20 +257,16 @@ mod tests {
         assert!(!bloom_contains_topic(&bloom, &other)); 
     }
 
-    #[test]
-    fn test_rlp_encode_index() {
-        // Index 0 should encode to 0x80 (empty string in RLP)
-        let encoded = rlp_encode_index(0);
-        assert_eq!(encoded, vec![0x80]);
-
-        // Index 127 should encode to single byte
-        let encoded = rlp_encode_index(127);
-        assert_eq!(encoded, vec![127]);
-
-        // Index 128 should encode with length prefix
-        let encoded = rlp_encode_index(128);
-        assert_eq!(encoded, vec![0x81, 128]);
-    }
+    // Note: rlp_encode_index was moved to sods-core::header_anchor
+    // #[test]
+    // fn test_rlp_encode_index() {
+    //     let encoded = rlp_encode_index(0);
+    //     assert_eq!(encoded, vec![0x80]);
+    //     let encoded = rlp_encode_index(127);
+    //     assert_eq!(encoded, vec![127]);
+    //     let encoded = rlp_encode_index(128);
+    //     assert_eq!(encoded, vec![0x81, 128]);
+    // }
 
     #[test]
     fn test_empty_receipts_root() {

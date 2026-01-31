@@ -1,7 +1,5 @@
-#![no_main]
-
 use risc0_zkvm::guest::env;
-use sods_zk_methods::BehavioralProofInput;
+use sods_core::symbol::BehavioralProofInput;
 
 risc0_zkvm::guest::entry!(main);
 

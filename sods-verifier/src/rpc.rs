@@ -545,11 +545,11 @@ mod tests {
         assert!(l2.delays()[2] > eth.delays()[2]);
     }
 
-    #[test]
-    fn test_cache_size_default() {
+    #[tokio::test]
+    async fn test_cache_size_default() {
         let urls = vec!["https://example.com".to_string()];
         let client = RpcClient::new(&urls).unwrap();
-        assert_eq!(client.cache_len(), 0);
+        assert_eq!(client.cache_len().await, 0);
     }
 
     #[tokio::test]

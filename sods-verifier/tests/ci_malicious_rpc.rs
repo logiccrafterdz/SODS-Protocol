@@ -65,7 +65,7 @@ async fn test_corrupted_log_data_rejection() {
 
 #[tokio::test]
 async fn test_reorg_detection_logic() {
-    use crate::sods_verifier::header_anchor::BlockHeader;
+    use sods_verifier::header_anchor::BlockHeader;
     use ethers_core::types::H256;
     
     // 1. Header for Block #2000 with hash A
@@ -90,7 +90,7 @@ async fn test_reorg_detection_logic() {
 
 #[tokio::test]
 async fn test_pre_eip4788_fallback_warning() {
-    use crate::sods_verifier::header_anchor::BlockHeader;
+    use sods_verifier::header_anchor::BlockHeader;
     
     // 1. Header without beacon root (Pre-EIP-4788)
     let header = BlockHeader {

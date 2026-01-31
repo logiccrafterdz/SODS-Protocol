@@ -7,6 +7,15 @@ use ethers_core::types::{Address, U256, H256};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
+/// Input for the behavioral proof ZK guest.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BehavioralProofInput {
+    pub symbols: Vec<BehavioralSymbol>,
+    pub pattern: String,
+    pub block_number: u64,
+    pub chain_id: u64,
+}
+
 /// A behavioral symbol extracted from an EVM log event.
 ///
 /// Represents an atomic blockchain operation identified by its symbol code

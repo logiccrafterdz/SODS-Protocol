@@ -33,8 +33,8 @@ async fn test_immediate_slashing_on_proof_mismatch() {
     // Scenario: Peer A provides a proof that contradicts locally verified truth.
     // Peer A MUST be blacklisted immediately.
     
-    let _local_truth = true;
-    let _peer_proof = false;
+    let local_truth = true;
+    let peer_proof = false;
     let keypair = libp2p::identity::Keypair::generate_ed25519();
     let peer_id = PeerId::from(keypair.public());
     

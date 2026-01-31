@@ -1,7 +1,9 @@
 use risc0_zkvm::{default_prover, ExecutorEnv, Receipt};
-use sods_core::symbol::BehavioralSymbol;
-use sods_zk_methods::{BehavioralProofInput, SODS_ZK_GUEST_ELF, SODS_ZK_GUEST_ID};
+use sods_core::symbol::{BehavioralSymbol, BehavioralProofInput};
 use anyhow::Result;
+
+// Include the generated methods.
+include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
 pub fn prove_behavior(
     symbols: Vec<BehavioralSymbol>,
