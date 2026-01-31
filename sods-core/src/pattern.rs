@@ -7,6 +7,8 @@ use std::time::{Instant, Duration};
 // const MAX_PATTERN_DEPTH: usize = 5;
 const MAX_SYMBOLS_PER_PATTERN: usize = 10;
 const PARSING_TIMEOUT_MS: u64 = 10;
+const MAX_QUANTIFIER_VALUE: usize = 1000;
+const MAX_PATTERN_LENGTH: usize = 500;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PatternCondition {
@@ -42,8 +44,8 @@ impl BehavioralPattern {
     pub fn parse(input: &str) -> Result<Self> {
         let start_time = Instant::now();
 
-        if input.len() > 500 {
-            return Err(SodsError::PatternError("Pattern string too long (max 500 chars)".into()));
+        if input.len() > MAX_PATTERN_LENGTH {
+            return Err(SodsError::PatternError(format!("Pattern string too long (max {} chars)", MAX_PATTERN_LENGTH)));
         }
 
         // 1. Check Presets
@@ -101,6 +103,16 @@ impl BehavioralPattern {
             // Check for quantifier { ... }
             if let Some(start_idx) = part_base.find('{') {
                 if let Some(end_idx) = part_base.find('}') {
+                    // ReDoS Protection: Ensure only one quantifier block per segment
+                    if part_base[end_idx+1..].contains('{') || part_base[..start_idx].contains('{') {
+                        return Err(SodsError::PatternError("Nested or multiple quantifiers not supported".into()));
+                    }
+
+                    // Ensure no trailing text after '}' in the base part
+                    if !part_base[end_idx+1..].trim().is_empty() {
+                        return Err(SodsError::PatternError(format!("Unexpected text after quantifier: '{}'", &part_base[end_idx+1..])));
+                    }
+
                     let symbol = part_base[..start_idx].trim().to_string();
                     let quantifier = &part_base[start_idx+1..end_idx]; // inside {}
 
@@ -109,6 +121,9 @@ impl BehavioralPattern {
                         let max_str = quantifier[comma_idx+1..].trim();
 
                         let min = min_str.parse::<usize>().map_err(|_| SodsError::PatternError(format!("Invalid min quantifier: {}", min_str)))?;
+                        if min > MAX_QUANTIFIER_VALUE {
+                            return Err(SodsError::PatternError(format!("Quantifier too large (max {})", MAX_QUANTIFIER_VALUE)));
+                        }
 
                         if max_str.is_empty() {
                             // {n,}
@@ -116,17 +131,30 @@ impl BehavioralPattern {
                         } else {
                             // {n,m}
                             let max = max_str.parse::<usize>().map_err(|_| SodsError::PatternError(format!("Invalid max quantifier: {}", max_str)))?;
+                            if max > MAX_QUANTIFIER_VALUE {
+                                return Err(SodsError::PatternError(format!("Quantifier too large (max {})", MAX_QUANTIFIER_VALUE)));
+                            }
+                            if max < min {
+                                return Err(SodsError::PatternError(format!("Max quantifier {} must be >= min {}", max, min)));
+                            }
                             steps.push(PatternStep::Range(symbol, min, max, condition));
                         }
                     } else {
                         // {n} exact count shorthand -> treat as Range(n, n)
                         let count = quantifier.trim().parse::<usize>().map_err(|_| SodsError::PatternError(format!("Invalid exact quantifier: {}", quantifier)))?;
+                        if count > MAX_QUANTIFIER_VALUE {
+                            return Err(SodsError::PatternError(format!("Quantifier too large (max {})", MAX_QUANTIFIER_VALUE)));
+                        }
                         steps.push(PatternStep::Range(symbol, count, count, condition));
                     }
                 } else {
-                    return Err(SodsError::PatternError(format!("Unmatched '{{' in pattern: {}", part_base)));
+                    return Err(SodsError::PatternError(format!("Unclosed quantifier: expected '}}' in segment '{}'", part_base)));
                 }
             } else {
+                // Check if we have an unmatched '}'
+                if part_base.contains('}') {
+                    return Err(SodsError::PatternError("Unmatched '}' in pattern".into()));
+                }
                 // Single symbol
                 // Validation: Symbol name must be alphanumeric + simple chars (+, -, _) 
                 // and MUST NOT contain control characters or null bytes.
