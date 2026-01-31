@@ -6292,6 +6292,7 @@ dependencies = [
  "sods-core",
  "thiserror 1.0.69",
  "tiny-keccak",
+ "tokio",
 ]
 
 [[package]]
@@ -6306,6 +6307,7 @@ dependencies = [
  "colored",
  "daemonize",
  "dirs",
+ "ethers",
  "ethers-core",
  "ethers-signers",
  "futures-util",
@@ -6320,6 +6322,7 @@ dependencies = [
  "reqwest 0.11.27",
  "serde",
  "serde_json",
+ "sods-causal",
  "sods-core",
  "sods-p2p",
  "sods-verifier",

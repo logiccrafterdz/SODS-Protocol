@@ -30,4 +30,4 @@ sods-core = { path = "../sods-core" }
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 
 [dev-dependencies]
-# No additional dev dependencies needed
+tokio = { version = "1.0", features = ["full"] }

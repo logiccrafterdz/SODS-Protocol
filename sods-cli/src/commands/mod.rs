@@ -14,3 +14,5 @@ pub mod hash_pattern;
 pub mod zk_prove;
 pub mod registry;
 pub mod listen;
+pub mod register_agent;
+pub mod agent;

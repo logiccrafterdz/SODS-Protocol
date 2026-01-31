@@ -5,6 +5,8 @@
 mod commands;
 mod config;
 mod output;
+#[cfg(feature = "api")]
+mod api;
 
 use clap::{Parser, Subcommand};
 
@@ -60,6 +62,9 @@ enum Commands {
 
     /// Listen for live behavioral alerts via WebSocket
     Listen(commands::listen::ListenArgs),
+
+    /// Manage ERC-8004 agent identity and services
+    Agent(commands::agent::AgentArgs),
 }
 
 fn main() {
@@ -92,6 +97,7 @@ fn main() {
             Commands::ZkProve(args) => commands::zk_prove::run(args).await,
             Commands::Registry(args) => commands::registry::run(args),
             Commands::Listen(args) => commands::listen::run(args).await,
+            Commands::Agent(args) => commands::agent::run(args).await,
             Commands::Daemon(_) => unreachable!(), // Handled above
         }
     });
