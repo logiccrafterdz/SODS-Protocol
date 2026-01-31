@@ -178,8 +178,8 @@ impl BehavioralSymbol {
         // Include causality fields if non-zero (to affect hash)
         if self.tx_hash != H256::zero() {
              hasher.update(self.tx_hash.as_bytes());
-             hasher.update(&self.nonce.to_be_bytes());
-             hasher.update(&self.call_sequence.to_be_bytes());
+             hasher.update(self.nonce.to_be_bytes());
+             hasher.update(self.call_sequence.to_be_bytes());
         }
 
         hasher.finalize().into()

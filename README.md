@@ -211,6 +211,10 @@ let event = CausalEvent::builder()
     .build()?;
 
 recorder.record_event(event)?;
+
+let tree = recorder.build_merkle_tree(agent_address)?;
+let proof = tree.generate_proof(0);
+assert!(proof.verify());
 ```
 
 ### sods-cli (Layer 3)

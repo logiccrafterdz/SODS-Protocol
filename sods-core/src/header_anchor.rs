@@ -93,8 +93,8 @@ pub fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
 /// Keys are RLP-encoded indices, values are RLP-encoded receipts.
 pub fn compute_receipts_root(receipts: &[TransactionReceipt]) -> H256 {
     if receipts.is_empty() {
-        // Empty trie root = keccak256(RLP(""))
-        return H256::from_slice(&Keccak256::digest(&[0x80]));
+        // Empty trie root
+        return H256::from_slice(&Keccak256::digest([0x80]));
     }
 
     let encoded_receipts: Vec<Vec<u8>> = receipts.iter().map(rlp_encode_receipt).collect();

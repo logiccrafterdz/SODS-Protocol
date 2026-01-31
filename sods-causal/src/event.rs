@@ -25,6 +25,7 @@
 //! ```
 
 use ethers::types::{Address, H256};
+use ethers::utils::rlp::{Encodable, RlpStream};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
@@ -96,6 +97,27 @@ impl CausalEvent {
         }
 
         Ok(())
+    }
+
+    /// RLP-encodes the event for Merkle tree inclusion.
+    pub fn rlp_encode(&self) -> Vec<u8> {
+        let mut stream = RlpStream::new_list(8);
+        stream.append(&self.agent_id);
+        stream.append(&self.nonce);
+        stream.append(&self.sequence_index);
+        stream.append(&self.event_type);
+        stream.append(&self.task_id);
+        stream.append(&self.result);
+        stream.append(&self.timestamp);
+        stream.append(&self.metadata_hash);
+        stream.out().to_vec()
+    }
+}
+
+impl Encodable for CausalEvent {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        let bytes = self.rlp_encode();
+        s.append_raw(&bytes, 1);
     }
 }
 
