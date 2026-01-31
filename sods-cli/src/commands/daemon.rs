@@ -579,7 +579,7 @@ async fn run_daemon_loop(
     if let Some(ref m) = _metrics {
         let m_clone = m.clone();
         tokio::spawn(async move {
-            use sysinfo::{System, SystemExt, ProcessExt};
+            use sysinfo::System;
             let mut sys = System::new();
             let pid = sysinfo::get_current_pid().ok();
             loop {
