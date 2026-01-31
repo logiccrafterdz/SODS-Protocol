@@ -67,11 +67,14 @@ Sorted binary Merkle trees containing behavioral symbols.
 - **Goal**: Provide a unique, deterministic commitment to the block's behavior for simple presence verification.
 - **Current Status**: Active in v1.0 - v7.0.
 
-### 2. **Causal Merkle Trees (CMT) — PLANNED FOR V8.0**
-Sorted by `(Origin, Nonce, Sequence)` to reconstruct coherent narratives.
-- **Goal**: Prove that a sequence of events (e.g. `Tf -> Sw -> Tf`) was executed by a single actor in a specific order.
-- **Verification**: Proofs must demonstrate contiguous nonces to be valid.
-- **Current Status**: **Not implemented**. Planned for the v8.0 Roadmap.
+### 2. **Causal Merkle Trees (CMT) — Implemented in v7.1**
+The `sods-causal` crate provides full Causal Merkle Tree functionality:
+- Actor-attributed event sequencing via `(nonce, sequence_index)` ordering
+- RLP-encoded leaf hashing for EVM compatibility  
+- Behavioral pattern matching with time windows
+- Integration with ERC-8004 as a Trustless Agent
+
+**Status**: Production-ready (v7.1). See [sods-causal/README.md](sods-causal/README.md) for detailed usage.
 
 ### 3. **Behavioral Symbols**
 Standardized event representations (e.g., `Tf`, `Sw`) derived from raw logs, enriched with causality metadata (`tx_hash`, `nonce`).
@@ -243,7 +246,8 @@ The RPC layer implements **Cache Stampede Prevention** using double-checked lock
 | v3.0 | Zero-RPC Release (Storage Proofs) |
 | v4.0 | Hybrid Trust Model & Adaptive Quorum |
 | v7.0 | Implementation Stable (Current) |
-| v8.0 | **Planned**: Causal Merkle Trees (CMT) & Actor Attribution |
+| v7.1 | Causal Merkle Trees (CMT) & Actor Attribution |
+| v8.0 | **Planned**: Advanced Cross-Chain Behavioral Inference |
 
 ## Version History
 

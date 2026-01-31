@@ -306,6 +306,22 @@ SODS is hardened for unreliable L2 public RPCs (Scroll, Polygon zkEVM, Base, etc
 ### Using Custom RPCs with Fallback
 If you provide a custom RPC URL via `--rpc-url`, SODS will use that as the primary endpoint but still maintain the ability to fallback to public defaults if yours becomes unavailable.
 
+## Zero-RPC Verification Mode
+
+SODS supports completely trustless verification without relying on RPC log data:
+
+```bash
+sods verify "Tf" --block 290000000 --chain arbitrum --mode storage-proof
+```
+
+This mode:
+- Uses `eth_getProof` to fetch storage proofs
+- Reconstructs receipts root from Merkle Patricia Trie
+- Validates against block header's `receiptsRoot`
+- Works on all supported L2s (Arbitrum, Optimism, Base, etc.)
+
+**Note**: Requires RPC provider support for `eth_getProof` (Alchemy, Infura, etc.)
+
 ## On-Chain Verification (New in v1.4)
 
 Generate behavioral proofs that can be verified inside Ethereum smart contracts:

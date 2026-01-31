@@ -36,7 +36,7 @@ pub struct VerifyArgs {
     #[arg(short, long, default_value = "sepolia")]
     pub chain: String,
 
-    /// Verification mode
+    /// Verification mode: 'rpc' (default), 'p2p', 'trustless', or 'storage-proof' (Zero-RPC trustless)
     #[arg(short, long, default_value = "auto")]
     pub mode: Mode,
 

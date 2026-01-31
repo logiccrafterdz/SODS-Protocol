@@ -66,6 +66,16 @@ cargo install sods-cli
 npx sods-cli verify "Sandwich" --block 20000000 --chain ethereum
 ```
 
+## Platform Support
+
+| Platform | CLI | Docker | npm Wrapper |
+|----------|-----|--------|-------------|
+| Linux    | ✅  | ✅     | ✅          |
+| macOS    | ✅  | ✅     | ✅          |
+| Windows  | ✅  | ✅     | ✅ (WSL2)   |
+
+**Note**: npm wrapper requires Docker to be installed.
+
 ---
 
 ## Getting Started
