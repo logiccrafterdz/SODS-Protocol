@@ -1,0 +1,40 @@
+name: npm Wrapper Cross-Platform Tests
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "sods-cli-wrapper/**"
+    pull_request:
+        branches: [main]
+        paths:
+            - "sods-cli-wrapper/**"
+
+jobs:
+    test:
+        name: Test on ${{ matrix.os }} (Node ${{ matrix.node-version }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+                node-version: [18.x, 20.x, 22.x]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Use Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  cache: "npm"
+                  cache-dependency-path: sods-cli-wrapper/package.json
+
+            - name: Install dependencies
+              run: |
+                  cd sods-cli-wrapper
+                  npm install
+
+            - name: Run tests
+              run: |
+                  cd sods-cli-wrapper
+                  npm test

@@ -1,23 +1,30 @@
 # sods-cli
 
-npm wrapper for SODS Protocol CLI.
+Trustless behavioral verification for blockchain data.
 
-Requires Docker to be installed.
+This package provides a seamless way to run the SODS CLI using `npx` without needing to install the Rust toolchain manually. It wraps the official SODS Docker image for cross-platform reliability.
 
-This package provides a seamless way to run the SODS CLI using `npx` without needing to install the Rust toolchain manually.
-
-## Installation
-
-You don't need to install this package. Simply use `npx`:
+## Quick Start
 
 ```bash
 npx sods-cli verify "Sandwich" --block 20000000 --chain ethereum
 ```
 
+## Platform Support
+
+| Platform | Node.js | Docker | npm Wrapper |
+|----------|---------|--------|-------------|
+| Linux    | ✅ 18+  | ✅ 20.10+ | ✅         |
+| macOS    | ✅ 18+  | ✅ 20.10+ | ✅         |
+| Windows  | ✅ 18+  | ✅ 20.10+ | ✅ (WSL2)  |
+
+> [!NOTE]
+> Windows requires Docker Desktop with the WSL2 backend enabled.
+
 ## Requirements
 
-- **Docker**: Must be installed and running on your system.
-- **Node.js**: Version 12 or higher.
+- **Docker**: Must be installed and running. [Get Docker](https://docs.docker.com/get-docker/)
+- **Node.js**: Version 18.0 or higher.
 
 ## License
 
