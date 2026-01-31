@@ -2957,7 +2957,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "socket2 0.6.1",
- "system-configuration 0.5.1",
+ "system-configuration 0.6.1",
  "tokio",
  "tower-service",
  "tracing",
@@ -6426,17 +6426,20 @@ version = "0.2.0"
 dependencies = [
  "ethers-core",
  "ethers-providers",
+ "hash-db",
  "hex",
  "libp2p",
  "lru",
  "rand 0.8.5",
  "serde",
+ "serde_json",
  "sha3",
  "sods-core",
  "sods-p2p",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
+ "triehash",
 ]
 
 [[package]]

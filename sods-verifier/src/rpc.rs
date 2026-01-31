@@ -74,6 +74,11 @@ impl RpcClient {
         self
     }
 
+    /// Set the backoff profile on an existing client.
+    pub fn set_backoff_profile(&mut self, profile: BackoffProfile) {
+        self.backoff_profile = profile;
+    }
+
     fn current_provider(&self) -> Arc<Provider<Http>> {
         let idx = self.current_provider_index.load(std::sync::atomic::Ordering::Relaxed);
         self.providers[idx % self.providers.len()].clone()

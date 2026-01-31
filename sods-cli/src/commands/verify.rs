@@ -176,67 +176,49 @@ pub async fn run(args: VerifyArgs) -> i32 {
     let start = std::time::Instant::now();
     
     // Determine if header proof (Trustless Mode) is required
-    let require_header = match args.mode {
+    let _require_header = match args.mode {
         Mode::Trustless => true,
         _ => !args.no_header_proof,
     };
 
     // Choose verifier based on requirements
-    let verifier: sods_verifier::BlockVerifier = if !require_header {
-        match sods_verifier::BlockVerifier::new_rpc_only(&rpc_urls) {
-            Ok(v) => v.with_backoff_profile(profile),
-            Err(e) => {
-                if args.json {
-                    let output = JsonOutput {
-                        success: false,
-                        symbol: args.symbol.clone(),
-                        block: args.block,
-                        chain: args.chain.clone(),
-                        verified: false,
-                        occurrences: 0,
-                        proof_size_bytes: 0,
-                        time_ms: start.elapsed().as_millis() as u64,
-                        method: "rpc".into(),
-                        verification_mode: "rpc_only".into(),
-                        error: Some(format!("Failed to create verifier: {}", e)),
-                        matched_sequence: None,
-                    };
-                    println!("{}", serde_json::to_string_pretty(&output).unwrap());
-                } else {
-                    output::error(&format!("Failed to initialize RPCs: {}", e));
-                    output::hint("Check your network connection or RPC endpoints.");
-                }
-                return 1;
+    let verifier: sods_verifier::BlockVerifier = match args.mode {
+        Mode::Rpc => sods_verifier::BlockVerifier::new_rpc_only(&rpc_urls),
+        Mode::StorageProof => sods_verifier::BlockVerifier::new_zero_rpc(&rpc_urls),
+        Mode::Trustless => sods_verifier::BlockVerifier::new(&rpc_urls),
+        _ => {
+            if args.no_header_proof {
+                sods_verifier::BlockVerifier::new_rpc_only(&rpc_urls)
+            } else {
+                sods_verifier::BlockVerifier::new(&rpc_urls)
             }
         }
-    } else {
-        match sods_verifier::BlockVerifier::new(&rpc_urls) {
-            Ok(v) => v.with_backoff_profile(profile),
-            Err(e) => {
-                if args.json {
-                    let output = JsonOutput {
-                        success: false,
-                        symbol: args.symbol.clone(),
-                        block: args.block,
-                        chain: args.chain.clone(),
-                        verified: false,
-                        occurrences: 0,
-                        proof_size_bytes: 0,
-                        time_ms: start.elapsed().as_millis() as u64,
-                        method: "rpc".into(),
-                        verification_mode: "trustless".into(),
-                        error: Some(format!("Failed to create verifier: {}", e)),
-                        matched_sequence: None,
-                    };
-                    println!("{}", serde_json::to_string_pretty(&output).unwrap());
-                } else {
-                    output::error(&format!("Failed to initialize RPCs: {}", e));
-                    output::hint("Check your network connection or RPC endpoints.");
-                }
-                return 1;
-            }
+    }
+    .map_err(|e| {
+        if args.json {
+            let output = JsonOutput {
+                success: false,
+                symbol: args.symbol.clone(),
+                block: args.block,
+                chain: args.chain.clone(),
+                verified: false,
+                occurrences: 0,
+                proof_size_bytes: 0,
+                time_ms: start.elapsed().as_millis() as u64,
+                method: "rpc".into(),
+                verification_mode: format!("{:?}", args.mode).to_lowercase(),
+                error: Some(format!("Failed to create verifier: {}", e)),
+                matched_sequence: None,
+            };
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        } else {
+            output::error(&format!("Failed to initialize RPCs: {}", e));
+            output::hint("Check your network connection or RPC endpoints.");
         }
-    };
+        e
+    }).unwrap();
+
+    let verifier = verifier.with_backoff_profile(profile);
 
     // Pre-flight health check
     if !verifier.health_check().await {

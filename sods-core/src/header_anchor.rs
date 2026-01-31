@@ -1,5 +1,6 @@
 use ethers_core::types::{TransactionReceipt, H256};
 use ethers_core::utils::rlp::RlpStream;
+use ethers_core::utils::hex;
 use sha3::{Digest, Keccak256};
 use hash_db::Hasher;
 
@@ -14,28 +15,23 @@ impl Hasher for KeccakHasher {
     }
 }
 
-/// RLP-encode a receipt for trie inclusion.
-///
-/// Receipts are encoded as:
-/// - Legacy: RLP([status, cumulative_gas, logs_bloom, logs])
-/// - EIP-2718: type_byte || RLP([status, cumulative_gas, logs_bloom, logs])
-///
-/// Note: Arbitrum and Optimism may have additional fields at the end of the list.
 pub fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
     // Determine the list size. Standard is 4.
     // L2s might append additional fields.
-    // For Optimism Bedrock: some receipts are standard, others might have depositNonce.
-    // However, `ethers-core`'s TransactionReceipt doesn't expose L2 fields directly.
-    // We use `receipt.other` if available or assume standard for now but prepare the structure.
+    let mut list_size = 4;
     
-    let list_size = 4;
+    // Check for L2 specific fields in `other` map that are part of the consensus commitment.
+    // Optimism Bedrock: Deposit receipts (type 0x7E/126) include depositNonce and depositReceiptVersion.
+    // L1 information fields (l1BlockNumber, l1Fee, etc.) are usually NOT part of the receiptsRoot.
+    let l2_fields: Vec<&serde_json::Value> = [
+        "depositNonce", 
+        "depositReceiptVersion"
+    ]
+        .iter()
+        .filter_map(|key| receipt.other.get(*key))
+        .collect();
     
-    // Check for L2 specific fields in `other` map (if supported by the provider)
-    let has_l2_fields = !receipt.other.is_empty();
-    if has_l2_fields {
-        // This is a heuristic: if there are extra fields, we might need a longer RLP list.
-        // For Optimism, we often see 4 fields. For Arbitrum, it varies by version.
-    }
+    list_size += l2_fields.len();
 
     let mut stream = RlpStream::new_list(list_size);
 
@@ -65,10 +61,55 @@ pub fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
         stream.append(&log.data.to_vec());
     }
 
-    // --- L2 Specific Extensions ---
-    // In a full implementation, we would check the chain_id or receipt metadata
-    // to append fields like `depositNonce` (Optimism) or `cumulativeGasUsed` variants (Arbitrum).
-    // For v1.2, we stick to the 4 standard fields but allow extension points.
+    // Append L2 fields if present
+    for value in l2_fields {
+        if let Some(n) = value.as_u64() {
+            stream.append(&n);
+        } else if let Some(s) = value.as_str() {
+            if s.starts_with("0x") {
+                let hex_str = if s.len() % 2 != 0 {
+                    format!("0{}", &s[2..])
+                } else {
+                    s[2..].to_string()
+                };
+                let bytes = hex::decode(&hex_str).unwrap_or_default();
+                // If the bytes represent a number, we might want to append as a number
+                // but usually they are appended as raw bytes in these L2 extensions.
+                stream.append(&bytes);
+            } else {
+                stream.append(&s);
+            }
+        } else if let Some(b) = value.as_bool() {
+            stream.append(&b);
+        } else if value.is_null() {
+            stream.append_empty_data();
+        } else if let Some(arr) = value.as_array() {
+            stream.begin_list(arr.len());
+            for item in arr {
+                if let Some(n) = item.as_u64() {
+                    stream.append(&n);
+                } else if let Some(s) = item.as_str() {
+                    if s.starts_with("0x") {
+                        let hex_str = if s.len() % 2 != 0 {
+                            format!("0{}", &s[2..])
+                        } else {
+                            s[2..].to_string()
+                        };
+                        let bytes = hex::decode(&hex_str).unwrap_or_default();
+                        stream.append(&bytes);
+                    } else {
+                        stream.append(&s);
+                    }
+                } else if let Some(b) = item.as_bool() {
+                    stream.append(&b);
+                } else {
+                    stream.append_empty_data();
+                }
+            }
+        } else {
+            stream.append_empty_data();
+        }
+    }
 
     let rlp_bytes = stream.out().to_vec();
 
@@ -76,8 +117,6 @@ pub fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
     if let Some(t) = receipt.transaction_type {
         let t_u64 = t.as_u64();
         if t_u64 > 0 {
-            // Type 0x7E is Optimism Deposit
-            // Type 0x64 is Arbitrum
             let mut typed = vec![t_u64 as u8];
             typed.extend(rlp_bytes);
             return typed;
