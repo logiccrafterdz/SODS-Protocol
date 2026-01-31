@@ -47,6 +47,7 @@ tokio-test = "0.4"
 serde_json = "1.0"
 triehash = "0.8.4"
 hash-db = "0.15.2"
+futures = "0.3"
 
 [[test]]
 name = "ci_beacon_fallback"
