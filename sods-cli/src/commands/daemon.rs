@@ -30,10 +30,8 @@ use daemonize::Daemonize;
 use std::fs::File;
 
 #[cfg(unix)]
-use crate::config::get_chain;
-use crate::output;
-#[cfg(unix)]
 use serde_json::json;
+use crate::output;
 #[cfg(unix)]
 use sods_p2p::{SodsPeer, ThreatRule};
 

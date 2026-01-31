@@ -35,10 +35,5 @@ pub async fn run(args: AgentArgs) -> i32 {
             }
             0
         }
-        #[cfg(not(feature = "api"))]
-        AgentCommands::Serve(_) => {
-            eprintln!("Error: API feature is disabled. Recompile with --features api");
-            1
-        }
     }
 }
