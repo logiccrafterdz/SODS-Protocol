@@ -58,11 +58,13 @@ pub mod event;
 pub mod recorder;
 pub mod tree;
 pub mod proof;
+pub mod pattern;
 
 // Re-export main types for convenience
 pub use error::{CausalError, Result};
 pub use event::{CausalEvent, CausalEventBuilder, VALID_RESULTS};
 pub use recorder::CausalEventRecorder;
 pub use tree::CausalMerkleTree;
-pub use proof::CausalProof;
+pub use proof::{CausalProof, CausalBehavioralProof};
+pub use pattern::{AgentBehaviorPattern, generate_behavioral_proof};
 

@@ -58,3 +58,53 @@ impl CausalProof {
         current_hash == self.root
     }
 }
+
+/// A verifiable proof of a complex behavioral claim.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CausalBehavioralProof {
+    /// The pattern that was matched.
+    pub pattern: crate::pattern::AgentBehaviorPattern,
+    /// The events that satisfy the pattern.
+    pub matched_events: Vec<crate::event::CausalEvent>,
+    /// Individual Merkle proofs for each matched event.
+    pub event_proofs: Vec<CausalProof>,
+    /// The root hash of the agent's full history.
+    pub agent_root: ethers::types::H256,
+}
+
+impl CausalBehavioralProof {
+    /// Verifies the behavioral proof.
+    ///
+    /// 1. Verifies each individual event proof against agent_root.
+    /// 2. Verifies that the matched events satisfy the pattern.
+    pub fn verify(&self, now: u64) -> bool {
+        // Ensure we have correct number of proofs
+        if self.matched_events.len() != self.event_proofs.len() {
+            return false;
+        }
+
+        // Verify each event proof
+        for (i, proof) in self.event_proofs.iter().enumerate() {
+            // Check that proof matches the claimed event
+            if proof.event != self.matched_events[i] {
+                return false;
+            }
+            // Check against claimed root
+            if proof.root != self.agent_root {
+                return false;
+            }
+            // Cryptographic verification
+            if !proof.verify() {
+                return false;
+            }
+        }
+
+        // Apply pattern matching logic to the RECONSTRUCTED events
+        let matches = self.pattern.matches(&self.matched_events, now);
+        
+        // The claim is that matched_events satisfy the pattern.
+        // If we apply the pattern to matched_events and get back the SAME list, then it's valid.
+        // Also check count constraints.
+        matches.len() == self.matched_events.len() && matches.len() >= self.pattern.min_count as usize
+    }
+}

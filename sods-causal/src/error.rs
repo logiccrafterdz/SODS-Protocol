@@ -37,6 +37,10 @@ pub enum CausalError {
     /// Serialization or deserialization error.
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+
+    /// Internal consistency or logic error.
+    #[error("Internal error: {0}")]
+    InternalError(String),
 }
 
 /// Result type alias for causal operations.
