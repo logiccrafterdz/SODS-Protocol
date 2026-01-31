@@ -190,6 +190,29 @@ let valid: bool = receipt.journal.decode()?;
 > [!NOTE]
 > ZK features are now **optional** (`zk` feature flag) to ensure cross-platform buildability on Windows and other non-Unix systems.
 
+### sods-causal (Layer 0.5)
+
+The causal event model for agent behavior. Handles:
+
+- Atomic behavioral event definitions
+- Strict causal ordering via nonces and sequence indices
+- Multi-agent event history recording and validation
+
+```rust
+use sods_causal::{CausalEvent, CausalEventRecorder};
+
+let mut recorder = CausalEventRecorder::new();
+let event = CausalEvent::builder()
+    .agent_id(agent_address)
+    .nonce(0)
+    .sequence_index(0)
+    .event_type("task_executed")
+    .result("success")
+    .build()?;
+
+recorder.record_event(event)?;
+```
+
 ### sods-cli (Layer 3)
 
 Command-line interface for SODS Protocol. Provides:
@@ -501,6 +524,13 @@ sods-protocol/
 │       ├── result.rs
 │       ├── rpc.rs
 │       └── verifier.rs
+├── sods-causal/       <- Layer 0.5: Causal Event Model (Rust)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── event.rs
+│       ├── recorder.rs
+│       └── error.rs
 ├── sods-zk/            <- Layer 2.5: ZK behavioral proofs (Rust)
 │   ├── Cargo.toml
 │   ├── src/
