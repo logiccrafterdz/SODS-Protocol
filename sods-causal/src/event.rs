@@ -32,7 +32,7 @@ use std::cmp::Ordering;
 use crate::error::{CausalError, Result};
 
 /// Valid result values for causal events.
-pub const VALID_RESULTS: &[&str] = &["success", "failure", "partial", "timeout"];
+pub const VALID_RESULTS: &[&str] = &["success", "failure", "partial", "timeout", "profit", "loss"];
 
 /// Atomic unit of agent behavior in the causal event model.
 ///
