@@ -11,6 +11,8 @@ use futures_util::{StreamExt, SinkExt};
 use tracing::{info, warn, debug, error};
 #[cfg(feature = "metrics")]
 use crate::monitoring::metrics::AgentMetrics;
+#[cfg(not(feature = "metrics"))]
+type AgentMetrics = ();
 
 #[cfg(unix)]
 use std::fs;
@@ -236,10 +238,7 @@ impl WebSocketServer {
 
 // AgentMetrics is now defined in crate::monitoring::metrics
 
-// Stub for optional _metrics
-#[cfg(not(feature = "metrics"))]
-#[derive(Clone)]
-pub struct MetricsServer;
+// MonitoringTarget is used to track patterns in the daemon loop
 
 #[derive(Clone)]
 pub(crate) struct MonitoringTarget {
@@ -323,9 +322,9 @@ fn start_daemon(
     let log_file = get_log_file();
 
     // _metrics Server Setup
-    let _metrics = metrics_port.and_then(|_port| {
+    let _metrics: Option<Arc<AgentMetrics>> = metrics_port.and_then(|_port| {
         #[cfg(feature = "metrics")]
-        { MetricsServer::new().ok().map(|m| Arc::new(m)) }
+        { AgentMetrics::new().ok().map(|m| Arc::new(m)) }
         #[cfg(not(feature = "metrics"))]
         { None }
     });
