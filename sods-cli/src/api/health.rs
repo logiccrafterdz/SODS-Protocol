@@ -1,9 +1,9 @@
 use serde::{Serialize, Deserialize};
-use axum::{extract::State, http::StatusCode};
+use axum::{extract::State, http::StatusCode, Json, Router, routing::get};
 use std::sync::Arc;
 use crate::monitoring::metrics::AgentMetrics;
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct HealthResponse {
     pub status: String,
     pub version: String,
@@ -11,7 +11,7 @@ pub struct HealthResponse {
     pub metrics: HealthMetrics,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Erc8004Status {
     pub identity_registered: bool,
     pub validation_registry_connected: bool,
@@ -19,14 +19,14 @@ pub struct Erc8004Status {
     pub escrow_contract_accessible: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct HealthMetrics {
     pub uptime_seconds: u64,
     pub validation_success_rate: f64,
     pub quality_score: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct ReadyResponse {
     pub status: String,
 }
@@ -77,8 +77,8 @@ where S: HealthState {
         let erc8004_status = Erc8004Status {
             identity_registered: total_requests > 0.0, // Simplified check
             validation_registry_connected: total_requests > 0.0,
-            reputation_registry_connected: metrics.feedback_received_total.get() > 0,
-            escrow_contract_accessible: metrics.payments_received_total.get() > 0,
+            reputation_registry_connected: metrics.feedback_received_total.get() > 0.0,
+            escrow_contract_accessible: metrics.payments_received_total.get() > 0.0,
         };
         
         // Build real metrics
@@ -119,7 +119,7 @@ pub async fn readiness_check<S>(State(state): State<S>) -> Result<Json<ReadyResp
 where S: HealthState {
     if let Some(metrics) = state.get_metrics() {
         let total_requests = metrics.validation_requests_received_total.get();
-        if total_requests > 0 {
+        if total_requests > 0.0 {
             // Agent has processed at least one request = ready
             return Ok(Json(ReadyResponse { status: "ready".to_string() }));
         }
@@ -131,11 +131,11 @@ where S: HealthState {
 
 pub fn router<S>() -> Router<S>
 where
-    S: Clone + Send + Sync + 'static,
+    S: HealthState + Clone + Send + Sync + 'static,
 {
     Router::new()
-        .route("/health", get(health_check))
-        .route("/health/ready", get(readiness_check))
+        .route("/health", get(health_check::<S>))
+        .route("/health/ready", get(readiness_check::<S>))
 }
 #[cfg(test)]
 mod tests {
