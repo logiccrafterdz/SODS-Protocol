@@ -1,17 +1,9 @@
-//! SODS Protocol CLI
-//!
-//! Terminal-first interface for on-chain behavioral verification.
-
-mod commands;
-mod config;
-mod output;
-#[cfg(feature = "api")]
-mod api;
-#[cfg(feature = "metrics")]
-mod monitoring;
-mod logging;
-
+use sods_cli::{commands, logging};
 use clap::{Parser, Subcommand};
+#[cfg(feature = "api")]
+use sods_cli::api;
+#[cfg(feature = "metrics")]
+use sods_cli::monitoring;
 
 #[derive(Parser)]
 #[command(name = "sods")]

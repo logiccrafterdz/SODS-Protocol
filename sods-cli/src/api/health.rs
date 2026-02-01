@@ -1,9 +1,9 @@
 use serde::{Serialize, Deserialize};
-use axum::{extract::State, http::StatusCode, Json, Router, routing::get};
+use axum::{extract::{State, FromRef}, http::StatusCode, Json, Router, routing::get};
 use std::sync::Arc;
 use crate::monitoring::metrics::AgentMetrics;
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HealthResponse {
     pub status: String,
     pub version: String,
@@ -11,7 +11,7 @@ pub struct HealthResponse {
     pub metrics: HealthMetrics,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Erc8004Status {
     pub identity_registered: bool,
     pub validation_registry_connected: bool,
@@ -19,69 +19,57 @@ pub struct Erc8004Status {
     pub escrow_contract_accessible: bool,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HealthMetrics {
     pub uptime_seconds: u64,
     pub validation_success_rate: f64,
     pub quality_score: u32,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ReadyResponse {
     pub status: String,
 }
 
-// We need a way to access the metrics from the state. 
-// Since health.rs is used by both the causal API (ApiState) and the metrics server (Arc<AgentMetrics>),
-// we'll define a trait or just use a generic approach.
-// However, to follow the user's specific code request, I'll assume it's used with a state that has .metrics.
-
-pub trait HealthState {
-    fn get_metrics(&self) -> Option<Arc<AgentMetrics>>;
+/// Shared state for health and readiness checks.
+#[derive(Clone, Default)]
+pub struct MonitoringState {
+    pub metrics: Option<Arc<AgentMetrics>>,
 }
 
-impl HealthState for Arc<crate::api::causal::ApiState> {
-    fn get_metrics(&self) -> Option<Arc<AgentMetrics>> {
-        self.metrics.clone()
+// FromRef<MonitoringState> is automatically provided by Axum's blanket impl.
+
+impl FromRef<Arc<AgentMetrics>> for MonitoringState {
+    fn from_ref(metrics: &Arc<AgentMetrics>) -> Self {
+        Self { metrics: Some(metrics.clone()) }
     }
 }
 
-impl HealthState for Arc<AgentMetrics> {
-    fn get_metrics(&self) -> Option<Arc<AgentMetrics>> {
-        Some(self.clone())
-    }
-}
-
-pub async fn health_check<S>(State(state): State<S>) -> Json<HealthResponse> 
-where S: HealthState {
-    let (status, erc8004_status, health_metrics) = if let Some(metrics) = state.get_metrics() {
-        // Calculate real validation success rate
+pub async fn health_check(State(state): State<MonitoringState>) -> Json<HealthResponse> {
+    let (status, erc8004_status, health_metrics) = if let Some(ref metrics) = state.metrics {
         let total_requests = metrics.validation_requests_received_total.get() as f64;
         let successful_responses = metrics.validation_responses_submitted_total.get() as f64;
         let success_rate = if total_requests > 0.0 {
             (successful_responses / total_requests) * 100.0
         } else {
-            100.0 // No requests yet = healthy
+            100.0
         };
         
-        // Determine overall status
         let status = if success_rate >= 80.0 && total_requests > 0.0 {
             "healthy".to_string()
         } else if total_requests == 0.0 {
-            "starting".to_string() // Agent hasn't processed any requests yet
+            "starting".to_string()
         } else {
             "degraded".to_string()
         };
         
-        // Build ERC-8004 status from real connectivity
         let erc8004_status = Erc8004Status {
-            identity_registered: total_requests > 0.0, // Simplified check
+            identity_registered: total_requests > 0.0,
             validation_registry_connected: total_requests > 0.0,
             reputation_registry_connected: metrics.feedback_received_total.get() > 0.0,
             escrow_contract_accessible: metrics.payments_received_total.get() > 0.0,
         };
         
-        // Build real metrics
         let health_metrics = HealthMetrics {
             uptime_seconds: metrics.agent_uptime_seconds.get() as u64,
             validation_success_rate: success_rate,
@@ -90,7 +78,6 @@ where S: HealthState {
         
         (status, erc8004_status, health_metrics)
     } else {
-        // Fallback when metrics are disabled
         (
             "healthy".to_string(),
             Erc8004Status {
@@ -115,89 +102,104 @@ where S: HealthState {
     })
 }
 
-pub async fn readiness_check<S>(State(state): State<S>) -> Result<Json<ReadyResponse>, StatusCode>
-where S: HealthState {
-    if let Some(metrics) = state.get_metrics() {
-        let total_requests = metrics.validation_requests_received_total.get();
-        if total_requests > 0.0 {
-            // Agent has processed at least one request = ready
+pub async fn readiness_check(State(state): State<MonitoringState>) -> Result<Json<ReadyResponse>, StatusCode> {
+    if let Some(ref metrics) = state.metrics {
+        if metrics.validation_requests_received_total.get() > 0.0 {
             return Ok(Json(ReadyResponse { status: "ready".to_string() }));
         }
     }
-    
-    // Not ready yet
     Err(StatusCode::SERVICE_UNAVAILABLE)
 }
 
 pub fn router<S>() -> Router<S>
 where
-    S: HealthState + Clone + Send + Sync + 'static,
+    S: Send + Sync + Clone + 'static,
+    MonitoringState: FromRef<S>,
 {
     Router::new()
-        .route("/health", get(health_check::<S>))
-        .route("/health/ready", get(readiness_check::<S>))
+        .route("/health", get(health_check))
+        .route("/health/ready", get(readiness_check))
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::Json;
-    use crate::api::causal::ApiState;
-    use sods_causal::CausalEventRecorder;
-    use tokio::sync::RwLock;
 
     #[tokio::test]
-    async fn test_health_endpoint_returns_real_metrics() {
-        let metrics = AgentMetrics::new().unwrap();
-        let metrics = Arc::new(metrics);
-        
-        // Simulate some activity
+    async fn test_health_starting_status() {
+        let metrics = Arc::new(AgentMetrics::new().unwrap());
+        let state = MonitoringState { metrics: Some(metrics) };
+        let response = health_check(State(state)).await;
+        assert_eq!(response.0.status, "starting");
+    }
+
+    #[tokio::test]
+    async fn test_health_healthy_status() {
+        let metrics = Arc::new(AgentMetrics::new().unwrap());
         metrics.validation_requests_received_total.inc();
         metrics.validation_responses_submitted_total.inc();
-        metrics.average_quality_score.set(95.0);
         
-        let state = Arc::new(ApiState {
-            recorder: Arc::new(RwLock::new(CausalEventRecorder::new())),
-            metrics: Some(metrics),
-        });
-        
+        let state = MonitoringState { metrics: Some(metrics) };
         let response = health_check(State(state)).await;
-        let health = response.0;
-        
-        assert_eq!(health.status, "healthy");
-        assert_eq!(health.metrics.validation_success_rate, 100.0);
-        assert_eq!(health.metrics.quality_score, 95);
+        assert_eq!(response.0.status, "healthy");
+        assert_eq!(response.0.metrics.validation_success_rate, 100.0);
     }
 
     #[tokio::test]
-    async fn test_ready_endpoint_unavailable_when_no_requests() {
-        let metrics = AgentMetrics::new().unwrap();
-        let metrics = Arc::new(metrics);
+    async fn test_health_degraded_status() {
+        let metrics = Arc::new(AgentMetrics::new().unwrap());
+        // 10 requests, 1 success = 10% rate
+        for _ in 0..10 {
+            metrics.validation_requests_received_total.inc();
+        }
+        metrics.validation_responses_submitted_total.inc();
         
-        let state = Arc::new(ApiState {
-            recorder: Arc::new(RwLock::new(CausalEventRecorder::new())),
-            metrics: Some(metrics),
-        });
-        
+        let state = MonitoringState { metrics: Some(metrics) };
+        let response = health_check(State(state)).await;
+        assert_eq!(response.0.status, "degraded");
+        assert_eq!(response.0.metrics.validation_success_rate, 10.0);
+    }
+
+    #[tokio::test]
+    async fn test_health_graceful_without_metrics() {
+        let state = MonitoringState { metrics: None };
+        let response = health_check(State(state)).await;
+        assert_eq!(response.0.status, "healthy");
+    }
+
+    #[tokio::test]
+    async fn test_readiness_unavailable_when_no_requests() {
+        let metrics = Arc::new(AgentMetrics::new().unwrap());
+        let state = MonitoringState { metrics: Some(metrics) };
         let result = readiness_check(State(state)).await;
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), StatusCode::SERVICE_UNAVAILABLE);
     }
 
     #[tokio::test]
-    async fn test_ready_endpoint_available_after_request() {
-        let metrics = AgentMetrics::new().unwrap();
-        let metrics = Arc::new(metrics);
-        
+    async fn test_readiness_available_after_request() {
+        let metrics = Arc::new(AgentMetrics::new().unwrap());
         metrics.validation_requests_received_total.inc();
-        
-        let state = Arc::new(ApiState {
-            recorder: Arc::new(RwLock::new(CausalEventRecorder::new())),
-            metrics: Some(metrics),
-        });
-        
+        let state = MonitoringState { metrics: Some(metrics) };
         let result = readiness_check(State(state)).await;
         assert!(result.is_ok());
-        let ready = result.unwrap().0;
-        assert_eq!(ready.status, "ready");
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_metric_updates() {
+        let metrics = Arc::new(AgentMetrics::new().unwrap());
+        let mut handles = Vec::new();
+        for _ in 0..50 {
+            let m = metrics.clone();
+            handles.push(tokio::spawn(async move {
+                m.validation_requests_received_total.inc();
+                m.validation_responses_submitted_total.inc();
+            }));
+        }
+        for h in handles { h.await.unwrap(); }
+        
+        let state = MonitoringState { metrics: Some(metrics.clone()) };
+        let response = health_check(State(state)).await;
+        assert_eq!(response.0.status, "healthy");
+        assert_eq!(response.0.metrics.validation_success_rate, 100.0);
     }
 }

@@ -14,10 +14,21 @@ use crate::monitoring::metrics::AgentMetrics;
 use crate::logging::ValidationLog;
 use tracing::info;
 
+use crate::api::health::MonitoringState;
+use axum::extract::FromRef;
+
 /// Shared state for the Causal API server.
 pub struct ApiState {
     pub recorder: Arc<tokio::sync::RwLock<CausalEventRecorder>>,
     pub metrics: Option<Arc<AgentMetrics>>,
+}
+
+impl FromRef<Arc<ApiState>> for MonitoringState {
+    fn from_ref(state: &Arc<ApiState>) -> Self {
+        MonitoringState {
+            metrics: state.metrics.clone(),
+        }
+    }
 }
 
 /// Request for proof generation.
