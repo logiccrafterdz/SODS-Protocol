@@ -43,12 +43,21 @@ Import the alerting rules provided in `config/alerts.yaml` into your Prometheus 
 
 Import the dashboard template located at `dashboards/sods-agent.json` into your Grafana instance to get a real-time overview of your agent's performance.
 
-## Health Checks
+## Health and Readiness Endpoints
 
-The agent provides standardized health endpoints for automated orchestration (e.g., Kubernetes Liveness/Readiness):
+The SODS agent exposes standard health check endpoints for monitoring and orchestration (e.g., Kubernetes probes).
 
-- **GET /health**: Returns the overall status, registry connectivity, and key metrics.
-- **GET /health/ready**: Returns HTTP 200 if the agent is ready to process requests.
+### `/health`
+Returns comprehensive real-time health status:
+- **status**: `healthy` (success_rate >= 80%), `degraded` (< 80%), or `starting` (no requests yet).
+- **version**: Current agent version.
+- **erc8004**: Connectivity matrix for registry and escrow services.
+- **metrics**: Live telemetry (uptime, success rate, latest quality score).
+
+### `/health/ready`
+Indicates if the agent is ready to process validation requests:
+- Returns `200 OK` (status: `ready`) once at least one validation has been processed.
+- Returns `503 Service Unavailable` during initial startup.
 
 ## Structured Logging
 

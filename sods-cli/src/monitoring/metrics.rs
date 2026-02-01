@@ -33,7 +33,7 @@ pub struct AgentMetrics {
     pub payments_received_total: Counter,
     pub payment_success_rate: Gauge,
     
-    pub agent_uptime_seconds: Counter,
+    pub agent_uptime_seconds: Gauge,
     pub last_validation_timestamp: Gauge,
 }
 
@@ -62,7 +62,7 @@ impl AgentMetrics {
         let average_quality_score = Gauge::new("sods_average_quality_score", "Average agent quality score")?;
         let payments_received_total = Counter::new("sods_payments_received_total", "Total escrow payments received")?;
         let payment_success_rate = Gauge::new("sods_payment_success_rate", "Escrow payment success rate percentage")?;
-        let agent_uptime_seconds = Counter::new("sods_agent_uptime_seconds", "Agent uptime in seconds")?;
+        let agent_uptime_seconds = Gauge::new("sods_agent_uptime_seconds", "Agent uptime in seconds")?;
         let last_validation_timestamp = Gauge::new("sods_last_validation_timestamp", "Unix timestamp of the last validation")?;
 
         // Register all
@@ -87,7 +87,7 @@ impl AgentMetrics {
         registry.register(Box::new(agent_uptime_seconds.clone()))?;
         registry.register(Box::new(last_validation_timestamp.clone()))?;
         
-        Ok(Self {
+        let metrics = Self {
             registry,
             active_rules,
             memory_usage_mb,
@@ -108,7 +108,26 @@ impl AgentMetrics {
             payment_success_rate,
             agent_uptime_seconds,
             last_validation_timestamp,
-        })
+        };
+
+        // Start uptime tracking
+        let start_time = std::time::Instant::now();
+        let uptime_metrics = metrics.clone();
+        tokio::spawn(async move {
+            loop {
+                let uptime = start_time.elapsed().as_secs();
+                // Since agent_uptime_seconds is a Counter, we can't reliably "set" it 
+                // easily with Prometheus standard Counter unless we use its internal value or increment.
+                // However, our health check needs total uptime. 
+                // Let's use inc_by(1) every second for simplicity if we want to keep it a counter,
+                // or just change it to a Gauge if we want to "set" it.
+                // The user's requirement says .set(uptime), so I will change it back to a Gauge in the definition.
+                uptime_metrics.agent_uptime_seconds.set(uptime as f64);
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        });
+
+        Ok(metrics)
     }
 
     pub async fn start_http_server(self: Arc<Self>, port: u16) {
