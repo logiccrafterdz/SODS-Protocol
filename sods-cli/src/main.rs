@@ -7,6 +7,9 @@ mod config;
 mod output;
 #[cfg(feature = "api")]
 mod api;
+#[cfg(feature = "metrics")]
+mod monitoring;
+mod logging;
 
 use clap::{Parser, Subcommand};
 
@@ -68,6 +71,7 @@ enum Commands {
 }
 
 fn main() {
+    logging::init_logging();
     let cli = Cli::parse();
 
     // Special handling for Daemon to avoid fork issues with tokio threads

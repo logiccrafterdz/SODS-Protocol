@@ -1,0 +1,38 @@
+groups:
+  - name: SODSAgentAlerts
+    rules:
+      - alert: ValidationFailureRateHigh
+        expr: rate(sods_validation_responses_submitted_total{result="failure"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SODS agent validation failure rate exceeds 10%"
+          description: "Agent is failing more than 10% of validation requests over the last 5 minutes."
+
+      - alert: AgentOffline
+        expr: sods_agent_uptime_seconds == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SODS agent appears to be offline"
+          description: "Agent has reported 0 uptime for more than 2 minutes."
+
+      - alert: LowQualityScore
+        expr: sods_average_quality_score < 80
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SODS agent quality score below 80%"
+          description: "Average reputation score has dropped below 80%."
+
+      - alert: EscrowPaymentFailure
+        expr: rate(sods_payments_received_total{status="failed"}[1h]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SODS agent failing to receive escrow payments"
+          description: "Detection of failed escrow payments in the last hour."

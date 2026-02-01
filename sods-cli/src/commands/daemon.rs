@@ -8,12 +8,9 @@ use tokio::net::{TcpListener, TcpStream};
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use futures_util::{StreamExt, SinkExt};
+use tracing::{info, warn, debug, error};
 #[cfg(feature = "metrics")]
-use prometheus::{Encoder, TextEncoder, Registry, IntGauge, Counter, Histogram, HistogramOpts};
-#[cfg(feature = "metrics")]
-use axum::{Router, routing::get, extract::State, response::Response};
-#[cfg(feature = "metrics")]
-use http_body_util::Full;
+use crate::monitoring::metrics::AgentMetrics;
 
 #[cfg(unix)]
 use std::fs;
@@ -237,90 +234,7 @@ impl WebSocketServer {
     pub async fn broadcast_alert(&self, _alert: BehavioralAlert) {}
 }
 
-#[cfg(feature = "metrics")]
-#[derive(Clone)]
-pub struct MetricsServer {
-    registry: Registry,
-    pub active_rules: IntGauge,
-    pub memory_usage_mb: IntGauge,
-    pub connected_peers: IntGauge,
-    pub rpc_calls_total: Counter,
-    pub p2p_messages_total: Counter,
-    pub behavioral_alerts_total: Counter,
-    pub verification_failures_total: Counter,
-    pub verification_duration_seconds: Histogram,
-}
-
-#[cfg(feature = "metrics")]
-impl MetricsServer {
-    pub fn new() -> Result<Self, prometheus::Error> {
-        let registry = Registry::new();
-        
-        let active_rules = IntGauge::new("sods_active_rules", "Number of active monitoring rules")?;
-        let memory_usage_mb = IntGauge::new("sods_memory_usage_mb", "Memory usage in MB")?;
-        let connected_peers = IntGauge::new("sods_connected_peers", "Number of connected P2P peers")?;
-        
-        let rpc_calls_total = Counter::new("sods_rpc_calls_total", "Total RPC calls made")?;
-        let p2p_messages_total = Counter::new("sods_p2p_messages_total", "Total P2P messages processed")?;
-        let behavioral_alerts_total = Counter::new("sods_behavioral_alerts_total", "Total behavioral alerts triggered")?;
-        let verification_failures_total = Counter::new("sods_verification_failures_total", "Total failed block verifications")?;
-        
-        let verification_duration_seconds = Histogram::with_opts(
-            HistogramOpts::new("sods_verification_duration_seconds", "Time spent verifying blocks")
-        )?;
-        
-        registry.register(Box::new(active_rules.clone()))?;
-        registry.register(Box::new(memory_usage_mb.clone()))?;
-        registry.register(Box::new(connected_peers.clone()))?;
-        registry.register(Box::new(rpc_calls_total.clone()))?;
-        registry.register(Box::new(p2p_messages_total.clone()))?;
-        registry.register(Box::new(behavioral_alerts_total.clone()))?;
-        registry.register(Box::new(verification_failures_total.clone()))?;
-        registry.register(Box::new(verification_duration_seconds.clone()))?;
-        
-        Ok(Self {
-            registry,
-            active_rules,
-            memory_usage_mb,
-            connected_peers,
-            rpc_calls_total,
-            p2p_messages_total,
-            behavioral_alerts_total,
-            verification_failures_total,
-            verification_duration_seconds,
-        })
-    }
-
-    pub async fn start_http_server(self: Arc<Self>, port: u16) {
-        let app = Router::new()
-            .route("/_metrics", get(|State(_metrics): State<Arc<MetricsServer>>| async move {
-                let encoder = TextEncoder::new();
-                let metric_families = _metrics.registry.gather();
-                let mut buffer = Vec::new();
-                encoder.encode(&metric_families, &mut buffer).unwrap();
-                
-                Response::builder()
-                    .header("Content-Type", encoder.format_type())
-                    .body(Full::from(buffer))
-                    .unwrap()
-            }))
-            .with_state(self);
-        
-        let addr = format!("0.0.0.0:{}", port);
-        let listener = match tokio::net::TcpListener::bind(&addr).await {
-            Ok(l) => l,
-            Err(e) => {
-                eprintln!("_metrics Error: Failed to bind to {}: {}", addr, e);
-                return;
-            }
-        };
-
-        println!("_metrics Server: listening on http://{}/_metrics", addr);
-        if let Err(e) = axum::serve(listener, app).await {
-            eprintln!("_metrics Server Error: {}", e);
-        }
-    }
-}
+// AgentMetrics is now defined in crate::monitoring::metrics
 
 // Stub for optional _metrics
 #[cfg(not(feature = "metrics"))]
@@ -531,7 +445,7 @@ async fn run_daemon_loop(
     p2p_enabled: bool,
     expire_after_str: String,
     ws_server: Option<Arc<WebSocketServer>>,
-    _metrics: Option<Arc<MetricsServer>>, // renamed usage below to _metrics if needed
+    _metrics: Option<Arc<AgentMetrics>>,
 ) {
     use sods_verifier::BlockVerifier;
     use crate::config::get_chain;
@@ -682,7 +596,11 @@ async fn run_daemon_loop(
     loop {
         tokio::select! {
              _ = resource_timer.tick() => {
-                 println!("📊 TELEMETRY: Targets={} Queue=0 Time={} Memory=STABLE.rss", targets.len(), chrono::Local::now());
+                 debug!("📊 TELEMETRY: Targets={} Queue=0 Time={} Memory=STABLE.rss", targets.len(), chrono::Local::now());
+                 #[cfg(feature = "metrics")]
+                 if let Some(ref m) = _metrics {
+                     m.agent_uptime_seconds.inc();
+                 }
              }
 
              _ = hourly_timer.tick(), if p2p_enabled => {
@@ -768,9 +686,9 @@ async fn run_daemon_loop(
                                             if let Some(matched_symbols) = target.pattern.matches(&symbols, None) {
                                                 #[cfg(feature = "metrics")]
                                                 if let Some(ref m) = _metrics { m.behavioral_alerts_total.inc(); }
-                                                let msg = format!("🚨 {} ({}) detected on Block #{}", target.name, target.severity, block_num);
-                                                println!("{}", msg);
-                                                let _ = Notification::new().summary("SODS Threat Alert 🚨").body(&msg).show();
+                                                 let msg = format!("🚨 {} ({}) detected on Block #{}", target.name, target.severity, block_num);
+                                                 warn!("{}", msg);
+                                                 let _ = Notification::new().summary("SODS Threat Alert 🚨").body(&msg).show();
 
                                                 if let Some(ref ws) = ws_server {
                                                     let alert = BehavioralAlert {

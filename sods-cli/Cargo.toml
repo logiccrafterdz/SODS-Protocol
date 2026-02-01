@@ -55,6 +55,8 @@ uuid = { version = "1.7", features = ["v4", "serde"] }
 prometheus = { version = "0.13", optional = true }
 axum = { version = "0.7", optional = true }
 http-body-util = { version = "0.1", optional = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 
 [target.'cfg(unix)'.dependencies]
 daemonize = "0.5"
