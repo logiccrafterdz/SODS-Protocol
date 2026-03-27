@@ -178,6 +178,7 @@ impl BehavioralSymbol {
 
         let mut hasher = Sha256::new();
         hasher.update(self.symbol.as_bytes());
+        hasher.update(self.log_index.to_be_bytes());
 
         // Include metadata if present (full mode)
         if !self.metadata.is_empty() {
