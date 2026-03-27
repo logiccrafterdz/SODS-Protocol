@@ -7,6 +7,7 @@ authors = ["LogicCrafter <logiccrafterdz@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "SODS Protocol CLI - On-chain behavioral verification"
 repository = "https://github.com/logiccrafterdz/sods-protocol"
+homepage = "https://github.com/logiccrafterdz/SODS-Protocol"
 keywords = ["ethereum", "cli", "blockchain", "verification"]
 categories = ["command-line-utilities"]
 
@@ -73,3 +74,4 @@ default = ["metrics", "api"]
 zk = ["dep:sods-zk"]
 metrics = ["dep:prometheus", "dep:axum", "dep:http-body-util"]
 api = ["dep:axum"]
+

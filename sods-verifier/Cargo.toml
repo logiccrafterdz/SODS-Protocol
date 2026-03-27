@@ -7,6 +7,7 @@ authors = ["LogicCrafter <logiccrafterdz@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "SODS Protocol Layer 1: Local Verifier for Behavioral Merkle Trees"
 repository = "https://github.com/logiccrafterdz/sods-protocol"
+homepage = "https://github.com/logiccrafterdz/SODS-Protocol"
 keywords = ["ethereum", "evm", "merkle", "blockchain", "verification"]
 categories = ["cryptography", "network-programming"]
 
@@ -52,3 +53,4 @@ futures = "0.3"
 [[test]]
 name = "ci_beacon_fallback"
 path = "../tests/ci_beacon_fallback.rs"
+
