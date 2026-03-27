@@ -1,0 +1,18 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "SODS-Sepolia-Agent",
+  "description": "Production-ready behavioral monitoring agent for Sepolia",
+  "services": [
+    {
+      "name": "REST API",
+      "endpoint": "http://localhost:8080"
+    }
+  ],
+  "supportedTrust": [
+    "reputation",
+    "zk-proofs"
+  ],
+  "extensions": {
+    "behavioralProof": "http://localhost:8080/causal/proof/{agentId}"
+  }
+}
