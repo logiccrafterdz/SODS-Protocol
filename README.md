@@ -1,4 +1,4 @@
-﻿# SODS Protocol: Trustless Behavioral Verification
+# SODS Protocol: Trustless Behavioral Verification
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://img.shields.io/npm/v/sods-cli.svg)](https://www.npmjs.com/package/sods-cli)
@@ -489,8 +489,8 @@ The verifier now outputs a **Confidence Score (0.0 - 1.0)** for every detection 
 
 ## Project Status
 
-Status: Production Ready (v7.0)
-License: CC0 1.0 Universal
+Status: Alpha (Research Prototype)
+License: MIT OR Apache-2.0
 Documentation: See /docs directory and inline code comments
 
 ## Running Tests
@@ -590,4 +590,4 @@ Do not use in production systems.
 
 ## License
 
-[CC0 1.0 Universal](LICENSE) — Public Domain
+Dual-licensed under [MIT](https://opensource.org/licenses/MIT) or [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0).
