@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  sods-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sods-daemon
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # SODS REST API
+      - "9090:9090"   # Prometheus Metrics
+    environment:
+      - RUST_LOG=info
+      - SODS_CHAIN=sepolia
+    volumes:
+      - sods-data:/root/.sods
+    command: ["daemon", "--chain", "sepolia"]
+    healthcheck:
+      test: ["/usr/local/bin/sods", "chains"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  sods-data:
+    driver: local

@@ -1,12 +1,35 @@
+# Build artifacts
 target/
+sods-zk/target/
+
+# Version control
 .git/
+.gitignore
+.dockerignore
+
+# CI & GitHub
+.github/
+
+# Web dashboard (built separately)
+sods-web/node_modules/
+sods-web/dist/
+
+# Internal tooling
 .sods/
 brain/
 poc/
 scripts/
-tests/
+
+# Documentation (not needed in runtime image)
+docs/
 *.md
-.gitignore
-.dockerignore
-.github/
-Cargo.lock
+!README.md
+
+# Test artifacts
+proof.bin
+journal.bin
+public.json
+
+# OS files
+Thumbs.db
+.DS_Store
