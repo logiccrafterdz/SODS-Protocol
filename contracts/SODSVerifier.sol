@@ -10,8 +10,8 @@ library SODSVerifier {
         function getBeaconRoot(uint64 timestamp) external view returns (bytes32);
     }
 
-    /// @notice Emitted when beacon anchoring is skipped due to network limitations.
-    event BeaconAnchoringSkipped(uint256 blockNumber, string reason);
+    /// @notice Beacon anchoring events cannot be emitted from a view function.
+    /// This will be handled upstream or via return codes in future versions.
 
     bytes32 private constant DOMAIN_TYPEHASH = keccak256(
         "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
@@ -99,12 +99,12 @@ library SODSVerifier {
                 if (trustedRoot == beaconRoot) {
                     beaconVerified = true;
                 }
-            } catch Error(string memory reason) {
+            } catch Error(string memory /*reason*/) {
                 // EIP-4788 not supported or contract not deployed
-                emit BeaconAnchoringSkipped(blockNumber, reason);
+                // Warning only path - we proceed to verify the BMT proof itself
             } catch {
                 // Low-level call failure (e.g., out of gas, no contract)
-                emit BeaconAnchoringSkipped(blockNumber, "Beacon roots contract unavailable");
+                // Warning only path - we proceed to verify the BMT proof itself
             }
             
             // Require beacon verification OR proceed with warning status (emit already handled)
