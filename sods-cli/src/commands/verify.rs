@@ -154,7 +154,12 @@ pub async fn run(args: VerifyArgs) -> i32 {
     let rpc_urls: Vec<String> = if let Some(url) = args.rpc_url {
         vec![url]
     } else {
-        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+        let user_config = crate::config::UserConfig::load();
+        if let Some(overridden_rpc) = user_config.get_rpc_override(&chain_config.name) {
+            vec![overridden_rpc]
+        } else {
+            chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+        }
     };
 
     // Determine backoff profile
@@ -359,7 +364,14 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
         output::info(&format!("🔍 Verifying pattern '{}' in block {} ({})...", args.symbol, args.block, chain_config.description));
     }
 
-    let rpc_urls: Vec<String> = chain_config.rpc_urls.iter().map(|s| s.to_string()).collect();
+    let user_config = crate::config::UserConfig::load();
+    let rpc_urls: Vec<String> = if let Some(url) = args.rpc_url {
+        vec![url]
+    } else if let Some(overridden_rpc) = user_config.get_rpc_override(&chain_config.name) {
+        vec![overridden_rpc]
+    } else {
+        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+    };
     let is_l2 = chain_config.name != "ethereum" && chain_config.name != "sepolia";
     let profile = if is_l2 {
         sods_verifier::rpc::BackoffProfile::L2

@@ -39,6 +39,7 @@ tokio = { version = "1.36", features = ["rt-multi-thread", "macros"] }
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+toml = "0.8"
 
 # Terminal colors
 colored = "2.1"

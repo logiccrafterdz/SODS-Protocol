@@ -121,3 +121,34 @@ pub const SYMBOLS: &[(&str, &str)] = &[
 pub fn is_symbol_supported(symbol: &str) -> bool {
     SYMBOLS.iter().any(|(s, _)| *s == symbol)
 }
+
+use serde::Deserialize;
+use std::collections::HashMap;
+
+/// User-defined configuration structure mapped from ~/.sods/config.toml
+#[derive(Debug, Deserialize, Default)]
+pub struct UserConfig {
+    pub rpc_overrides: Option<HashMap<String, String>>,
+}
+
+impl UserConfig {
+    /// Loads the configuration from the user's home directory.
+    pub fn load() -> Self {
+        if let Some(mut path) = dirs::home_dir() {
+            path.push(".sods");
+            path.push("config.toml");
+
+            if let Ok(contents) = std::fs::read_to_string(path) {
+                if let Ok(config) = toml::from_str(&contents) {
+                    return config;
+                }
+            }
+        }
+        Self::default()
+    }
+
+    /// Gets a user-overridden RPC URL if it exists in the config for the given chain.
+    pub fn get_rpc_override(&self, chain_name: &str) -> Option<String> {
+        self.rpc_overrides.as_ref()?.get(&chain_name.to_lowercase()).cloned()
+    }
+}
