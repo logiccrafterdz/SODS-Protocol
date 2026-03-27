@@ -54,8 +54,8 @@ mod tests {
         ];
 
         // This tests the underlying logic that the guest will run
-        assert!(sods_core::pattern::matches_str(&symbols, "Tf -> Sw"));
-        assert!(sods_core::pattern::matches_str(&symbols, "Sandwich"));
-        assert!(!sods_core::pattern::matches_str(&symbols, "Dep"));
+        assert!(sods_core::pattern::matches_str(&symbols, "Tf -> Sw", None));
+        assert!(sods_core::pattern::matches_str(&symbols, "Sandwich", None));
+        assert!(!sods_core::pattern::matches_str(&symbols, "Dep", None));
     }
 }
