@@ -5,11 +5,12 @@
 
 use ethers_core::types::{BlockNumber, Filter, Log, Address, H256, EIP1186ProofResponse};
 use ethers_providers::{Http, Middleware, Provider};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::time::Duration;
 use tokio::time::sleep;
+use lru::LruCache;
+use std::num::NonZeroUsize;
 
 const MIN_ADAPTIVE_DELAY_MS: u64 = 100;
 const MAX_ADAPTIVE_DELAY_MS: u64 = 5000;
@@ -37,7 +38,7 @@ pub struct RpcClient {
     providers: Vec<Arc<Provider<Http>>>,
     urls: Vec<String>,
     current_provider_index: Arc<std::sync::atomic::AtomicUsize>,
-    cache: Arc<RwLock<HashMap<u64, Vec<Log>>>>,
+    cache: Arc<RwLock<LruCache<u64, Vec<Log>>>>,
     adaptive_delay: Arc<std::sync::atomic::AtomicU64>,
     backoff_profile: BackoffProfile,
     /// Total RPC fetch operations. Primarily for testing synchronization.
@@ -61,7 +62,7 @@ impl RpcClient {
             providers,
             urls: rpc_urls.to_vec(),
             current_provider_index: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
-            cache: Arc::new(RwLock::new(HashMap::new())),
+            cache: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(100).unwrap()))),
             adaptive_delay: Arc::new(std::sync::atomic::AtomicU64::new(MIN_ADAPTIVE_DELAY_MS)),
             backoff_profile: BackoffProfile::Ethereum,
             fetch_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
@@ -206,10 +207,10 @@ impl RpcClient {
     }
 
     pub async fn fetch_logs_for_block(&self, block_number: u64) -> Result<Vec<Log>> {
-        // 1. First check: Read lock (allows multiple concurrent readers)
+        // 1. First check: Read lock (allows multiple concurrent readers, using peek to not mutate LRU state)
         {
             let cache = self.cache.read().await;
-            if let Some(logs) = cache.get(&block_number) {
+            if let Some(logs) = cache.peek(&block_number) {
                 return Ok(logs.clone());
             }
         }
@@ -217,7 +218,7 @@ impl RpcClient {
         // 2. Second check: Write lock with double-check (Stampede Prevention)
         let mut cache = self.cache.write().await;
         
-        // Double-check: another request might have filled the cache while we were waiting for write lock
+        // Double-check using get (which promotes the LRU entry)
         if let Some(logs) = cache.get(&block_number) {
             return Ok(logs.clone());
         }
@@ -226,7 +227,7 @@ impl RpcClient {
         let logs = self.fetch_with_backoff(block_number, None).await?;
 
         // 4. Populate cache
-        cache.insert(block_number, logs.clone());
+        cache.put(block_number, logs.clone());
 
         Ok(logs)
     }
@@ -564,7 +565,7 @@ mod tests {
 
         {
             let mut cache = client.cache.write().await;
-            cache.insert(12345, vec![]); 
+            cache.put(12345, vec![]); 
         }
 
         let result = client.fetch_logs_for_block(12345).await;
