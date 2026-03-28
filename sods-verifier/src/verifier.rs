@@ -42,32 +42,6 @@ impl std::fmt::Display for BeaconRootSupport {
 /// Uses public RPC endpoints to fetch block data and `sods-core`
 /// to build Behavioral Merkle Trees and generate proofs.
 ///
-/// # Example
-///
-/// ```rust,no_run
-/// use sods_verifier::BlockVerifier;
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let verifier = BlockVerifier::new("https://sepolia.infura.io/v3/YOUR_KEY")?;
-///     
-///     let result = verifier
-///         .verify_symbol_in_block("Dep", 10002322)
-///         .await?;
-///
-///     if result.is_verified {
-///         println!("Symbol verified with {} byte proof", result.proof_size_bytes);
-///     }
-///
-///     Ok(())
-/// }
-/// ```
-/// Block verifier for SODS behavioral symbol verification.
-///
-/// The main entry point for verifying symbols in on-chain blocks.
-/// Uses public RPC endpoints to fetch block data and `sods-core`
-/// to build Behavioral Merkle Trees and generate proofs.
-///
 /// # Verification Modes
 ///
 /// - **Trustless (default)**: Logs are anchored to block header via receipt trie validation.
@@ -80,7 +54,8 @@ impl std::fmt::Display for BeaconRootSupport {
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let verifier = BlockVerifier::new("https://sepolia.infura.io/v3/YOUR_KEY")?;
+///     let urls = vec!["https://ethereum-sepolia.publicnode.com".to_string()];
+///     let verifier = BlockVerifier::new(&urls)?;
 ///     
 ///     let result = verifier
 ///         .verify_symbol_in_block("Dep", 10002322)

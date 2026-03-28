@@ -8,7 +8,7 @@ use sods_cli::monitoring;
 #[derive(Parser)]
 #[command(name = "sods")]
 #[command(author = "LogicCrafter")]
-#[command(version = "0.1.0")]
+#[command(version = "0.1.0-alpha")]
 #[command(about = "SODS Protocol - On-chain behavioral verification\nNote: Uses multiple RPC endpoints per chain for resilience.", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
