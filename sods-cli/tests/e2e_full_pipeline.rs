@@ -12,7 +12,7 @@ fn test_e2e_full_pipeline() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Trustless Behavioral Verification",
+            "On-chain behavioral verification",
         ));
 
     // Check symbols command
@@ -34,13 +34,15 @@ fn test_e2e_full_pipeline() {
             "Tf",
             "--block",
             "999999999",
-            "--node",
+            "--rpc-url",
             "http://127.0.0.1:0000",
         ])
         .assert()
         .failure() // Expecting a non-zero exit code due to unreachable RPC
         .stderr(
-            predicate::str::contains("Error").or(predicate::str::contains("failed to connect")),
+            predicate::str::contains("Error")
+                .or(predicate::str::contains("failed to connect"))
+                .or(predicate::str::contains("failed health check")),
         );
 
     println!("✅ E2E Full Pipeline CLI behaviors correctly validated");
