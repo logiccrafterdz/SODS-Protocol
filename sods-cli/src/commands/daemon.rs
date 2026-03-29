@@ -14,13 +14,9 @@ use crate::monitoring::metrics::AgentMetrics;
 #[cfg(not(feature = "metrics"))]
 type AgentMetrics = ();
 
-#[cfg(unix)]
 use std::fs;
-#[cfg(unix)]
 use std::path::{Path, PathBuf};
-#[cfg(unix)]
 use sysinfo::{System, Pid};
-#[cfg(unix)]
 use dirs;
 
 #[cfg(unix)]
@@ -28,10 +24,8 @@ use daemonize::Daemonize;
 #[cfg(unix)]
 use std::fs::File;
 
-#[cfg(unix)]
 use serde_json::json;
 use crate::output;
-#[cfg(unix)]
 use sods_p2p::{SodsPeer, ThreatRule};
 
 /// Arguments for the daemon command.
@@ -95,7 +89,6 @@ pub enum DaemonCommands {
     Status,
 }
 
-#[cfg(unix)]
 #[derive(serde::Deserialize, Debug, Clone)]
 pub struct ThreatFeedItem {
     pub name: String,
@@ -250,7 +243,6 @@ pub(crate) struct MonitoringTarget {
     pub(crate) expires_at: std::time::SystemTime,
 }
 
-#[cfg(unix)]
 fn get_sods_dir() -> PathBuf {
     let mut path = dirs::home_dir().expect("Failed to get home directory");
     path.push(".sods");
@@ -258,22 +250,18 @@ fn get_sods_dir() -> PathBuf {
     path
 }
 
-#[cfg(unix)]
 fn get_pid_file() -> PathBuf {
     get_sods_dir().join("sods.pid")
 }
 
-#[cfg(unix)]
 fn get_log_file() -> PathBuf {
     get_sods_dir().join("sods.log")
 }
 
-#[cfg(unix)]
 fn get_threat_rules_file() -> PathBuf {
     get_sods_dir().join("threat_rules.json")
 }
 
-#[cfg(unix)]
 fn get_trusted_keys_file() -> PathBuf {
     get_sods_dir().join("trusted_keys.json")
 }
@@ -421,7 +409,6 @@ fn start_daemon(
     }
 }
 
-#[cfg(unix)]
 async fn fetch_threat_feed(url: &str) -> Result<Vec<ThreatFeedItem>, String> {
     if !url.starts_with("https://") {
         return Err("URL must be HTTPS".to_string());
@@ -433,7 +420,6 @@ async fn fetch_threat_feed(url: &str) -> Result<Vec<ThreatFeedItem>, String> {
     Ok(items)
 }
 
-#[cfg(unix)]
 async fn run_daemon_loop(
     mut targets: Vec<MonitoringTarget>, 
     chain: String, 
@@ -753,7 +739,6 @@ async fn run_daemon_loop(
     }
 }
 
-#[cfg(unix)]
 async fn send_webhook(url: String, payload: serde_json::Value) {
     if !url.starts_with("https://") { return; }
     let client = reqwest::Client::new();
@@ -788,30 +773,102 @@ fn check_status() -> bool {
 }
 
 // -----------------------------------------------------------------------------
-// Windows Implementation (Stub)
+// Windows Implementation (Foreground)
 // -----------------------------------------------------------------------------
 
 #[cfg(not(unix))]
 fn start_daemon(
-    _pattern: Option<String>, 
-    _chain: String, 
-    _interval: String, 
-    _rpc_url: Option<String>, 
-    _autostart: bool, 
-    _webhook_url: Option<String>,
-    _threat_feed: Option<String>,
-    _p2p_threat_network: bool,
-    _expire_after: String,
-    _websocket_port: Option<u16>,
-    _metrics_port: Option<u16>,
+    pattern: Option<String>, 
+    chain: String, 
+    interval: String, 
+    rpc_url: Option<String>, 
+    autostart: bool, 
+    webhook_url: Option<String>,
+    threat_feed: Option<String>,
+    p2p_threat_network: bool,
+    expire_after_str: String,
+    websocket_port: Option<u16>,
+    metrics_port: Option<u16>,
 ) -> i32 {
-    output::error("Daemon mode is currently only supported on Linux/macOS.");
-    1
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let _guard = rt.enter();
+
+    let expire_duration = parse_duration(&expire_after_str);
+    let expires_at = std::time::SystemTime::now() + expire_duration;
+
+    // _metrics Server Setup
+    let _metrics: Option<Arc<AgentMetrics>> = metrics_port.and_then(|_port| {
+        #[cfg(feature = "metrics")]
+        { AgentMetrics::new().ok().map(|m| Arc::new(m)) }
+        #[cfg(not(feature = "metrics"))]
+        { None }
+    });
+
+    // WebSocket Server Setup
+    let ws_server = websocket_port.map(|port| Arc::new(WebSocketServer::new(port)));
+
+    if autostart {
+        output::error("Autostart script generation is not supported on Windows.");
+        return 1;
+    }
+
+    // --- Prepare Initial Targets ---
+    let mut targets = Vec::new();
+    
+    // 1. Manual Pattern
+    if let Some(p) = pattern {
+        match sods_core::pattern::BehavioralPattern::parse(&p) {
+            Ok(parsed) => {
+                targets.push(MonitoringTarget {
+                    pattern: parsed,
+                    name: "Manual Pattern".to_string(),
+                    severity: "manual".to_string(),
+                    pattern_str: p,
+                    chain: chain.clone(),
+                    expires_at,
+                });
+            },
+            Err(e) => {
+                output::error(&format!("Invalid manual pattern: {}", e));
+                return 1;
+            }
+        }
+    }
+
+    if !p2p_threat_network && targets.is_empty() {
+        output::error("No valid patterns to monitor. Provide --pattern, --threat-feed, or enable --p2p-threat-network.");
+        return 1;
+    }
+
+    println!("Starting SODS daemon (Foreground Mode on Windows)...");
+    println!("Monitoring {} initial targets.", targets.len());
+    if p2p_threat_network {
+        println!("Network:    Connected to P2P Threat Intelligence");
+    }
+    
+    // Start _metrics server if enabled
+    #[cfg(feature = "metrics")]
+    if let Some(ref m) = _metrics {
+        if let Some(port) = metrics_port.as_ref() {
+            let m_clone = m.clone();
+            rt.spawn(m_clone.start_http_server(*port));
+        }
+    }
+
+    // Start WS server if enabled
+    if let Some(ref ws) = ws_server {
+        let ws_clone = ws.clone();
+        rt.spawn(ws_clone.start());
+    }
+
+    // Run the daemon loop in foreground
+    rt.block_on(run_daemon_loop(targets.clone(), chain.clone(), interval.clone(), rpc_url.clone(), webhook_url.clone(), Some(threat_feed.clone()), p2p_threat_network, expire_after_str.clone(), ws_server.clone(), _metrics.clone()));
+    0 
 }
 
 #[cfg(not(unix))]
 fn stop_daemon() -> i32 {
-    output::error("Daemon mode is not supported on Windows.");
+    output::error("Daemon mode uses foreground tasks on Windows. Press Ctrl+C to stop it.");
     1
 }
 
