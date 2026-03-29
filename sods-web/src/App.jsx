@@ -31,6 +31,51 @@ const HUDDecor = () => (
   </>
 )
 
+const HUDIcon = ({ type }) => {
+  const icons = {
+    link: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="12" cy="12" r="2" fill="currentColor" />
+        <path d="M12 2v4M12 18v4M2 12h4M18 12h4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+      </svg>
+    ),
+    time: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 3" />
+        <path d="M12 2v2M12 20v2M2 12h2M20 12h2" opacity="0.5" />
+      </svg>
+    ),
+    nodes: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="6" cy="6" r="3" />
+        <circle cx="18" cy="18" r="3" />
+        <path d="M8.5 8.5l7 7" />
+        <circle cx="18" cy="6" r="2" opacity="0.5" />
+        <path d="M16 6h-7" opacity="0.5" />
+      </svg>
+    ),
+    shield: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <path d="M12 8v4M12 16h.01" />
+      </svg>
+    ),
+    focus: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2" />
+        <circle cx="12" cy="12" r="1" fill="currentColor" />
+      </svg>
+    ),
+    archive: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M4 6h16M4 12h16M4 18h11" />
+      </svg>
+    )
+  };
+  return <span className="card__icon" style={{ opacity: 0.7 }}>{icons[type]}</span>;
+}
+
 const NeuralMesh = () => (
   <div className="neural-mesh-container">
     <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -165,7 +210,7 @@ function App() {
             <HUDDecor />
             <div className="card__header">
               <span className="card__title">Neural Link</span>
-              <span className="card__icon">📡</span>
+              <HUDIcon type="link" />
             </div>
             <div className={`status ${statusClass}`}>
               <span className="status__dot"></span>
@@ -178,7 +223,7 @@ function App() {
             <HUDDecor />
             <div className="card__header">
               <span className="card__title">Time Since Boot</span>
-              <span className="card__icon">⏱️</span>
+              <HUDIcon type="time" />
             </div>
             <div className="card__value" style={{ fontSize: '2.5rem' }}>{formatUptime(uptime)}</div>
             <p className="card__label" style={{ opacity: 0.4 }}>Persistence: Stable</p>
@@ -188,7 +233,7 @@ function App() {
             <HUDDecor />
             <div className="card__header">
               <span className="card__title">Active Pathways</span>
-              <span className="card__icon">🧬</span>
+              <HUDIcon type="nodes" />
             </div>
             <div className="card__value">{SYMBOLS.length}</div>
             <p className="card__label" style={{ opacity: 0.4 }}>Sub-neural processors active</p>
@@ -198,7 +243,7 @@ function App() {
             <HUDDecor />
             <div className="card__header">
               <span className="card__title">Integrity Mode</span>
-              <span className="card__icon">🛡️</span>
+              <HUDIcon type="shield" />
             </div>
             <div className="card__value" style={{ fontSize: '1.4rem', color: 'var(--bismuth-g)' }}>CRYSTALLINE</div>
             <p className="card__label" style={{ opacity: 0.4 }}>Secure Storage Proof</p>
@@ -212,7 +257,7 @@ function App() {
             <HUDDecor />
             <div className="card__header">
               <span className="card__title">Path Verification Hub</span>
-              <span className="card__icon">👁️</span>
+              <HUDIcon type="focus" />
             </div>
 
             <form className="verify-form" onSubmit={handleVerify}>
@@ -273,7 +318,7 @@ function App() {
             <HUDDecor />
             <div className="card__header">
               <span className="card__title">Symbol Reference Archive</span>
-              <span className="card__icon">📖</span>
+              <HUDIcon type="archive" />
             </div>
             <div style={{ maxHeight: '420px', overflowY: 'auto', paddingRight: '1rem' }}>
               <table className="symbols-table">
@@ -305,7 +350,7 @@ function App() {
 
         {/* Footer */}
         <footer className="footer animate-in" style={{ animationDelay: '0.6s' }}>
-          SODS-X // NEURAL_OVERLAY · CC0 1.0 UNIVERSAL ·{' '}
+          SODS-X // NEURAL_OVERLAY · LogicCrafterDZ · CC0 1.0 UNIVERSAL ·{' '}
           <a href="https://github.com/logiccrafterdz/SODS-Protocol" target="_blank" rel="noopener noreferrer">
             PROJECT_SOURCE
           </a>
