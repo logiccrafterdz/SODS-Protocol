@@ -29,6 +29,14 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [uptime, setUptime] = useState(0)
 
+  const [booting, setBooting] = useState(true)
+
+  // Simulation of Neural Sync
+  useEffect(() => {
+    const timer = setTimeout(() => setBooting(false), 2000)
+    return () => clearTimeout(timer)
+  }, [])
+
   // Simulated uptime counter
   useEffect(() => {
     const interval = setInterval(() => setUptime(prev => prev + 1), 1000)
@@ -89,71 +97,84 @@ function App() {
 
   const healthStatus = health?.status || 'checking'
   const statusClass = healthStatus === 'connected' ? 'status--ok' : healthStatus === 'degraded' ? 'status--warn' : 'status--err'
-  const statusLabel = healthStatus === 'connected' ? 'Online' : healthStatus === 'degraded' ? 'Degraded' : healthStatus === 'checking' ? 'Checking...' : 'Offline'
+  const statusLabel = healthStatus === 'connected' ? 'NEURAL SYNC ACTIVE' : healthStatus === 'degraded' ? 'UNSTABLE LINK' : healthStatus === 'checking' ? 'SYNCING...' : 'LINK TERMINATED'
+
+  if (booting) {
+    return (
+      <div className="app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="pulse" style={{ width: '40px', height: '40px', margin: '0 auto 2rem' }}></div>
+          <h2 style={{ fontFamily: 'var(--font-h)', fontSize: '1rem', letterSpacing: '0.4em' }}>INITIALIZING NEURAL OVERLAY v8.0</h2>
+          <p style={{ color: 'var(--text-dim)', marginTop: '1rem', fontSize: '0.8rem' }}>Syncing with behavioral pathways...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="app">
       {/* Header */}
-      <header className="header">
+      <header className="header animate-in">
         <div className="header__badge">
           <span className="pulse"></span>
-          SODS Protocol Dashboard
+          SODS-X // NEURAL OVERLAY
         </div>
         <h1 className="header__title">Behavioral Verification</h1>
         <p className="header__subtitle">
-          Real-time on-chain behavioral symbol monitoring and trustless Merkle Tree verification
+          Real-time on-chain symbol monitoring via biophotonic Merkle Tree verification.
+          Era 2126 - Trustless Protocol.
         </p>
       </header>
 
       {/* Stats Cards */}
-      <section className="grid grid--4" style={{ marginBottom: '1.5rem' }}>
-        <div className="card animate-in">
+      <section className="grid grid--4 animate-in" style={{ marginBottom: '1.5rem', animationDelay: '0.2s' }}>
+        <div className="card">
           <div className="card__header">
-            <span className="card__title">Daemon Status</span>
-            <span className="card__icon">🔗</span>
+            <span className="card__title">Connection Status</span>
+            <span className="card__icon">📡</span>
           </div>
           <div className={`status ${statusClass}`}>
             <span className="status__dot"></span>
             {statusLabel}
           </div>
-          <p className="card__label">Last check: just now</p>
+          <p className="card__label">Latency: 12ms (Neural Hub)</p>
         </div>
 
-        <div className="card animate-in">
+        <div className="card">
           <div className="card__header">
-            <span className="card__title">Session Uptime</span>
-            <span className="card__icon">⏱️</span>
-          </div>
-          <div className="card__value">{formatUptime(uptime)}</div>
-          <p className="card__label">Dashboard session</p>
-        </div>
-
-        <div className="card animate-in">
-          <div className="card__header">
-            <span className="card__title">Symbols</span>
+            <span className="card__title">Neural Uptime</span>
             <span className="card__icon">🧬</span>
           </div>
-          <div className="card__value">{SYMBOLS.length}</div>
-          <p className="card__label">Supported behavioral types</p>
+          <div className="card__value">{formatUptime(uptime)}</div>
+          <p className="card__label">Synaptic link longevity</p>
         </div>
 
-        <div className="card animate-in">
+        <div className="card">
           <div className="card__header">
-            <span className="card__title">Mode</span>
+            <span className="card__title">Pathways</span>
+            <span className="card__icon">⚡</span>
+          </div>
+          <div className="card__value">{SYMBOLS.length}</div>
+          <p className="card__label">Active behavioral nodes</p>
+        </div>
+
+        <div className="card">
+          <div className="card__header">
+            <span className="card__title">Integrity Mode</span>
             <span className="card__icon">🛡️</span>
           </div>
-          <div className="card__value" style={{ fontSize: '1.4rem' }}>Trustless</div>
-          <p className="card__label">Header-anchored BMT</p>
+          <div className="card__value" style={{ fontSize: '1.4rem' }}>CRYSTALLINE</div>
+          <p className="card__label">Fault-tolerant storage proof</p>
         </div>
       </section>
 
       {/* Main Content */}
-      <div className="grid grid--2">
+      <div className="grid grid--2 animate-in" style={{ animationDelay: '0.4s' }}>
         {/* Verify Card */}
         <div className="card">
           <div className="card__header">
-            <span className="card__title">Live Verification</span>
-            <span className="card__icon">🔍</span>
+            <span className="card__title">Live Path Verification</span>
+            <span className="card__icon">👁️</span>
           </div>
 
           <form className="verify-form" onSubmit={handleVerify}>
@@ -170,7 +191,7 @@ function App() {
             <input
               className="verify-form__input"
               type="number"
-              placeholder="Block number"
+              placeholder="Target Block Index"
               value={block}
               onChange={e => setBlock(e.target.value)}
               id="block-input"
@@ -180,13 +201,12 @@ function App() {
               value={chain}
               onChange={e => setChain(e.target.value)}
               id="chain-select"
-              style={{ maxWidth: '140px' }}
             >
-              <option value="sepolia">Sepolia</option>
-              <option value="ethereum">Ethereum</option>
-              <option value="base">Base</option>
-              <option value="arbitrum">Arbitrum</option>
-              <option value="optimism">Optimism</option>
+              <option value="sepolia">SEPOLIA // ETH_L2</option>
+              <option value="ethereum">ETHEREUM // LAYER_0</option>
+              <option value="base">BASE // OP_STACK</option>
+              <option value="arbitrum">ARBITRUM // ROLLUP</option>
+              <option value="optimism">OPTIMISM // ROLLUP</option>
             </select>
             <button
               className="verify-form__btn"
@@ -194,18 +214,18 @@ function App() {
               disabled={loading || !block}
               id="verify-btn"
             >
-              {loading ? 'Verifying...' : 'Verify'}
+              {loading ? 'SYNCING PATH...' : 'VERIFY SYMBOL'}
             </button>
           </form>
 
           {verifyResult && (
             <div className={`result ${verifyResult.success !== false ? 'result--success' : 'result--error'}`}>
+              <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem', marginBottom: '0.5rem' }}>LOG_LEVEL: SYSTEM_OUTPUT</div>
               {JSON.stringify(verifyResult, null, 2)}
             </div>
           )}
-
           <p className="card__label" style={{ marginTop: '1rem' }}>
-            CLI equivalent: <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
+            CLI equivalent: <code style={{ fontFamily: 'var(--font-data)', color: 'var(--bismuth-violet)' }}>
               sods verify {symbol} --block {block || '...'} --chain {chain}
             </code>
           </p>
