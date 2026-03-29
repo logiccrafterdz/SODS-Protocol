@@ -1,5 +1,5 @@
-use sods_core::pattern::parse_amount;
 use ethers_core::types::U256;
+use sods_core::pattern::parse_amount;
 
 #[test]
 fn test_large_ether_values() {
@@ -46,7 +46,13 @@ fn test_wei_no_decimals() {
 #[test]
 fn test_high_decimal_precision() {
     // 0.000000000000000001 ether = 1 wei
-    assert_eq!(parse_amount("0.000000000000000001 ether").unwrap(), U256::from(1u64));
+    assert_eq!(
+        parse_amount("0.000000000000000001 ether").unwrap(),
+        U256::from(1u64)
+    );
     // More than 18 decimals should be truncated (floor)
-    assert_eq!(parse_amount("0.0000000000000000019 ether").unwrap(), U256::from(1u64));
+    assert_eq!(
+        parse_amount("0.0000000000000000019 ether").unwrap(),
+        U256::from(1u64)
+    );
 }

@@ -1,12 +1,12 @@
 //! Eclipse attack prevention test - Multi-path confirmation logic
-//! 
+//!
 //! This test verifies the multi-transport confirmation logic without
 //! needing an actual network connection. The goal is to ensure peers
 //! are only trusted when confirmed via multiple independent transports.
 
+use libp2p::PeerId;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use libp2p::PeerId;
 
 /// Minimal test struct to verify confirmation logic without full network stack
 struct MockMultiPathTracker {
@@ -52,6 +52,6 @@ async fn test_multi_path_confirmation() {
     // 3. Add second independent transport
     tracker.confirm_transport(&peer_id, "webrtc");
     assert!(tracker.is_peer_fully_confirmed(&peer_id));
-    
+
     println!("✅ Multi-Path Confirmation Logic Verified.");
 }

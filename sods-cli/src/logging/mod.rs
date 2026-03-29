@@ -1,6 +1,6 @@
+use chrono::Utc;
 use serde::Serialize;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use chrono::Utc;
 
 #[derive(Serialize, Debug)]
 pub struct ValidationLog {
@@ -15,8 +15,7 @@ pub struct ValidationLog {
 }
 
 pub fn init_logging() {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     tracing_subscriber::registry()
         .with(filter)

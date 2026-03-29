@@ -3,11 +3,11 @@
 //! This module provides the `CausalMerkleTree` which constructs a binary
 //! Merkle tree over causally-ordered events and supports proof generation.
 
-use ethers::types::H256;
-use tiny_keccak::{Hasher, Keccak};
+use crate::error::{CausalError, Result};
 use crate::event::CausalEvent;
 use crate::proof::CausalProof;
-use crate::error::{CausalError, Result};
+use ethers::types::H256;
+use tiny_keccak::{Hasher, Keccak};
 
 /// A cryptographically secure Merkle tree for causal events.
 ///

@@ -1,8 +1,8 @@
-use ethers_core::types::U256;
-use crate::symbol::BehavioralSymbol;
-use crate::error::{SodsError, Result};
 use crate::deployer::ContractRegistry;
-use std::time::{Instant, Duration};
+use crate::error::{Result, SodsError};
+use crate::symbol::BehavioralSymbol;
+use ethers_core::types::U256;
+use std::time::{Duration, Instant};
 
 // const MAX_PATTERN_DEPTH: usize = 5;
 const MAX_SYMBOLS_PER_PATTERN: usize = 10;
@@ -35,7 +35,7 @@ impl BehavioralPattern {
     }
 
     /// Parse a pattern string into a BehavioralPattern.
-    /// 
+    ///
     /// Syntax:
     /// - "A -> B": Sequence of A then B
     /// - "A{n,}": At least n occurrences of A
@@ -45,30 +45,39 @@ impl BehavioralPattern {
         let start_time = Instant::now();
 
         if input.len() > MAX_PATTERN_LENGTH {
-            return Err(SodsError::PatternError(format!("Pattern string too long (max {} chars)", MAX_PATTERN_LENGTH)));
+            return Err(SodsError::PatternError(format!(
+                "Pattern string too long (max {} chars)",
+                MAX_PATTERN_LENGTH
+            )));
         }
 
         // 1. Check Presets
         match input {
-            "Sandwich" => return Ok(Self {
-                steps: vec![
-                    PatternStep::Exact("Tf".into(), PatternCondition::None),
-                    PatternStep::Exact("Sw".into(), PatternCondition::None),
-                    PatternStep::Exact("Tf".into(), PatternCondition::None),
-                ]
-            }),
-            "Frontrun" => return Ok(Self {
-                steps: vec![
-                    PatternStep::Exact("Tf".into(), PatternCondition::None),
-                    PatternStep::Exact("Sw".into(), PatternCondition::None),
-                ]
-            }),
-            "Backrun" => return Ok(Self {
-                steps: vec![
-                    PatternStep::Exact("Sw".into(), PatternCondition::None),
-                    PatternStep::Exact("Tf".into(), PatternCondition::None),
-                ]
-            }),
+            "Sandwich" => {
+                return Ok(Self {
+                    steps: vec![
+                        PatternStep::Exact("Tf".into(), PatternCondition::None),
+                        PatternStep::Exact("Sw".into(), PatternCondition::None),
+                        PatternStep::Exact("Tf".into(), PatternCondition::None),
+                    ],
+                })
+            }
+            "Frontrun" => {
+                return Ok(Self {
+                    steps: vec![
+                        PatternStep::Exact("Tf".into(), PatternCondition::None),
+                        PatternStep::Exact("Sw".into(), PatternCondition::None),
+                    ],
+                })
+            }
+            "Backrun" => {
+                return Ok(Self {
+                    steps: vec![
+                        PatternStep::Exact("Sw".into(), PatternCondition::None),
+                        PatternStep::Exact("Tf".into(), PatternCondition::None),
+                    ],
+                })
+            }
             _ => {}
         }
 
@@ -83,9 +92,9 @@ impl BehavioralPattern {
 
             // Parse condition if present ("... where ...")
             let (part_base, condition) = if let Some(idx) = part.find("where") {
-                let cond_str = part[idx+5..].trim();
+                let cond_str = part[idx + 5..].trim();
                 let base = part[..idx].trim();
-                
+
                 let cond = if cond_str == "from == deployer" {
                     PatternCondition::FromDeployer
                 } else if let Some(stripped) = cond_str.strip_prefix("value >") {
@@ -93,7 +102,10 @@ impl BehavioralPattern {
                     let amount = parse_amount(amount_str)?;
                     PatternCondition::ValueGreaterThan(amount)
                 } else {
-                    return Err(SodsError::PatternError(format!("Unsupported condition: {}", cond_str)));
+                    return Err(SodsError::PatternError(format!(
+                        "Unsupported condition: {}",
+                        cond_str
+                    )));
                 };
                 (base, cond)
             } else {
@@ -104,25 +116,37 @@ impl BehavioralPattern {
             if let Some(start_idx) = part_base.find('{') {
                 if let Some(end_idx) = part_base.find('}') {
                     // ReDoS Protection: Ensure only one quantifier block per segment
-                    if part_base[end_idx+1..].contains('{') || part_base[..start_idx].contains('{') {
-                        return Err(SodsError::PatternError("Nested or multiple quantifiers not supported".into()));
+                    if part_base[end_idx + 1..].contains('{')
+                        || part_base[..start_idx].contains('{')
+                    {
+                        return Err(SodsError::PatternError(
+                            "Nested or multiple quantifiers not supported".into(),
+                        ));
                     }
 
                     // Ensure no trailing text after '}' in the base part
-                    if !part_base[end_idx+1..].trim().is_empty() {
-                        return Err(SodsError::PatternError(format!("Unexpected text after quantifier: '{}'", &part_base[end_idx+1..])));
+                    if !part_base[end_idx + 1..].trim().is_empty() {
+                        return Err(SodsError::PatternError(format!(
+                            "Unexpected text after quantifier: '{}'",
+                            &part_base[end_idx + 1..]
+                        )));
                     }
 
                     let symbol = part_base[..start_idx].trim().to_string();
-                    let quantifier = &part_base[start_idx+1..end_idx]; // inside {}
+                    let quantifier = &part_base[start_idx + 1..end_idx]; // inside {}
 
                     if let Some(comma_idx) = quantifier.find(',') {
                         let min_str = quantifier[..comma_idx].trim();
-                        let max_str = quantifier[comma_idx+1..].trim();
+                        let max_str = quantifier[comma_idx + 1..].trim();
 
-                        let min = min_str.parse::<usize>().map_err(|_| SodsError::PatternError(format!("Invalid min quantifier: {}", min_str)))?;
+                        let min = min_str.parse::<usize>().map_err(|_| {
+                            SodsError::PatternError(format!("Invalid min quantifier: {}", min_str))
+                        })?;
                         if min > MAX_QUANTIFIER_VALUE {
-                            return Err(SodsError::PatternError(format!("Quantifier too large (max {})", MAX_QUANTIFIER_VALUE)));
+                            return Err(SodsError::PatternError(format!(
+                                "Quantifier too large (max {})",
+                                MAX_QUANTIFIER_VALUE
+                            )));
                         }
 
                         if max_str.is_empty() {
@@ -130,25 +154,47 @@ impl BehavioralPattern {
                             steps.push(PatternStep::AtLeast(symbol, min, condition));
                         } else {
                             // {n,m}
-                            let max = max_str.parse::<usize>().map_err(|_| SodsError::PatternError(format!("Invalid max quantifier: {}", max_str)))?;
+                            let max = max_str.parse::<usize>().map_err(|_| {
+                                SodsError::PatternError(format!(
+                                    "Invalid max quantifier: {}",
+                                    max_str
+                                ))
+                            })?;
                             if max > MAX_QUANTIFIER_VALUE {
-                                return Err(SodsError::PatternError(format!("Quantifier too large (max {})", MAX_QUANTIFIER_VALUE)));
+                                return Err(SodsError::PatternError(format!(
+                                    "Quantifier too large (max {})",
+                                    MAX_QUANTIFIER_VALUE
+                                )));
                             }
                             if max < min {
-                                return Err(SodsError::PatternError(format!("Max quantifier {} must be >= min {}", max, min)));
+                                return Err(SodsError::PatternError(format!(
+                                    "Max quantifier {} must be >= min {}",
+                                    max, min
+                                )));
                             }
                             steps.push(PatternStep::Range(symbol, min, max, condition));
                         }
                     } else {
                         // {n} exact count shorthand -> treat as Range(n, n)
-                        let count = quantifier.trim().parse::<usize>().map_err(|_| SodsError::PatternError(format!("Invalid exact quantifier: {}", quantifier)))?;
+                        let count = quantifier.trim().parse::<usize>().map_err(|_| {
+                            SodsError::PatternError(format!(
+                                "Invalid exact quantifier: {}",
+                                quantifier
+                            ))
+                        })?;
                         if count > MAX_QUANTIFIER_VALUE {
-                            return Err(SodsError::PatternError(format!("Quantifier too large (max {})", MAX_QUANTIFIER_VALUE)));
+                            return Err(SodsError::PatternError(format!(
+                                "Quantifier too large (max {})",
+                                MAX_QUANTIFIER_VALUE
+                            )));
                         }
                         steps.push(PatternStep::Range(symbol, count, count, condition));
                     }
                 } else {
-                    return Err(SodsError::PatternError(format!("Unclosed quantifier: expected '}}' in segment '{}'", part_base)));
+                    return Err(SodsError::PatternError(format!(
+                        "Unclosed quantifier: expected '}}' in segment '{}'",
+                        part_base
+                    )));
                 }
             } else {
                 // Check if we have an unmatched '}'
@@ -156,26 +202,40 @@ impl BehavioralPattern {
                     return Err(SodsError::PatternError("Unmatched '}' in pattern".into()));
                 }
                 // Single symbol
-                // Validation: Symbol name must be alphanumeric + simple chars (+, -, _) 
+                // Validation: Symbol name must be alphanumeric + simple chars (+, -, _)
                 // and MUST NOT contain control characters or null bytes.
-                if part_base.is_empty() || part_base.chars().any(|c| c.is_control() || c == '\0' || (!c.is_alphanumeric() && c != '+' && c != '-' && c != '_')) {
-                    return Err(SodsError::PatternError(format!("Invalid symbol name: {:?}", part_base)));
+                if part_base.is_empty()
+                    || part_base.chars().any(|c| {
+                        c.is_control()
+                            || c == '\0'
+                            || (!c.is_alphanumeric() && c != '+' && c != '-' && c != '_')
+                    })
+                {
+                    return Err(SodsError::PatternError(format!(
+                        "Invalid symbol name: {:?}",
+                        part_base
+                    )));
                 }
                 steps.push(PatternStep::Exact(part_base.to_string(), condition));
             }
 
             // Check Limits
             if steps.len() > MAX_SYMBOLS_PER_PATTERN {
-                return Err(SodsError::PatternError(format!("Pattern too complex (max {} symbols)", MAX_SYMBOLS_PER_PATTERN)));
+                return Err(SodsError::PatternError(format!(
+                    "Pattern too complex (max {} symbols)",
+                    MAX_SYMBOLS_PER_PATTERN
+                )));
             }
 
             if start_time.elapsed() > Duration::from_millis(PARSING_TIMEOUT_MS) {
-                return Err(SodsError::PatternError("Pattern parsing timed out (DoS Protection)".into()));
+                return Err(SodsError::PatternError(
+                    "Pattern parsing timed out (DoS Protection)".into(),
+                ));
             }
         }
 
         if steps.is_empty() {
-             return Err(SodsError::PatternError("Empty pattern".to_string()));
+            return Err(SodsError::PatternError("Empty pattern".to_string()));
         }
 
         Ok(Self { steps })
@@ -184,9 +244,9 @@ impl BehavioralPattern {
     /// Check if the pattern matches the given sorted symbols.
     /// Returns the sequence of matched symbols if found, or None.
     pub fn matches<'a>(
-        &self, 
+        &self,
         symbols: &'a [BehavioralSymbol],
-        registry: Option<&ContractRegistry>
+        registry: Option<&ContractRegistry>,
     ) -> Option<Vec<&'a BehavioralSymbol>> {
         let mut matched_sequence = Vec::new();
         let mut current_sym_idx = 0;
@@ -203,10 +263,10 @@ impl BehavioralPattern {
                         s.symbol == *target && Self::check_condition(s, cond, registry)
                     })?;
                     let absolute_idx = current_sym_idx + found_idx;
-                    
+
                     matched_sequence.push(&symbols[absolute_idx]);
                     current_sym_idx = absolute_idx + 1;
-                },
+                }
                 PatternStep::AtLeast(target, min, cond) => {
                     let mut count = 0;
                     let mut temp_matched = Vec::new();
@@ -230,7 +290,7 @@ impl BehavioralPattern {
 
                     matched_sequence.extend(temp_matched);
                     current_sym_idx = idx;
-                },
+                }
                 PatternStep::Range(target, min, max, cond) => {
                     let mut count = 0;
                     let mut temp_matched = Vec::new();
@@ -249,7 +309,7 @@ impl BehavioralPattern {
                     }
 
                     if count < *min {
-                        return None; 
+                        return None;
                     }
 
                     matched_sequence.extend(temp_matched);
@@ -262,9 +322,9 @@ impl BehavioralPattern {
     }
 
     fn check_condition(
-        symbol: &BehavioralSymbol, 
+        symbol: &BehavioralSymbol,
         condition: &PatternCondition,
-        registry: Option<&ContractRegistry>
+        registry: Option<&ContractRegistry>,
     ) -> bool {
         match condition {
             PatternCondition::None => true,
@@ -284,7 +344,11 @@ impl BehavioralPattern {
 }
 
 /// Helper function for ZK guest or simple matching
-pub fn matches_str(symbols: &[BehavioralSymbol], pattern_str: &str, registry: Option<&ContractRegistry>) -> bool {
+pub fn matches_str(
+    symbols: &[BehavioralSymbol],
+    pattern_str: &str,
+    registry: Option<&ContractRegistry>,
+) -> bool {
     if let Ok(p) = BehavioralPattern::parse(pattern_str) {
         p.matches(symbols, registry).is_some()
     } else {
@@ -303,24 +367,39 @@ pub fn parse_amount(input: &str) -> Result<U256> {
     } else if parts.len() == 1 {
         (parts[0], "wei".to_string()) // Default to wei
     } else {
-        return Err(SodsError::PatternError(format!("Malformed amount: {}", input)));
+        return Err(SodsError::PatternError(format!(
+            "Malformed amount: {}",
+            input
+        )));
     };
 
     // Split amount into integer and decimal parts
     let amount_parts: Vec<&str> = amount_str.split('.').collect();
     if amount_parts.len() > 2 {
-        return Err(SodsError::PatternError(format!("Invalid amount format (multiple dots): {}", amount_str)));
+        return Err(SodsError::PatternError(format!(
+            "Invalid amount format (multiple dots): {}",
+            amount_str
+        )));
     }
 
     let base_str = amount_parts[0];
-    let decimals_str = if amount_parts.len() > 1 { amount_parts[1] } else { "" };
+    let decimals_str = if amount_parts.len() > 1 {
+        amount_parts[1]
+    } else {
+        ""
+    };
 
     // Determine target decimals based on unit
     let target_decimals = match unit.as_str() {
         "ether" => 18,
         "gwei" => 9,
         "wei" => 0,
-        _ => return Err(SodsError::PatternError(format!("Unsupported unit: {}", unit))),
+        _ => {
+            return Err(SodsError::PatternError(format!(
+                "Unsupported unit: {}",
+                unit
+            )))
+        }
     };
 
     // Parse integer part
@@ -339,16 +418,19 @@ pub fn parse_amount(input: &str) -> Result<U256> {
         if !decimals_str.is_empty() {
             let decimals_len = decimals_str.len().min(target_decimals as usize);
             let decimal_part_str = &decimals_str[..decimals_len];
-            
+
             let decimal_part = U256::from_dec_str(decimal_part_str)
                 .map_err(|e| SodsError::PatternError(format!("Invalid decimal part: {}", e)))?;
-            
+
             // Add scaled decimal part
-            let decimal_scale = U256::from(10u64).pow(U256::from(target_decimals as u32 - decimals_len as u32));
+            let decimal_scale =
+                U256::from(10u64).pow(U256::from(target_decimals as u32 - decimals_len as u32));
             result = result.saturating_add(decimal_part.saturating_mul(decimal_scale));
         }
     } else if !decimals_str.is_empty() {
-        return Err(SodsError::PatternError("Decimals not allowed for 'wei' unit".into()));
+        return Err(SodsError::PatternError(
+            "Decimals not allowed for 'wei' unit".into(),
+        ));
     } else {
         // Non-ether/gwei path (wei or raw), already matches U256 format or handled above
     }
@@ -368,7 +450,10 @@ mod tests {
     fn test_parse_simple() {
         let p = BehavioralPattern::parse("Tf -> Dep").unwrap();
         match &p.steps[0] {
-            PatternStep::Exact(s, c) => { assert_eq!(s, "Tf"); assert_eq!(c, &PatternCondition::None); }
+            PatternStep::Exact(s, c) => {
+                assert_eq!(s, "Tf");
+                assert_eq!(c, &PatternCondition::None);
+            }
             _ => panic!("Wrong step type"),
         }
     }
@@ -377,9 +462,9 @@ mod tests {
     fn test_parse_condition() {
         let p = BehavioralPattern::parse("Tf where from == deployer -> Sw").unwrap();
         match &p.steps[0] {
-            PatternStep::Exact(s, c) => { 
-                assert_eq!(s, "Tf"); 
-                assert_eq!(c, &PatternCondition::FromDeployer); 
+            PatternStep::Exact(s, c) => {
+                assert_eq!(s, "Tf");
+                assert_eq!(c, &PatternCondition::FromDeployer);
             }
             _ => panic!("Wrong step type"),
         }
@@ -396,16 +481,16 @@ mod tests {
         let mut sym1 = mock_sym("Tf", 0);
         sym1.is_from_deployer = true;
         let sym2 = mock_sym("Sw", 1);
-        
+
         let symbols = vec![sym1, sym2.clone()];
-        
+
         let p = BehavioralPattern::parse("Tf where from == deployer -> Sw").unwrap();
         assert!(p.matches(&symbols, None).is_some());
 
         // Test fail condition
         let sym3 = mock_sym("Tf", 0); // is_from_deployer = false by default
         let symbols_fail = vec![sym3, sym2];
-         assert!(p.matches(&symbols_fail, None).is_none());
+        assert!(p.matches(&symbols_fail, None).is_none());
     }
 
     #[test]
@@ -465,13 +550,21 @@ mod tests {
     #[test]
     fn test_match_value_condition() {
         use ethers_core::types::Address;
-        let sym_high = BehavioralSymbol::new("Tf", 0)
-            .with_context(Address::zero(), Address::zero(), U256::from(2_000_000_000_000_000_000u128), None);
-        let sym_low = BehavioralSymbol::new("Tf", 1)
-            .with_context(Address::zero(), Address::zero(), U256::from(500_000_000_000_000_000u128), None);
-        
+        let sym_high = BehavioralSymbol::new("Tf", 0).with_context(
+            Address::zero(),
+            Address::zero(),
+            U256::from(2_000_000_000_000_000_000u128),
+            None,
+        );
+        let sym_low = BehavioralSymbol::new("Tf", 1).with_context(
+            Address::zero(),
+            Address::zero(),
+            U256::from(500_000_000_000_000_000u128),
+            None,
+        );
+
         let p = BehavioralPattern::parse("Tf where value > 1 ether").unwrap();
-        
+
         // High value matches
         assert!(p.matches(&vec![sym_high], None).is_some());
         // Low value fails
@@ -480,8 +573,14 @@ mod tests {
 
     #[test]
     fn test_parse_amount_units() {
-        assert_eq!(parse_amount("10 ether").unwrap(), U256::from(10_000_000_000_000_000_000u128));
-        assert_eq!(parse_amount("500 gwei").unwrap(), U256::from(500_000_000_000u128));
+        assert_eq!(
+            parse_amount("10 ether").unwrap(),
+            U256::from(10_000_000_000_000_000_000u128)
+        );
+        assert_eq!(
+            parse_amount("500 gwei").unwrap(),
+            U256::from(500_000_000_000u128)
+        );
         assert_eq!(parse_amount("1000000").unwrap(), U256::from(1_000_000));
     }
 
@@ -492,11 +591,7 @@ mod tests {
     }
     #[test]
     fn test_matches_str() {
-        let symbols = vec![
-            mock_sym("Tf", 0),
-            mock_sym("Sw", 1),
-            mock_sym("Tf", 2),
-        ];
+        let symbols = vec![mock_sym("Tf", 0), mock_sym("Sw", 1), mock_sym("Tf", 2)];
         assert!(matches_str(&symbols, "Tf -> Sw", None));
         assert!(matches_str(&symbols, "Sandwich", None));
         assert!(!matches_str(&symbols, "Dep", None));
@@ -504,27 +599,25 @@ mod tests {
 
     #[test]
     fn test_rigorous_quantifier_matching() {
-        let symbols = vec![
-            mock_sym("Sw", 0),
-            mock_sym("Tf", 1),
-            mock_sym("Sw", 2),
-        ];
-        
+        let symbols = vec![mock_sym("Sw", 0), mock_sym("Tf", 1), mock_sym("Sw", 2)];
+
         // Exact {2} should FAIL because Tf is in the middle (it looks for EXACT SEQUENCE of Sw then Sw)
         // Wait, the current implementation of position(|s| s.symbol == *target) allows intermediate symbols.
         // Let's check the objective: "'Sw{2}' Valid: [Sw, Sw], Invalid: [Sw, Tf, Sw]"
-        // My current 'matches' logic uses .iter().position(...) which finds the NEXT occurrence, 
+        // My current 'matches' logic uses .iter().position(...) which finds the NEXT occurrence,
         // essentially treating it as "contains sequence" rather than "exact adjacent sequence".
-        
+
         // RE-AUDIT: If the objective requires [Sw, Tf, Sw] to FAIL for Sw{2}, I need to fix the logic.
         // The objective says "Invalid Sequence" for Sw{2} is [Sw, Tf, Sw].
         // So they MUST be adjacent.
-        
+
         let p = BehavioralPattern::parse("Sw{2}").unwrap();
-        assert!(p.matches(&vec![mock_sym("Sw", 0), mock_sym("Sw", 1)], None).is_some());
-        
+        assert!(p
+            .matches(&vec![mock_sym("Sw", 0), mock_sym("Sw", 1)], None)
+            .is_some());
+
         // This MUST FAIL now per objective audit
-        assert!(p.matches(&symbols, None).is_none()); 
+        assert!(p.matches(&symbols, None).is_none());
     }
 
     #[test]
@@ -533,12 +626,12 @@ mod tests {
         // The parser should treat this as part of the condition value or fail
         let malicious = "LP+ where from == 0x0 OR 1==1";
         let result = BehavioralPattern::parse(malicious);
-        
+
         // Our current parser is very strict on '==' format.
         // If it doesn't match 'key == value', it fails or ignores the 'OR' part.
         match result {
             Ok(p) => {
-                // If it parsed, ensure the condition is exactly what we expect 
+                // If it parsed, ensure the condition is exactly what we expect
                 // and DOES NOT include the injected OR logic
                 for step in p.steps {
                     if let PatternStep::Exact(_, cond) = step {
@@ -547,7 +640,7 @@ mod tests {
                         }
                     }
                 }
-            },
+            }
             Err(_) => println!("✅ Logic injection rejected by strict parser."),
         }
     }

@@ -43,7 +43,10 @@ pub fn verification_result(
 ) {
     println!();
     if verified {
-        success(&format!("Verified via {} ({} occurrences found)", method, occurrences));
+        success(&format!(
+            "Verified via {} ({} occurrences found)",
+            method, occurrences
+        ));
         kv("Proof size", &format!("{} bytes", proof_size));
         kv("Total time", &format!("{:.2}s", time_ms as f64 / 1000.0));
         kv("Confidence", "High");

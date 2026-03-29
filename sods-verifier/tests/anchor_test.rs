@@ -7,7 +7,9 @@ use std::env;
 
 fn get_rpc_url() -> Option<String> {
     let project_id = env::var("INFURA_PROJECT_ID").ok()?;
-    if project_id.is_empty() { return None; }
+    if project_id.is_empty() {
+        return None;
+    }
     Some(format!("https://sepolia.infura.io/v3/{}", project_id))
 }
 
@@ -31,7 +33,7 @@ async fn test_trustless_verification_success() {
     assert_eq!(result.verification_mode, VerificationMode::Trustless);
     assert_eq!(result.occurrences, 20); // Known value for this block
     assert!(result.is_verified);
-    
+
     println!("✅ Trustless verification passed: {:?}", result);
 }
 

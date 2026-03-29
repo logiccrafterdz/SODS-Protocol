@@ -75,8 +75,11 @@ pub async fn run(args: RegisterAgentArgs) -> i32 {
         return 1;
     }
 
-    println!("✅ Agent registration file created at: {}", file_path.display());
+    println!(
+        "✅ Agent registration file created at: {}",
+        file_path.display()
+    );
     println!("🚀 You can now host this file on IPFS or your service endpoint.");
-    
+
     0
 }

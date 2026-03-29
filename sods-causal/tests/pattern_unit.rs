@@ -1,6 +1,6 @@
-use std::time::Duration;
 use ethers::types::Address;
-use sods_causal::{CausalEvent, AgentBehaviorPattern};
+use sods_causal::{AgentBehaviorPattern, CausalEvent};
+use std::time::Duration;
 
 fn create_event(timestamp: u64, result: &str) -> CausalEvent {
     CausalEvent::builder()

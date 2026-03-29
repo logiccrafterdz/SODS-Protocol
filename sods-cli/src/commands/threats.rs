@@ -2,9 +2,9 @@
 
 use clap::{Args, Subcommand};
 use colored::Colorize;
+use sods_p2p::ThreatRule;
 use std::fs;
 use std::path::PathBuf;
-use sods_p2p::ThreatRule;
 
 #[derive(Args)]
 pub struct ThreatsArgs {
@@ -17,9 +17,9 @@ pub enum ThreatsCommands {
     /// List active threat rules
     List,
     /// Add a trusted researcher public key (hex)
-    AddKey { 
+    AddKey {
         /// Compressed public key (33 bytes) in hex
-        key: String 
+        key: String,
     },
 }
 

@@ -15,11 +15,7 @@ fn create_event(nonce: u64, seq: u32) -> CausalEvent {
 
 #[test]
 fn test_tree_root_consistency() {
-    let events = vec![
-        create_event(0, 0),
-        create_event(0, 1),
-        create_event(1, 0),
-    ];
+    let events = vec![create_event(0, 0), create_event(0, 1), create_event(1, 0)];
 
     let tree1 = CausalMerkleTree::new(events.clone()).unwrap();
     let tree2 = CausalMerkleTree::new(events).unwrap();
@@ -42,7 +38,7 @@ fn test_causal_ordering_enforced() {
 fn test_single_event_tree() {
     let event = create_event(0, 0);
     let tree = CausalMerkleTree::new(vec![event]).unwrap();
-    
+
     assert_ne!(tree.root, ethers::types::H256::zero());
     assert_eq!(tree.levels_len(), 1);
     assert_eq!(tree.get_hash(0, 0).unwrap(), tree.root);

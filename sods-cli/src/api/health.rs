@@ -1,7 +1,12 @@
-use serde::{Serialize, Deserialize};
-use axum::{extract::{State, FromRef}, http::StatusCode, Json, Router, routing::get};
-use std::sync::Arc;
 use crate::monitoring::metrics::AgentMetrics;
+use axum::{
+    extract::{FromRef, State},
+    http::StatusCode,
+    routing::get,
+    Json, Router,
+};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HealthResponse {
@@ -41,7 +46,9 @@ pub struct MonitoringState {
 
 impl FromRef<Arc<AgentMetrics>> for MonitoringState {
     fn from_ref(metrics: &Arc<AgentMetrics>) -> Self {
-        Self { metrics: Some(metrics.clone()) }
+        Self {
+            metrics: Some(metrics.clone()),
+        }
     }
 }
 
@@ -54,7 +61,7 @@ pub async fn health_check(State(state): State<MonitoringState>) -> Json<HealthRe
         } else {
             100.0
         };
-        
+
         let status = if success_rate >= 80.0 && total_requests > 0.0 {
             "healthy".to_string()
         } else if total_requests == 0.0 {
@@ -62,20 +69,20 @@ pub async fn health_check(State(state): State<MonitoringState>) -> Json<HealthRe
         } else {
             "degraded".to_string()
         };
-        
+
         let erc8004_status = Erc8004Status {
             identity_registered: total_requests > 0.0,
             validation_registry_connected: total_requests > 0.0,
             reputation_registry_connected: metrics.feedback_received_total.get() > 0.0,
             escrow_contract_accessible: metrics.payments_received_total.get() > 0.0,
         };
-        
+
         let health_metrics = HealthMetrics {
             uptime_seconds: metrics.agent_uptime_seconds.get() as u64,
             validation_success_rate: success_rate,
             quality_score: metrics.average_quality_score.get() as u32,
         };
-        
+
         (status, erc8004_status, health_metrics)
     } else {
         (
@@ -90,10 +97,10 @@ pub async fn health_check(State(state): State<MonitoringState>) -> Json<HealthRe
                 uptime_seconds: 0,
                 validation_success_rate: 100.0,
                 quality_score: 100,
-            }
+            },
         )
     };
-    
+
     Json(HealthResponse {
         status,
         version: env!("CARGO_PKG_VERSION").to_string(),
@@ -102,10 +109,14 @@ pub async fn health_check(State(state): State<MonitoringState>) -> Json<HealthRe
     })
 }
 
-pub async fn readiness_check(State(state): State<MonitoringState>) -> Result<Json<ReadyResponse>, StatusCode> {
+pub async fn readiness_check(
+    State(state): State<MonitoringState>,
+) -> Result<Json<ReadyResponse>, StatusCode> {
     if let Some(ref metrics) = state.metrics {
         if metrics.validation_requests_received_total.get() > 0.0 {
-            return Ok(Json(ReadyResponse { status: "ready".to_string() }));
+            return Ok(Json(ReadyResponse {
+                status: "ready".to_string(),
+            }));
         }
     }
     Err(StatusCode::SERVICE_UNAVAILABLE)
@@ -128,7 +139,9 @@ mod tests {
     #[tokio::test]
     async fn test_health_starting_status() {
         let metrics = Arc::new(AgentMetrics::new().unwrap());
-        let state = MonitoringState { metrics: Some(metrics) };
+        let state = MonitoringState {
+            metrics: Some(metrics),
+        };
         let response = health_check(State(state)).await;
         assert_eq!(response.0.status, "starting");
     }
@@ -138,8 +151,10 @@ mod tests {
         let metrics = Arc::new(AgentMetrics::new().unwrap());
         metrics.validation_requests_received_total.inc();
         metrics.validation_responses_submitted_total.inc();
-        
-        let state = MonitoringState { metrics: Some(metrics) };
+
+        let state = MonitoringState {
+            metrics: Some(metrics),
+        };
         let response = health_check(State(state)).await;
         assert_eq!(response.0.status, "healthy");
         assert_eq!(response.0.metrics.validation_success_rate, 100.0);
@@ -153,8 +168,10 @@ mod tests {
             metrics.validation_requests_received_total.inc();
         }
         metrics.validation_responses_submitted_total.inc();
-        
-        let state = MonitoringState { metrics: Some(metrics) };
+
+        let state = MonitoringState {
+            metrics: Some(metrics),
+        };
         let response = health_check(State(state)).await;
         assert_eq!(response.0.status, "degraded");
         assert_eq!(response.0.metrics.validation_success_rate, 10.0);
@@ -170,7 +187,9 @@ mod tests {
     #[tokio::test]
     async fn test_readiness_unavailable_when_no_requests() {
         let metrics = Arc::new(AgentMetrics::new().unwrap());
-        let state = MonitoringState { metrics: Some(metrics) };
+        let state = MonitoringState {
+            metrics: Some(metrics),
+        };
         let result = readiness_check(State(state)).await;
         assert!(result.is_err());
     }
@@ -179,7 +198,9 @@ mod tests {
     async fn test_readiness_available_after_request() {
         let metrics = Arc::new(AgentMetrics::new().unwrap());
         metrics.validation_requests_received_total.inc();
-        let state = MonitoringState { metrics: Some(metrics) };
+        let state = MonitoringState {
+            metrics: Some(metrics),
+        };
         let result = readiness_check(State(state)).await;
         assert!(result.is_ok());
     }
@@ -195,9 +216,13 @@ mod tests {
                 m.validation_responses_submitted_total.inc();
             }));
         }
-        for h in handles { h.await.unwrap(); }
-        
-        let state = MonitoringState { metrics: Some(metrics.clone()) };
+        for h in handles {
+            h.await.unwrap();
+        }
+
+        let state = MonitoringState {
+            metrics: Some(metrics.clone()),
+        };
         let response = health_check(State(state)).await;
         assert_eq!(response.0.status, "healthy");
         assert_eq!(response.0.metrics.validation_success_rate, 100.0);

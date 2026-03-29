@@ -53,7 +53,11 @@ pub async fn run(args: ZkProveArgs) -> i32 {
     let rpc_urls: Vec<String> = if let Some(url) = args.rpc_url {
         vec![url]
     } else {
-        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+        chain_config
+            .rpc_urls
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
     };
 
     if !args.json {
@@ -65,7 +69,7 @@ pub async fn run(args: ZkProveArgs) -> i32 {
     }
 
     let start = std::time::Instant::now();
-    
+
     // 1. Create verifier and fetch symbols
     let verifier = match BlockVerifier::new(&rpc_urls) {
         Ok(v) => v,
@@ -108,11 +112,11 @@ pub async fn run(args: ZkProveArgs) -> i32 {
     let receipt_path = "proof.bin";
     let journal_path = "journal.bin";
     let receipt_bytes = bincode::serialize(&receipt).unwrap_or_default();
-    
+
     if let Ok(mut file) = File::create(receipt_path) {
         let _ = file.write_all(&receipt_bytes);
     }
-    
+
     if let Ok(mut file) = File::create(journal_path) {
         let _ = file.write_all(&receipt.journal.bytes);
     }
@@ -135,7 +139,7 @@ pub async fn run(args: ZkProveArgs) -> i32 {
         println!("Receipt: {}", receipt_path);
         println!("Journal: {} (use for on-chain verification)", journal_path);
         println!("Time taken: {:?}", start.elapsed());
-        
+
         let public_json = "public.json";
         if let Ok(mut file) = File::create(public_json) {
             let _ = file.write_all(serde_json::to_string_pretty(&result).unwrap().as_bytes());

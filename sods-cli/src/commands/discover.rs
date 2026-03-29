@@ -60,7 +60,11 @@ pub async fn run(args: DiscoverArgs) -> i32 {
             output::error(&format!("Symbol '{}' not supported.", args.symbol));
             output::hint(&format!(
                 "Supported symbols: {}",
-                SYMBOLS.iter().map(|(s, _)| *s).collect::<Vec<_>>().join(", ")
+                SYMBOLS
+                    .iter()
+                    .map(|(s, _)| *s)
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
         }
         return 1;
@@ -95,7 +99,11 @@ pub async fn run(args: DiscoverArgs) -> i32 {
     }
 
     // 2. Initialize Verifier
-    let rpc_urls: Vec<String> = chain_config.rpc_urls.iter().map(|s| s.to_string()).collect();
+    let rpc_urls: Vec<String> = chain_config
+        .rpc_urls
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     let is_l2 = chain_config.name != "ethereum" && chain_config.name != "sepolia";
     let profile = if is_l2 {
         sods_verifier::rpc::BackoffProfile::L2
@@ -145,7 +153,10 @@ pub async fn run(args: DiscoverArgs) -> i32 {
 
     // Iterate in reverse (newest first)
     for block_num in (start_block..=end_block).rev() {
-        match verifier.verify_symbol_in_block(&args.symbol, block_num).await {
+        match verifier
+            .verify_symbol_in_block(&args.symbol, block_num)
+            .await
+        {
             Ok(result) => {
                 if result.occurrences > 0 {
                     results.push(BlockCount {
@@ -161,7 +172,7 @@ pub async fn run(args: DiscoverArgs) -> i32 {
                 }
             }
         }
-        
+
         // Rate limiting delay
         sleep(Duration::from_millis(500)).await;
     }
@@ -182,16 +193,19 @@ pub async fn run(args: DiscoverArgs) -> i32 {
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
     } else {
         if results.is_empty() {
-             output::info("No events found in the scanned range.");
+            output::info("No events found in the scanned range.");
         } else {
             for (i, res) in results.iter().take(10).enumerate() {
-                 let medal = match i {
+                let medal = match i {
                     0 => "🥇",
                     1 => "🥈",
                     2 => "🥉",
                     _ => "  ",
                 };
-                println!("{} Block {}: {} {} events", medal, res.block, res.count, args.symbol);
+                println!(
+                    "{} Block {}: {} {} events",
+                    medal, res.block, res.count, args.symbol
+                );
             }
         }
     }

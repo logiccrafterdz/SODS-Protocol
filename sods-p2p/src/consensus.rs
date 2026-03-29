@@ -12,7 +12,7 @@ pub const DEFAULT_THRESHOLD: f64 = 0.66;
 /// Calculate required quorum count based on network size.
 pub fn required_quorum(peer_count: usize) -> usize {
     match peer_count {
-        0..=10 => peer_count,        // 100% for small networks (bootstrap phase)
+        0..=10 => peer_count, // 100% for small networks (bootstrap phase)
         11..=100 => (peer_count * 2 + 2) / 3, // ~67% 2f+1 style
         _ => (peer_count * 3 + 4) / 5, // 60% for large networks
     }
@@ -62,23 +62,18 @@ pub fn evaluate_consensus(
     }
 
     let total_count = responses.len();
-    
+
     // Calculate total weight of all responding peers
-    let total_weight: f32 = responses.iter()
-        .map(|(p, _)| reputation.get_score(p))
-        .sum();
+    let total_weight: f32 = responses.iter().map(|(p, _)| reputation.get_score(p)).sum();
 
     if total_weight <= 0.0 {
-         // Edge case: all peers have 0 reputation? fallback to count?
-         // For now, if 0 weight, we can't decide trusted consensus.
-         return ConsensusResult::failed(total_count);
+        // Edge case: all peers have 0 reputation? fallback to count?
+        // For now, if 0 weight, we can't decide trusted consensus.
+        return ConsensusResult::failed(total_count);
     }
 
     // Filter successful responses
-    let successful: Vec<_> = responses
-        .iter()
-        .filter(|(_, r)| r.success)
-        .collect();
+    let successful: Vec<_> = responses.iter().filter(|(_, r)| r.success).collect();
 
     if successful.is_empty() {
         return ConsensusResult {
@@ -94,10 +89,7 @@ pub fn evaluate_consensus(
     // Group by BMT root
     let mut groups: HashMap<[u8; 32], Vec<(PeerId, &ProofResponse)>> = HashMap::new();
     for (peer, resp) in &successful {
-        groups
-            .entry(resp.bmt_root)
-            .or_default()
-            .push((*peer, resp));
+        groups.entry(resp.bmt_root).or_default().push((*peer, resp));
     }
 
     // Find the group with highest weight
@@ -110,7 +102,10 @@ pub fn evaluate_consensus(
         })
         .expect("successful is non-empty");
 
-    let agreeing_weight: f32 = largest_group.iter().map(|(p, _)| reputation.get_score(p)).sum();
+    let agreeing_weight: f32 = largest_group
+        .iter()
+        .map(|(p, _)| reputation.get_score(p))
+        .sum();
     let agreement_ratio = agreeing_weight / total_weight;
 
     // Identify conflicting peers (those not in the largest group)
@@ -124,7 +119,7 @@ pub fn evaluate_consensus(
     if agreement_ratio as f64 >= threshold {
         // Consensus reached
         let proof_bytes = largest_group.first().map(|(_, r)| r.proof_bytes.clone());
-        
+
         ConsensusResult {
             is_verified: true,
             agreeing_peers: agreeing_peers.len(),
@@ -167,7 +162,9 @@ mod tests {
 
         // peer1: default 0.1
         // peer2: reward 10x -> high score
-        for _ in 0..10 { tracker.reward(&peer2); } 
+        for _ in 0..10 {
+            tracker.reward(&peer2);
+        }
         // peer3: default 0.1
 
         let good_root = [0xAA; 32];
@@ -180,11 +177,9 @@ mod tests {
         ];
 
         let result = evaluate_consensus(responses, &tracker, DEFAULT_THRESHOLD);
-        
+
         assert!(result.is_verified);
         assert_eq!(result.bmt_root, Some(good_root));
         assert!(result.conflicting_peers.contains(&peer3));
     }
 }
-
-

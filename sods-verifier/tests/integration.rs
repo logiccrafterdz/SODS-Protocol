@@ -13,11 +13,11 @@ use sods_verifier::BlockVerifier;
 /// Get the RPC URL from environment, or skip test if not set.
 fn get_rpc_url() -> Option<String> {
     let project_id = env::var("INFURA_PROJECT_ID").ok()?;
-    
+
     if project_id.is_empty() || project_id == "your_project_id_here" {
         return None;
     }
-    
+
     Some(format!("https://sepolia.infura.io/v3/{}", project_id))
 }
 
@@ -35,7 +35,7 @@ async fn test_verify_deposit_symbol() {
     };
 
     let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
-    
+
     let result = verifier
         .verify_symbol_in_block("Dep", TEST_BLOCK)
         .await
@@ -47,10 +47,17 @@ async fn test_verify_deposit_symbol() {
     println!("  Total time: {:?}", result.total_time);
 
     // Assertions based on Python PoC results
-    assert!(result.is_verified, "Dep should be verified in block {}", TEST_BLOCK);
+    assert!(
+        result.is_verified,
+        "Dep should be verified in block {}",
+        TEST_BLOCK
+    );
     assert_eq!(result.occurrences, 2, "Expected 2 Dep occurrences");
-    assert!(result.proof_size_bytes > 0, "Proof should have non-zero size");
-    
+    assert!(
+        result.proof_size_bytes > 0,
+        "Proof should have non-zero size"
+    );
+
     // Print BMT root for comparison with Python PoC
     if let Some(ref root) = result.merkle_root {
         println!("  BMT Root: 0x{}", hex::encode(root));
@@ -65,7 +72,7 @@ async fn test_verify_transfer_symbol() {
     };
 
     let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
-    
+
     let result = verifier
         .verify_symbol_in_block("Tf", TEST_BLOCK)
         .await
@@ -74,7 +81,11 @@ async fn test_verify_transfer_symbol() {
     println!("\n{}", result);
 
     // Assertions based on Python PoC results
-    assert!(result.is_verified, "Tf should be verified in block {}", TEST_BLOCK);
+    assert!(
+        result.is_verified,
+        "Tf should be verified in block {}",
+        TEST_BLOCK
+    );
     assert_eq!(result.occurrences, 20, "Expected 20 Tf occurrences");
 }
 
@@ -86,7 +97,7 @@ async fn test_verify_withdrawal_symbol() {
     };
 
     let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
-    
+
     let result = verifier
         .verify_symbol_in_block("Wdw", TEST_BLOCK)
         .await
@@ -95,7 +106,11 @@ async fn test_verify_withdrawal_symbol() {
     println!("\n{}", result);
 
     // Assertions based on Python PoC results
-    assert!(result.is_verified, "Wdw should be verified in block {}", TEST_BLOCK);
+    assert!(
+        result.is_verified,
+        "Wdw should be verified in block {}",
+        TEST_BLOCK
+    );
     assert_eq!(result.occurrences, 1, "Expected 1 Wdw occurrence");
 }
 
@@ -107,7 +122,7 @@ async fn test_non_existent_symbol() {
     };
 
     let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
-    
+
     // LP+ likely doesn't exist in this block
     let result = verifier
         .verify_symbol_in_block("LP+", TEST_BLOCK)
@@ -129,13 +144,13 @@ async fn test_unsupported_symbol() {
     };
 
     let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
-    
+
     let result = verifier
         .verify_symbol_in_block("InvalidSymbol", TEST_BLOCK)
         .await;
 
     assert!(result.is_err(), "Should fail for invalid symbol");
-    
+
     let err = result.unwrap_err();
     println!("Error (expected): {}", err);
     assert!(err.to_string().contains("Unsupported symbol"));
@@ -149,7 +164,7 @@ async fn test_performance_under_2_seconds() {
     };
 
     let verifier = BlockVerifier::new(&[rpc_url]).expect("Failed to create verifier");
-    
+
     let result = verifier
         .verify_symbol_in_block("Dep", TEST_BLOCK)
         .await

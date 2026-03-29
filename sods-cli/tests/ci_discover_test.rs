@@ -1,5 +1,5 @@
-use std::process::Command;
 use std::env;
+use std::process::Command;
 
 #[test]
 fn test_discover_on_all_chains() {
@@ -15,7 +15,7 @@ fn test_discover_on_all_chains() {
 
     for chain in chains {
         println!("Testing discovery on chain: {}", chain);
-        
+
         let output = Command::new("cargo")
             .args(&[
                 "run",
@@ -28,7 +28,7 @@ fn test_discover_on_all_chains() {
                 chain,
                 "--last",
                 last_blocks,
-                "--json"
+                "--json",
             ])
             .output()
             .expect("Failed to execute command");
@@ -45,7 +45,14 @@ fn test_discover_on_all_chains() {
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        assert!(stdout.contains("\"success\": true"), "Output did not indicate success for chain {}", chain);
-        assert!(stdout.contains(&format!("\"chain\": \"{}\"", chain)), "Output missing correct chain info");
+        assert!(
+            stdout.contains("\"success\": true"),
+            "Output did not indicate success for chain {}",
+            chain
+        );
+        assert!(
+            stdout.contains(&format!("\"chain\": \"{}\"", chain)),
+            "Output missing correct chain info"
+        );
     }
 }

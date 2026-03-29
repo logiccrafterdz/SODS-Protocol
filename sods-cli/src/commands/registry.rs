@@ -1,7 +1,7 @@
-use clap::{Args, Subcommand};
-use sods_core::ContractRegistry;
-use ethers_core::types::Address;
 use crate::output;
+use clap::{Args, Subcommand};
+use ethers_core::types::Address;
+use sods_core::ContractRegistry;
 use std::str::FromStr;
 
 #[derive(Args)]
@@ -45,7 +45,11 @@ pub fn run(args: RegistryArgs) -> i32 {
     };
 
     match args.command {
-        RegistryCommands::Add { contract, deployer, block } => {
+        RegistryCommands::Add {
+            contract,
+            deployer,
+            block,
+        } => {
             let contract_addr = match Address::from_str(&contract) {
                 Ok(a) => a,
                 Err(_) => {
@@ -66,7 +70,10 @@ pub fn run(args: RegistryArgs) -> i32 {
                 output::error(&format!("Failed to save registry: {}", e));
                 return 1;
             }
-            output::success(&format!("Added {} (Deployer: {}) to registry.", contract, deployer));
+            output::success(&format!(
+                "Added {} (Deployer: {}) to registry.",
+                contract, deployer
+            ));
         }
 
         RegistryCommands::Import { path } => {
@@ -93,7 +100,7 @@ pub fn run(args: RegistryArgs) -> i32 {
                     if let (Ok(addr), Some(deployer_str), Some(block)) = (
                         Address::from_str(addr_str),
                         val.get("deployer").and_then(|v| v.as_str()),
-                        val.get("block").and_then(|v| v.as_u64())
+                        val.get("block").and_then(|v| v.as_u64()),
                     ) {
                         if let Ok(deployer_addr) = Address::from_str(deployer_str) {
                             registry.add(addr, deployer_addr, block, None);
@@ -107,7 +114,9 @@ pub fn run(args: RegistryArgs) -> i32 {
                 }
                 output::success(&format!("Imported {} contracts from {}.", count, path));
             } else {
-                output::error("Invalid JSON format. Expected an object mapping addresses to metadata.");
+                output::error(
+                    "Invalid JSON format. Expected an object mapping addresses to metadata.",
+                );
                 return 1;
             }
         }
@@ -116,11 +125,19 @@ pub fn run(args: RegistryArgs) -> i32 {
             if registry.contracts.is_empty() {
                 output::info("Registry is empty.");
             } else {
-                output::info(&format!("Registry contains {} entries:", registry.contracts.len()));
+                output::info(&format!(
+                    "Registry contains {} entries:",
+                    registry.contracts.len()
+                ));
                 println!("{:<44} | {:<44} | {:<10}", "Contract", "Deployer", "Block");
                 println!("{:-<44}-+-{:-<44}-+-{:-<10}", "", "", "");
                 for (contract, entry) in &registry.contracts {
-                    println!("{:<44} | {:<44} | {:<10}", format!("{:?}", contract), format!("{:?}", entry.deployer), entry.block);
+                    println!(
+                        "{:<44} | {:<44} | {:<10}",
+                        format!("{:?}", contract),
+                        format!("{:?}", entry.deployer),
+                        entry.block
+                    );
                 }
             }
         }

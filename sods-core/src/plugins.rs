@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-use ethers_core::types::H256;
 use crate::error::{Result, SodsError};
+use ethers_core::types::H256;
+use serde::{Deserialize, Serialize};
 
 /// Type of parser logic to apply for this symbol.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -55,6 +55,10 @@ mod tests {
         let plugin = SymbolPlugin::load_from_json(json).unwrap();
         assert_eq!(plugin.symbol, "SwV3");
         assert_eq!(plugin.parser, ParserType::Swap);
-        assert_eq!(plugin.event_topic, H256::from_str("0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67").unwrap());
+        assert_eq!(
+            plugin.event_topic,
+            H256::from_str("0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67")
+                .unwrap()
+        );
     }
 }

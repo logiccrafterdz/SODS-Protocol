@@ -1,8 +1,7 @@
 use ethers::types::Address;
 use sods_causal::{
-    CausalEvent, CausalMerkleTree, AgentBehaviorPattern, 
-    generate_behavioral_proof,
-    ReputationFeedback, ValidationRequest, ValidationHandler
+    generate_behavioral_proof, AgentBehaviorPattern, CausalEvent, CausalMerkleTree,
+    ReputationFeedback, ValidationHandler, ValidationRequest,
 };
 
 #[test]
@@ -21,7 +20,7 @@ fn test_feedback_parsing_and_storage() {
     };
 
     assert!(feedback.validate().is_ok());
-    
+
     let response = feedback.generate_response();
     assert!(response.contains("95"));
 }
@@ -29,18 +28,16 @@ fn test_feedback_parsing_and_storage() {
 #[test]
 fn test_validation_request_handling() {
     let agent_id = Address::random();
-    let events = vec![
-        CausalEvent::builder()
-            .agent_id(agent_id)
-            .nonce(0)
-            .sequence_index(0)
-            .event_type("task_executed")
-            .result("success")
-            .timestamp(1000)
-            .build()
-            .unwrap()
-    ];
-    
+    let events = vec![CausalEvent::builder()
+        .agent_id(agent_id)
+        .nonce(0)
+        .sequence_index(0)
+        .event_type("task_executed")
+        .result("success")
+        .timestamp(1000)
+        .build()
+        .unwrap()];
+
     let tree = CausalMerkleTree::new(events).unwrap();
     let pattern = AgentBehaviorPattern {
         event_type: "task_executed".to_string(),
@@ -69,17 +66,15 @@ fn test_validation_request_handling() {
 async fn test_full_agent_lifecycle_mock() {
     // 1. Setup History
     let agent_id = Address::repeat_byte(0x42);
-    let events = vec![
-        CausalEvent::builder()
-            .agent_id(agent_id)
-            .nonce(0)
-            .sequence_index(0)
-            .event_type("task_executed")
-            .result("success")
-            .timestamp(100)
-            .build()
-            .unwrap()
-    ];
+    let events = vec![CausalEvent::builder()
+        .agent_id(agent_id)
+        .nonce(0)
+        .sequence_index(0)
+        .event_type("task_executed")
+        .result("success")
+        .timestamp(100)
+        .build()
+        .unwrap()];
     let tree = CausalMerkleTree::new(events).unwrap();
 
     // 2. Generate Proof for matching

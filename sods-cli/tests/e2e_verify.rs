@@ -25,7 +25,9 @@ async fn test_verify_invalid_chain() {
         .arg("nonexistent")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Chain 'nonexistent' not supported"));
+        .stderr(predicate::str::contains(
+            "Chain 'nonexistent' not supported",
+        ));
 }
 
 #[tokio::test]

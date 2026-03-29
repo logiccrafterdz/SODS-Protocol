@@ -102,21 +102,21 @@ pub fn bloom_contains_topic(bloom: &Bloom, topic: &H256) -> bool {
     // Ethereum bloom filter uses 3 hash functions
     // Each extracts 11 bits from keccak256(x) to determine bit positions
     let hash = Keccak256::digest(topic.as_bytes());
-    
+
     for i in 0..3 {
         let bit_pair_index = i * 2;
         let high = hash[bit_pair_index] as usize;
         let low = hash[bit_pair_index + 1] as usize;
         let bit_index = ((high << 8) | low) & 0x7FF; // 11 bits = 0-2047
-        
+
         let byte_index = 255 - (bit_index / 8); // bloom is big-endian
         let bit_offset = bit_index % 8;
-        
+
         if bloom.0[byte_index] & (1 << bit_offset) == 0 {
             return false;
         }
     }
-    
+
     true
 }
 
@@ -226,7 +226,7 @@ mod tests {
         // Empty bloom should not contain any topic
         let empty_bloom = Bloom::default();
         let topic = H256::random();
-        
+
         // Manual bloom check should return false for empty bloom
         assert!(!bloom_contains_topic(&empty_bloom, &topic));
 
@@ -235,7 +235,7 @@ mod tests {
         // Manually set bits for a comprehensive test logic
         // Let's use a known topic hash to verify bit setting
         let topic_hash = Keccak256::digest(topic.as_bytes());
-        
+
         for i in 0..3 {
             let bit_pair_index = i * 2;
             let high = topic_hash[bit_pair_index] as usize;
@@ -254,7 +254,7 @@ mod tests {
         // probability of collision for random topic is very low (~ 2.5e-9)
         let other = H256::random();
         // This assertion *could* theoretically fail but is statistically safe for unit test
-        assert!(!bloom_contains_topic(&bloom, &other)); 
+        assert!(!bloom_contains_topic(&bloom, &other));
     }
 
     // Note: rlp_encode_index was moved to sods-core::header_anchor

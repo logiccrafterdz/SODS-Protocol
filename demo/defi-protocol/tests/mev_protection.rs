@@ -1,7 +1,7 @@
 use ethers::types::Address;
 use sods_causal::{
-    CausalEvent, CausalEventRecorder, AgentBehaviorPattern,
-    generate_behavioral_proof, CausalBehavioralProof
+    AgentBehaviorPattern, CausalBehavioralProof, CausalEvent, CausalEventRecorder,
+    generate_behavioral_proof,
 };
 
 #[tokio::test]
@@ -37,7 +37,10 @@ async fn test_valid_trading_behavior_unlocks_escrow_mock() {
     let proof = generate_behavioral_proof(&tree, &pattern, now).unwrap();
 
     // 3. Verify Proof (Simulating Escrow contract logic)
-    assert!(proof.verify(now), "Valid history should produce valid proof");
+    assert!(
+        proof.verify(now),
+        "Valid history should produce valid proof"
+    );
 }
 
 #[tokio::test]
@@ -58,7 +61,7 @@ async fn test_malicious_trading_behavior_blocks_escrow_mock() {
             .unwrap();
         recorder.record_event(event).unwrap();
     }
-    
+
     // The 10th one is a loss
     let event = CausalEvent::builder()
         .agent_id(agent_id)
@@ -83,9 +86,12 @@ async fn test_malicious_trading_behavior_blocks_escrow_mock() {
     // 2. Attempt to generate proof for 10 profits (should fail or return insufficient)
     let now = 2000;
     let proof_res = generate_behavioral_proof(&tree, &pattern, now);
-    
+
     // In our implementation, generate_behavioral_proof returns an error if count is not met
-    assert!(proof_res.is_err(), "Should fail to generate proof for 10 profits when only 9 exist");
+    assert!(
+        proof_res.is_err(),
+        "Should fail to generate proof for 10 profits when only 9 exist"
+    );
 }
 
 #[test]
@@ -120,7 +126,7 @@ fn test_tampered_proof_detection() {
 
     // Tamper with one event in the proof
     let mut tampered_events = proof.matched_events.clone();
-    tampered_events[0].nonce = 999; 
+    tampered_events[0].nonce = 999;
 
     let tampered_proof = CausalBehavioralProof {
         pattern: proof.pattern.clone(),
@@ -129,5 +135,8 @@ fn test_tampered_proof_detection() {
         agent_root: proof.agent_root,
     };
 
-    assert!(!tampered_proof.verify(now), "Tampered proof must fail verification");
+    assert!(
+        !tampered_proof.verify(now),
+        "Tampered proof must fail verification"
+    );
 }

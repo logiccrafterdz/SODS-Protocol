@@ -1,10 +1,9 @@
 use ethers::types::Address;
-use sods_causal::{
-    CausalEvent, CausalEventRecorder, AgentBehaviorPattern,
-    generate_behavioral_proof, CausalBehavioralProof
-};
 use serde::{Deserialize, Serialize};
-
+use sods_causal::{
+    AgentBehaviorPattern, CausalBehavioralProof, CausalEvent, CausalEventRecorder,
+    generate_behavioral_proof,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .result("profit")
             .timestamp(1706720000 + (i as u64 * 60))
             .build()?;
-        
+
         recorder.record_event(event)?;
     }
 
@@ -46,13 +45,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 4. Generate Behavioral Proof
     let now = 1706730000;
     let proof = generate_behavioral_proof(&tree, &pattern, now)?;
-    println!("📄 Behavioral Proof generated for pattern: {:?}", pattern.event_type);
+    println!(
+        "📄 Behavioral Proof generated for pattern: {:?}",
+        pattern.event_type
+    );
 
     // 5. Submit to SODS Agent API (Mocked call to our /causal/verify endpoint)
     println!("📡 Submitting proof to SODS Agent at http://localhost:8080/causal/verify...");
-    
+
     let client = reqwest::Client::new();
-    let res = client.post("http://localhost:8080/causal/verify")
+    let res = client
+        .post("http://localhost:8080/causal/verify")
         .json(&proof)
         .send()
         .await;
@@ -61,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(response) => {
             let body: serde_json::Value = response.json().await?;
             println!("✅ SODS Validation Response: {}", body);
-            
+
             if body["valid"].as_bool() == Some(true) {
                 println!("💰 ESCROW TRIGGER: Verification successful. Payment can be released!");
             } else {
@@ -69,7 +72,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Err(_) => {
-            println!("⚠️ SODS Agent not reachable. (Make sure 'sods agent serve' is running on port 8080)");
+            println!(
+                "⚠️ SODS Agent not reachable. (Make sure 'sods agent serve' is running on port 8080)"
+            );
             println!("   Falling back to local verification for demonstration...");
             let is_valid = proof.verify(now);
             println!("✅ Local Verification result: {}", is_valid);
@@ -80,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n🕵️ Simulating Malicious Behavior (Tampered History)...");
     let mut tampered_events = proof.matched_events.clone();
     tampered_events[0].result = "loss".to_string(); // Change a profit to a loss
-    
+
     let tampered_proof = CausalBehavioralProof {
         pattern: proof.pattern.clone(),
         matched_events: tampered_events,
@@ -88,7 +93,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         agent_root: proof.agent_root,
     };
 
-    println!("❌ Verification result for tampered history: {}", tampered_proof.verify(now));
+    println!(
+        "❌ Verification result for tampered history: {}",
+        tampered_proof.verify(now)
+    );
 
     println!("\n🏁 Demo completed.");
     Ok(())

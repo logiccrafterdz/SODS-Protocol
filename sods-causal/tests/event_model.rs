@@ -148,7 +148,11 @@ fn test_invalid_result_rejection() {
             .agent_id(test_address())
             .result(*result)
             .build();
-        assert!(event.is_ok(), "Valid result '{}' should be accepted", result);
+        assert!(
+            event.is_ok(),
+            "Valid result '{}' should be accepted",
+            result
+        );
     }
 
     // Test invalid results are rejected

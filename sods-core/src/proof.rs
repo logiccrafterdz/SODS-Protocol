@@ -125,8 +125,7 @@ impl Proof {
     ///
     /// Returns `SodsError::InvalidProof` if the data is malformed.
     pub fn deserialize(data: &[u8]) -> Result<Self> {
-        bincode::deserialize(data)
-            .map_err(|e| SodsError::InvalidProof(e.to_string()))
+        bincode::deserialize(data).map_err(|e| SodsError::InvalidProof(e.to_string()))
     }
 
     /// Returns the depth of the proof (number of tree levels).
@@ -205,12 +204,7 @@ impl OnChainBehavioralProof {
                     .collect(),
             ),
             // v3 ABI: isLeftPath boolean array for explicit ordering
-            Token::Array(
-                self.is_left_path
-                    .iter()
-                    .map(|&b| Token::Bool(b))
-                    .collect(),
-            ),
+            Token::Array(self.is_left_path.iter().map(|&b| Token::Bool(b)).collect()),
             Token::FixedBytes(self.bmt_root.to_vec()),
             Token::FixedBytes(self.beacon_root.unwrap_or([0u8; 32]).to_vec()),
             Token::Uint(self.timestamp.into()),
@@ -272,7 +266,7 @@ impl CausalProof {
             // Must be sequential
             // Case A: EOA (Nonce increases by 1)
             let nonce_ok = sym.nonce == prev_nonce + 1;
-            
+
             // Case B: Contrcat (Same Nonce, Sequence increases)
             let seq_ok = sym.nonce == prev_nonce && sym.call_sequence > prev_seq;
 
@@ -291,8 +285,8 @@ impl CausalProof {
 #[cfg(test)]
 mod tests {
     // use super::*;
-    use crate::tree::BehavioralMerkleTree;
     use crate::symbol::BehavioralSymbol;
+    use crate::tree::BehavioralMerkleTree;
 
     #[test]
     fn test_onchain_proof_manual_abi_serialization() {
@@ -302,15 +296,17 @@ mod tests {
         ];
         let bmt = BehavioralMerkleTree::new_keccak(syms.clone());
         let matched = vec![&syms[0], &syms[1]];
-        
-        let proof = bmt.generate_onchain_proof(&matched, 11155111, 100, None, 1700000000).unwrap();
+
+        let proof = bmt
+            .generate_onchain_proof(&matched, 11155111, 100, None, 1700000000)
+            .unwrap();
         let calldata = proof.to_calldata();
-        
+
         // Basic length check for ABI encoded dynamic data
         // 7 slots (224 bytes) base + symbols data + indices data + hashes data + path data
         assert!(calldata.len() > 224);
         assert_eq!(calldata.len() % 32, 0); // ABI encoding is always 32-byte padded
-        
+
         println!("Calldata len: {}", calldata.len());
         println!("Calldata: 0x{}", hex::encode(&calldata));
     }

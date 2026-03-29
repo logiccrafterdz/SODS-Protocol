@@ -9,9 +9,9 @@ fn mock_sym(s: &str, idx: u32) -> BehavioralSymbol {
 fn test_greedy_consumption() {
     let symbols = vec![
         mock_sym("Sw", 0),
-        mock_sym("Sw", 1), 
+        mock_sym("Sw", 1),
         mock_sym("Sw", 2),
-        mock_sym("Tf", 3)
+        mock_sym("Tf", 3),
     ];
     let pattern = BehavioralPattern::parse("Sw{1,3}").unwrap();
     let result = pattern.matches(&symbols, None).unwrap();
@@ -43,10 +43,10 @@ fn test_insufficient_range() {
 fn test_range_boundary_limit() {
     let symbols = vec![
         mock_sym("Sw", 0),
-        mock_sym("Sw", 1), 
+        mock_sym("Sw", 1),
         mock_sym("Sw", 2),
         mock_sym("Sw", 3),
-        mock_sym("Tf", 4)
+        mock_sym("Tf", 4),
     ];
     let pattern = BehavioralPattern::parse("Sw{1,2}").unwrap();
     let result = pattern.matches(&symbols, None).unwrap();
@@ -59,9 +59,9 @@ fn test_range_boundary_limit() {
 fn test_at_least_greedy() {
     let symbols = vec![
         mock_sym("Sw", 0),
-        mock_sym("Sw", 1), 
+        mock_sym("Sw", 1),
         mock_sym("Sw", 2),
-        mock_sym("Tf", 3)
+        mock_sym("Tf", 3),
     ];
     let pattern = BehavioralPattern::parse("Sw{2,}").unwrap();
     let result = pattern.matches(&symbols, None).unwrap();
@@ -73,10 +73,10 @@ fn test_at_least_greedy() {
 fn test_sequential_greedy_patterns() {
     let symbols = vec![
         mock_sym("Tf", 0),
-        mock_sym("Sw", 1), 
+        mock_sym("Sw", 1),
         mock_sym("Sw", 2),
         mock_sym("Sw", 3),
-        mock_sym("Tf", 4)
+        mock_sym("Tf", 4),
     ];
     // Pattern: Tf -> Sw{2,5} -> Tf
     let pattern = BehavioralPattern::parse("Tf -> Sw{2,5} -> Tf").unwrap();

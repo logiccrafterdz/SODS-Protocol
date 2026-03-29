@@ -55,20 +55,19 @@
 
 pub mod error;
 pub mod event;
-pub mod recorder;
-pub mod tree;
-pub mod proof;
 pub mod pattern;
+pub mod proof;
+pub mod recorder;
 pub mod reputation;
+pub mod tree;
 pub mod validation;
 
 // Re-export main types for convenience
 pub use error::{CausalError, Result};
 pub use event::{CausalEvent, CausalEventBuilder, VALID_RESULTS};
+pub use pattern::{generate_behavioral_proof, AgentBehaviorPattern};
+pub use proof::{CausalBehavioralProof, CausalProof};
 pub use recorder::CausalEventRecorder;
+pub use reputation::{ReputationClaim, ReputationFeedback};
 pub use tree::CausalMerkleTree;
-pub use proof::{CausalProof, CausalBehavioralProof};
-pub use pattern::{AgentBehaviorPattern, generate_behavioral_proof};
-pub use reputation::{ReputationFeedback, ReputationClaim};
 pub use validation::{ValidationHandler, ValidationRequest, ValidationResponse};
-

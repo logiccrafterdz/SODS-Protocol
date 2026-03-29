@@ -186,13 +186,19 @@ impl BehavioralMerkleTree {
 
         loop {
             let current = layers.last().unwrap();
-            if current.len() == 1 { break; }
+            if current.len() == 1 {
+                break;
+            }
 
             let mut next_layer = Vec::with_capacity((current.len() + 1) / 2);
 
             for i in (0..current.len()).step_by(2) {
                 let left = current[i];
-                let right = if i + 1 < current.len() { current[i + 1] } else { left };
+                let right = if i + 1 < current.len() {
+                    current[i + 1]
+                } else {
+                    left
+                };
 
                 let mut hasher = tiny_keccak::Keccak::v256();
                 hasher.update(&left);
@@ -262,9 +268,10 @@ impl BehavioralMerkleTree {
     /// ```
     pub fn generate_proof(&self, symbol: &str, log_index: u32) -> Option<Proof> {
         // Find the symbol in the sorted list
-        let leaf_index = self.symbols.iter().position(|s| {
-            s.symbol() == symbol && s.log_index() == log_index
-        })?;
+        let leaf_index = self
+            .symbols
+            .iter()
+            .position(|s| s.symbol() == symbol && s.log_index() == log_index)?;
 
         self.generate_proof_by_index(leaf_index)
     }
@@ -318,9 +325,9 @@ impl BehavioralMerkleTree {
 
     /// Generate an on-chain verifiable proof.
     pub fn generate_onchain_proof(
-        &self, 
-        matched_symbols: &[&BehavioralSymbol], 
-        chain_id: u64, 
+        &self,
+        matched_symbols: &[&BehavioralSymbol],
+        chain_id: u64,
         block_number: u64,
         beacon_root: Option<[u8; 32]>,
         timestamp: u64,
@@ -328,7 +335,7 @@ impl BehavioralMerkleTree {
         let mut symbols = Vec::new();
         let mut log_indices = Vec::new();
         let mut leaf_hashes = Vec::new();
-        
+
         for s in matched_symbols {
             symbols.push(s.symbol().to_string());
             log_indices.push(s.log_index());
@@ -337,7 +344,8 @@ impl BehavioralMerkleTree {
 
         // For simplicity in the first version, we'll provide the proof for the FIRST symbol
         let first_idx = self.symbols.iter().position(|s| {
-            s.symbol() == matched_symbols[0].symbol() && s.log_index() == matched_symbols[0].log_index()
+            s.symbol() == matched_symbols[0].symbol()
+                && s.log_index() == matched_symbols[0].log_index()
         })?;
 
         let proof = self.generate_proof_by_index(first_idx)?;

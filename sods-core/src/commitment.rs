@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use tiny_keccak::{Hasher, Keccak};
 
 /// A behavioral commitment binds a BMT root to its block data.
-/// 
+///
 /// This structure is signed off-chain and verified on-chain to ensure
 /// that the BMT root used for verification is authentic.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,7 +15,12 @@ pub struct BehavioralCommitment {
 
 impl BehavioralCommitment {
     /// Create a new commitment.
-    pub fn new(chain_id: u64, block_number: u64, receipts_root: [u8; 32], bmt_root: [u8; 32]) -> Self {
+    pub fn new(
+        chain_id: u64,
+        block_number: u64,
+        receipts_root: [u8; 32],
+        bmt_root: [u8; 32],
+    ) -> Self {
         Self {
             chain_id,
             block_number,
@@ -25,7 +30,7 @@ impl BehavioralCommitment {
     }
 
     /// Encode the commitment to bytes for signing (matching Solidity abi.encodePacked).
-    /// 
+    ///
     /// Format: (uint64, uint64, bytes32, bytes32)
     pub fn to_signing_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(8 + 8 + 32 + 32);
@@ -52,16 +57,11 @@ mod tests {
 
     #[test]
     fn test_commitment_signing_bytes() {
-        let commitment = BehavioralCommitment::new(
-            1,
-            100,
-            [0x11; 32],
-            [0x22; 32],
-        );
+        let commitment = BehavioralCommitment::new(1, 100, [0x11; 32], [0x22; 32]);
 
         let bytes = commitment.to_signing_bytes();
         assert_eq!(bytes.len(), 8 + 8 + 32 + 32);
-        
+
         // uint64(1)
         assert_eq!(bytes[7], 1);
         // uint64(100)

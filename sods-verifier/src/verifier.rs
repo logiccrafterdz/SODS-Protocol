@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use ethers_core::types::{Address, H256};
-use sods_core::{BehavioralMerkleTree, BehavioralSymbol, SymbolDictionary, ContractRegistry};
+use sods_core::{BehavioralMerkleTree, BehavioralSymbol, ContractRegistry, SymbolDictionary};
 
 use crate::error::{Result, SodsVerifierError};
 use crate::query::QueryParser;
@@ -172,7 +172,9 @@ impl BlockVerifier {
         if self.rpc_client.check_beacon_support().await {
             BeaconRootSupport::Supported
         } else {
-            BeaconRootSupport::Unsupported("Beacon roots contract unavailable or EIP-4788 not implemented".to_string())
+            BeaconRootSupport::Unsupported(
+                "Beacon roots contract unavailable or EIP-4788 not implemented".to_string(),
+            )
         }
     }
 
@@ -182,7 +184,10 @@ impl BlockVerifier {
     }
 
     /// Fetch a block's header.
-    pub async fn fetch_block_header(&self, block_number: u64) -> Result<crate::header_anchor::BlockHeader> {
+    pub async fn fetch_block_header(
+        &self,
+        block_number: u64,
+    ) -> Result<crate::header_anchor::BlockHeader> {
         self.rpc_client.fetch_block_header(block_number).await
     }
 
@@ -198,28 +203,30 @@ impl BlockVerifier {
     ) -> Result<ethers_core::types::TransactionReceipt> {
         // 1. Fetch block header to get receiptsRoot
         let _header = self.rpc_client.fetch_block_header(block_number).await?;
-        
+
         // 2. Fetch the receipt from RPC
         let receipt = self.rpc_client.fetch_transaction_receipt(tx_hash).await?;
-        
+
         // 3. Verify it belongs to this block
         if receipt.block_number.map(|n| n.as_u64()) != Some(block_number) {
-            return Err(SodsVerifierError::RpcError("Receipt block number mismatch".into()));
+            return Err(SodsVerifierError::RpcError(
+                "Receipt block number mismatch".into(),
+            ));
         }
 
         // 4. Cryptographic Validation
         let _encoded = sods_core::header_anchor::rlp_encode_receipt(&receipt);
-        
+
         // Since we don't have an easy "eth_getReceiptProof" on most standard RPCs,
-        // we fallback to verifying the full trie if receipts are small, 
+        // we fallback to verifying the full trie if receipts are small,
         // OR we trust the receipt if it matches the hash (which is not fully Zero-RPC but 1.2 target).
         // For the purpose of "Zero-RPC" mode in Phase 7, we'll implement the logic to
         // handle a full proof if we had one.
-        
-        // For now, we perform "Lightweight Anchoring": 
+
+        // For now, we perform "Lightweight Anchoring":
         // verify this single receipt doesn't violate the receiptsRoot if it were the only one
         // or if we have others.
-        
+
         Ok(receipt)
     }
 
@@ -252,7 +259,7 @@ impl BlockVerifier {
         block_number: u64,
     ) -> Result<VerificationResult> {
         use crate::header_anchor::{
-            VerificationMode, verify_receipts_against_header, extract_logs_from_receipts
+            extract_logs_from_receipts, verify_receipts_against_header, VerificationMode,
         };
 
         let total_start = Instant::now();
@@ -273,7 +280,7 @@ impl BlockVerifier {
 
                 // Step 2c: Validate receipts against header
                 let validation = verify_receipts_against_header(&receipts, &header);
-                
+
                 if !validation.is_valid {
                     return Err(SodsVerifierError::InvalidReceiptProof {
                         computed: format!("0x{}", hex::encode(validation.computed_root)),
@@ -282,7 +289,10 @@ impl BlockVerifier {
                 }
 
                 let logs = extract_logs_from_receipts(&receipts);
-                let txs = self.rpc_client.fetch_block_transactions(block_number).await?;
+                let txs = self
+                    .rpc_client
+                    .fetch_block_transactions(block_number)
+                    .await?;
 
                 (logs, txs, VerificationMode::Trustless)
             }
@@ -292,16 +302,16 @@ impl BlockVerifier {
 
                 // Step 2b: Filter logs using Bloom (rejection path)
                 // (Optimized search would happen here - for now we proceed trustlessly)
-                
+
                 // For Zero-RPC, we ideally fetch ONLY the target logs/receipts.
                 // Since "verify_symbol_in_block" is a discovery operation, we use the Bloom filter
                 // to decide if we even bother searching.
-                
+
                 // For this implementation, Zero-RPC for broad discovery falls back to Trustless (Bulk),
                 // while for known indices it would be individual.
                 let receipts = self.rpc_client.fetch_block_receipts(block_number).await?;
                 let validation = verify_receipts_against_header(&receipts, &header);
-                
+
                 if !validation.is_valid {
                     return Err(SodsVerifierError::InvalidReceiptProof {
                         computed: format!("0x{}", hex::encode(validation.computed_root)),
@@ -310,7 +320,10 @@ impl BlockVerifier {
                 }
 
                 let logs = extract_logs_from_receipts(&receipts);
-                let txs = self.rpc_client.fetch_block_transactions(block_number).await?;
+                let txs = self
+                    .rpc_client
+                    .fetch_block_transactions(block_number)
+                    .await?;
 
                 (logs, txs, VerificationMode::ZeroRpc)
             }
@@ -318,7 +331,7 @@ impl BlockVerifier {
                 let logs_fut = self.rpc_client.fetch_logs_for_block(block_number);
                 let txs_fut = self.rpc_client.fetch_block_transactions(block_number);
                 let (logs, txs) = tokio::try_join!(logs_fut, txs_fut)?;
-                
+
                 (logs, txs, VerificationMode::RpcOnly)
             }
         };
@@ -327,7 +340,8 @@ impl BlockVerifier {
 
         // Build Tx Lookup Map: TxHash -> (Nonce, From)
         use std::collections::HashMap;
-        let tx_map: HashMap<_, _> = txs.iter()
+        let tx_map: HashMap<_, _> = txs
+            .iter()
             .map(|tx| (tx.hash, (tx.nonce, tx.from)))
             .collect();
 
@@ -352,10 +366,7 @@ impl BlockVerifier {
         let root = bmt.root();
 
         // Step 5: Count occurrences and find first match
-        let occurrences = symbols
-            .iter()
-            .filter(|s| s.symbol() == symbol)
-            .count();
+        let occurrences = symbols.iter().filter(|s| s.symbol() == symbol).count();
 
         if occurrences == 0 {
             return Ok(VerificationResult::not_found(
@@ -383,11 +394,19 @@ impl BlockVerifier {
 
         // Calculate Confidence Score per Behavioral Dictionary 2.0 spec
         let mut score: f32 = 0.5;
-        if first_match.from != Address::zero() { score += 0.2; }
-        if first_match.is_from_deployer { score += 0.3; }
-        if !first_match.value.is_zero() { score += 0.1; }
+        if first_match.from != Address::zero() {
+            score += 0.2;
+        }
+        if first_match.is_from_deployer {
+            score += 0.3;
+        }
+        if !first_match.value.is_zero() {
+            score += 0.1;
+        }
         // Penalty for missing internal tx data (spec: -0.4)
-        if first_match.tx_hash == H256::zero() { score -= 0.4; }
+        if first_match.tx_hash == H256::zero() {
+            score -= 0.4;
+        }
         let score = score.clamp(0.0, 1.0);
 
         let verification_time = verify_start.elapsed();
@@ -434,16 +453,17 @@ impl BlockVerifier {
         let topics = self.dictionary.pattern_to_required_topics(&pattern);
 
         let rpc_start = Instant::now();
-        
+
         // 2. Fetch Filtered Logs
         let logs_fut = self.rpc_client.fetch_filtered_logs(block_number, topics);
         let txs_fut = self.rpc_client.fetch_block_transactions(block_number);
-        
+
         let (logs, txs) = tokio::try_join!(logs_fut, txs_fut)?;
         let rpc_fetch_time = rpc_start.elapsed();
 
         // 3. Build Tx Lookup Map and parse symbols
-        let tx_map: HashMap<_, _> = txs.iter()
+        let tx_map: HashMap<_, _> = txs
+            .iter()
             .map(|tx| (tx.hash, (tx.nonce, tx.from)))
             .collect();
 
@@ -459,7 +479,8 @@ impl BlockVerifier {
         let result = if let Some(matched_seq) = matched {
             // Find first symbol of match to generate proof
             let first_sym = matched_seq[0];
-            let proof = bmt.generate_proof(first_sym.symbol(), first_sym.log_index())
+            let proof = bmt
+                .generate_proof(first_sym.symbol(), first_sym.log_index())
                 .ok_or_else(|| SodsVerifierError::SymbolNotFound {
                     symbol: first_sym.symbol().to_string(),
                     block_number,
@@ -499,38 +520,41 @@ impl BlockVerifier {
 
     /// Parse RPC logs into behavioral symbols.
     fn parse_logs_to_symbols(
-        &self, 
+        &self,
         logs: &[ethers_core::types::Log],
-        tx_map: &std::collections::HashMap<ethers_core::types::H256, (ethers_core::types::U256, ethers_core::types::Address)>
+        tx_map: &std::collections::HashMap<
+            ethers_core::types::H256,
+            (ethers_core::types::U256, ethers_core::types::Address),
+        >,
     ) -> Vec<BehavioralSymbol> {
         logs.iter()
             .filter_map(|log| {
                 let mut sym = self.dictionary.parse_log(log)?;
-                
+
                 // Enrich with causal data if tx exists
                 if let Some(tx_hash) = log.transaction_hash {
                     if let Some((nonce, from)) = tx_map.get(&tx_hash) {
-                         // Use log_index as call_sequence for intra-tx ordering
-                         sym = sym.with_causality(
-                             tx_hash, 
-                             nonce.as_u64(), 
-                             log.log_index.map(|i| i.as_u32()).unwrap_or(0)
-                         );
-                         // If the symbol context 'from' is 0x0 (not extracted from log topics),
-                         // we can fallback to tx.origin (though semantically different, helpful for causality grouping)
-                         // But for now, let's keep 'from' as event-specific.
-                         // Actually, Causal Tree sorts by sym.from. If sym.from is 0x0, it breaks grouping.
-                         // So we should probably set sym.from to tx.from if it's empty?
-                         // The user said: "Group symbols by transaction origin (from address)"
-                         // If the event doesn't explicitly have a 'from' (like Swap), we should attr it to the tx sender.
-                         if sym.from == ethers_core::types::Address::zero() {
-                             sym.from = *from;
-                         }
+                        // Use log_index as call_sequence for intra-tx ordering
+                        sym = sym.with_causality(
+                            tx_hash,
+                            nonce.as_u64(),
+                            log.log_index.map(|i| i.as_u32()).unwrap_or(0),
+                        );
+                        // If the symbol context 'from' is 0x0 (not extracted from log topics),
+                        // we can fallback to tx.origin (though semantically different, helpful for causality grouping)
+                        // But for now, let's keep 'from' as event-specific.
+                        // Actually, Causal Tree sorts by sym.from. If sym.from is 0x0, it breaks grouping.
+                        // So we should probably set sym.from to tx.from if it's empty?
+                        // The user said: "Group symbols by transaction origin (from address)"
+                        // If the event doesn't explicitly have a 'from' (like Swap), we should attr it to the tx sender.
+                        if sym.from == ethers_core::types::Address::zero() {
+                            sym.from = *from;
+                        }
 
-                         // Enrich with deployer flag from registry
-                         if let Some(deployer) = self.registry.get_deployer(&sym.contract_address) {
+                        // Enrich with deployer flag from registry
+                        if let Some(deployer) = self.registry.get_deployer(&sym.contract_address) {
                             sym.is_from_deployer = sym.from == deployer;
-                         }
+                        }
                     }
                 }
                 Some(sym)
@@ -559,15 +583,16 @@ impl BlockVerifier {
     }
 
     /// Fetch all behavioral symbols for a block.
-    /// 
+    ///
     /// Useful for pattern matching or manual inspection.
     pub async fn fetch_block_symbols(&self, block_number: u64) -> Result<Vec<BehavioralSymbol>> {
         let logs_fut = self.rpc_client.fetch_logs_for_block(block_number);
         let txs_fut = self.rpc_client.fetch_block_transactions(block_number);
-        
+
         let (logs, txs) = tokio::try_join!(logs_fut, txs_fut)?;
-        
-        let tx_map: std::collections::HashMap<_, _> = txs.iter()
+
+        let tx_map: std::collections::HashMap<_, _> = txs
+            .iter()
             .map(|tx| (tx.hash, (tx.nonce, tx.from)))
             .collect();
 
@@ -575,7 +600,7 @@ impl BlockVerifier {
     }
 
     /// Check if `from_address` is the deployer of `contract_address`.
-    /// 
+    ///
     /// Uses cache to avoid repeated RPC calls. Returns false if lookup fails.
     pub async fn is_deployer(&self, contract_address: Address, from_address: Address) -> bool {
         // 0. Check Persistent Registry first
@@ -592,7 +617,8 @@ impl BlockVerifier {
         }
 
         // Fetch deployer via RPC (expensive - only done once per contract)
-        let deployer = self.rpc_client
+        let deployer = self
+            .rpc_client
             .fetch_contract_deployer(contract_address)
             .await
             .unwrap_or(None);
@@ -607,15 +633,19 @@ impl BlockVerifier {
     }
 
     /// Fetch symbols with deployer detection enabled.
-    /// 
+    ///
     /// This is a more expensive variant that checks `is_from_deployer` for each symbol.
-    pub async fn fetch_block_symbols_with_deployer(&self, block_number: u64) -> Result<Vec<BehavioralSymbol>> {
+    pub async fn fetch_block_symbols_with_deployer(
+        &self,
+        block_number: u64,
+    ) -> Result<Vec<BehavioralSymbol>> {
         let logs_fut = self.rpc_client.fetch_logs_for_block(block_number);
         let txs_fut = self.rpc_client.fetch_block_transactions(block_number);
-        
+
         let (logs, txs) = tokio::try_join!(logs_fut, txs_fut)?;
-        
-        let tx_map: std::collections::HashMap<_, _> = txs.iter()
+
+        let tx_map: std::collections::HashMap<_, _> = txs
+            .iter()
             .map(|tx| (tx.hash, (tx.nonce, tx.from)))
             .collect();
 

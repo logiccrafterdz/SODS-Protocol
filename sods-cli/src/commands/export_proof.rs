@@ -1,6 +1,6 @@
-use clap::{Args, ValueEnum};
 use crate::config::get_chain;
 use crate::output;
+use clap::{Args, ValueEnum};
 use sods_core::pattern::BehavioralPattern;
 use sods_core::BehavioralMerkleTree;
 
@@ -56,7 +56,11 @@ pub async fn run(args: ExportProofArgs) -> i32 {
     let rpc_urls: Vec<String> = if let Some(url) = args.rpc_url {
         vec![url]
     } else {
-        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+        chain_config
+            .rpc_urls
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
     };
 
     let verifier = match sods_verifier::BlockVerifier::new(&rpc_urls) {
@@ -87,16 +91,23 @@ pub async fn run(args: ExportProofArgs) -> i32 {
     if let Some(matched) = pattern.matches(&symbols, None) {
         // Build Keccak BMT
         let bmt = BehavioralMerkleTree::new_keccak(symbols.clone());
-        
+
         let chain_id = 11155111; // Default to Sepolia
-        
+
         // Fetch beacon root and timestamp if anchored
         let (beacon_root, timestamp, receipts_root) = if args.anchored {
             output::info("Fetching block metadata for anchoring...");
             match verifier.fetch_block_header(args.block).await {
-                Ok(header) => (header.parent_beacon_block_root.map(|h| h.0), header.timestamp, Some(header.receipts_root.0)),
+                Ok(header) => (
+                    header.parent_beacon_block_root.map(|h| h.0),
+                    header.timestamp,
+                    Some(header.receipts_root.0),
+                ),
                 Err(e) => {
-                    output::error(&format!("Failed to fetch block header for anchoring: {}", e));
+                    output::error(&format!(
+                        "Failed to fetch block header for anchoring: {}",
+                        e
+                    ));
                     return 1;
                 }
             }
@@ -104,7 +115,13 @@ pub async fn run(args: ExportProofArgs) -> i32 {
             (None, 0, None)
         };
 
-        let mut proof = match bmt.generate_onchain_proof(&matched, chain_id, args.block, beacon_root, timestamp) {
+        let mut proof = match bmt.generate_onchain_proof(
+            &matched,
+            chain_id,
+            args.block,
+            beacon_root,
+            timestamp,
+        ) {
             Some(p) => p,
             None => {
                 output::error("Failed to generate on-chain proof.");
@@ -118,7 +135,7 @@ pub async fn run(args: ExportProofArgs) -> i32 {
         if let Some(key_str) = args.signing_key {
             output::info("Signing behavioral commitment...");
             use ethers_signers::{LocalWallet, Signer};
-            
+
             let wallet: LocalWallet = match key_str.parse() {
                 Ok(w) => w,
                 Err(e) => {
@@ -135,7 +152,7 @@ pub async fn run(args: ExportProofArgs) -> i32 {
             );
 
             let hash = commitment.hash();
-            
+
             // Sign the commitment hash
             match wallet.sign_message(hash).await {
                 Ok(sig) => {

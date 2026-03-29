@@ -110,7 +110,11 @@ pub async fn run(args: TrendArgs) -> i32 {
     let rpc_urls: Vec<String> = if let Some(url) = args.rpc_url {
         vec![url]
     } else {
-        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+        chain_config
+            .rpc_urls
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
     };
 
     let is_l2 = chain_config.name != "ethereum" && chain_config.name != "sepolia";
@@ -124,7 +128,7 @@ pub async fn run(args: TrendArgs) -> i32 {
         Ok(v) => v.with_backoff_profile(profile),
         Err(e) => {
             if args.json {
-                 println!("{{ \"error\": \"Failed to initialize RPCs: {}\" }}", e);
+                println!("{{ \"error\": \"Failed to initialize RPCs: {}\" }}", e);
             } else {
                 output::error(&format!("Failed to initialize RPCs: {}", e));
             }
@@ -146,8 +150,8 @@ pub async fn run(args: TrendArgs) -> i32 {
     let head_block = match verifier.get_latest_block().await {
         Ok(b) => b,
         Err(e) => {
-             if args.json {
-                 println!("{{ \"error\": \"Failed to fetch latest block: {}\" }}", e);
+            if args.json {
+                println!("{{ \"error\": \"Failed to fetch latest block: {}\" }}", e);
             } else {
                 output::error(&format!("Failed to fetch latest block: {}", e));
             }
@@ -189,7 +193,7 @@ pub async fn run(args: TrendArgs) -> i32 {
                 std::io::stdout().flush().unwrap();
             }
         } else {
-             if !args.json {
+            if !args.json {
                 print!("_"); // No match dot
                 use std::io::Write;
                 std::io::stdout().flush().unwrap();
@@ -222,16 +226,35 @@ pub async fn run(args: TrendArgs) -> i32 {
         };
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
     } else {
-        let chart = if frequency > 50.0 { "🔥" } else if frequency > 20.0 { "📈" } else { "📉" };
-        
-        println!("{} Pattern \"{}\" on {} (last {} blocks):", chart, args.pattern.bold(), args.chain, window);
-        println!("   Frequency: {}/{} blocks ({:.1}%)", matches_count, window, frequency);
-        
+        let chart = if frequency > 50.0 {
+            "🔥"
+        } else if frequency > 20.0 {
+            "📈"
+        } else {
+            "📉"
+        };
+
+        println!(
+            "{} Pattern \"{}\" on {} (last {} blocks):",
+            chart,
+            args.pattern.bold(),
+            args.chain,
+            window
+        );
+        println!(
+            "   Frequency: {}/{} blocks ({:.1}%)",
+            matches_count, window, frequency
+        );
+
         if matches_count > 0 {
-            let hotspot_str = hotspots.iter().map(|b| format!("#{}", b)).collect::<Vec<_>>().join(", ");
+            let hotspot_str = hotspots
+                .iter()
+                .map(|b| format!("#{}", b))
+                .collect::<Vec<_>>()
+                .join(", ");
             println!("   Hotspots:  {}", hotspot_str.green());
         } else {
-             println!("   Hotspots:  None found");
+            println!("   Hotspots:  None found");
         }
         println!();
     }

@@ -71,9 +71,9 @@ pub enum SodsVerifierError {
 
     /// All RPC endpoints failed for a chain.
     #[error("All RPC endpoints failed for {chain}. Try again later.")]
-    AllRpcEndpointsFailed { 
+    AllRpcEndpointsFailed {
         /// The chain name
-        chain: String 
+        chain: String,
     },
 }
 

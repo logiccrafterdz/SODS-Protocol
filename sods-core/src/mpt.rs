@@ -1,7 +1,7 @@
+use crate::error::SodsError;
 use ethers_core::types::H256;
 use ethers_core::utils::rlp::Rlp;
 use sha3::{Digest, Keccak256};
-use crate::error::SodsError;
 
 /// Lightweight Merkle-Patricia Trie (MPT) proof verifier.
 pub struct MptVerifier;
@@ -26,57 +26,90 @@ impl MptVerifier {
 
         for node_bytes in nodes.iter() {
             let node_hash = H256::from_slice(&Keccak256::digest(node_bytes));
-            
+
             if node_hash != current_hash {
                 return Ok(false);
             }
 
             let rlp = Rlp::new(node_bytes);
             if !rlp.is_list() {
-                return Err(SodsError::InternalError("Invalid MPT node: not a list".into()));
+                return Err(SodsError::InternalError(
+                    "Invalid MPT node: not a list".into(),
+                ));
             }
 
-            match rlp.item_count().map_err(|_| SodsError::InternalError("RLP error".into()))? {
+            match rlp
+                .item_count()
+                .map_err(|_| SodsError::InternalError("RLP error".into()))?
+            {
                 17 => {
                     // Branch node
                     if nibble_index == nibbles.len() {
-                        let branch_value = rlp.at(16).map_err(|_| SodsError::InternalError("RLP error".into()))?.data().map_err(|_| SodsError::InternalError("RLP error".into()))?;
+                        let branch_value = rlp
+                            .at(16)
+                            .map_err(|_| SodsError::InternalError("RLP error".into()))?
+                            .data()
+                            .map_err(|_| SodsError::InternalError("RLP error".into()))?;
                         return Ok(value == Some(branch_value));
                     }
                     let nibble = nibbles[nibble_index] as usize;
-                    let next_node_rlp = rlp.at(nibble).map_err(|_| SodsError::InternalError("RLP error".into()))?;
-                    
+                    let next_node_rlp = rlp
+                        .at(nibble)
+                        .map_err(|_| SodsError::InternalError("RLP error".into()))?;
+
                     if next_node_rlp.is_empty() {
                         return Ok(value.is_none());
                     }
-                    
-                    current_hash = H256::from_slice(next_node_rlp.data().map_err(|_| SodsError::InternalError("RLP error".into()))?);
+
+                    current_hash = H256::from_slice(
+                        next_node_rlp
+                            .data()
+                            .map_err(|_| SodsError::InternalError("RLP error".into()))?,
+                    );
                     nibble_index += 1;
                 }
                 2 => {
                     // Extension or Leaf node
-                    let encoded_path = rlp.at(0).map_err(|_| SodsError::InternalError("RLP error".into()))?.data().map_err(|_| SodsError::InternalError("RLP error".into()))?;
+                    let encoded_path = rlp
+                        .at(0)
+                        .map_err(|_| SodsError::InternalError("RLP error".into()))?
+                        .data()
+                        .map_err(|_| SodsError::InternalError("RLP error".into()))?;
                     let (node_nibbles, is_leaf) = Self::decode_path(encoded_path);
-                    
+
                     if nibbles[nibble_index..].starts_with(&node_nibbles) {
                         nibble_index += node_nibbles.len();
-                        
+
                         if is_leaf {
                             if nibble_index == nibbles.len() {
-                                let leaf_value = rlp.at(1).map_err(|_| SodsError::InternalError("RLP error".into()))?.data().map_err(|_| SodsError::InternalError("RLP error".into()))?;
+                                let leaf_value = rlp
+                                    .at(1)
+                                    .map_err(|_| SodsError::InternalError("RLP error".into()))?
+                                    .data()
+                                    .map_err(|_| SodsError::InternalError("RLP error".into()))?;
                                 return Ok(value == Some(leaf_value));
                             } else {
                                 return Ok(false);
                             }
                         } else {
-                            let next_node_rlp = rlp.at(1).map_err(|_| SodsError::InternalError("RLP error".into()))?;
-                            current_hash = H256::from_slice(next_node_rlp.data().map_err(|_| SodsError::InternalError("RLP error".into()))?);
+                            let next_node_rlp = rlp
+                                .at(1)
+                                .map_err(|_| SodsError::InternalError("RLP error".into()))?;
+                            current_hash = H256::from_slice(
+                                next_node_rlp
+                                    .data()
+                                    .map_err(|_| SodsError::InternalError("RLP error".into()))?,
+                            );
                         }
                     } else {
                         return Ok(false);
                     }
                 }
-                _ => return Err(SodsError::InternalError("Invalid MPT node: unexpected item count".into())),
+                _ => {
+                    return Err(SodsError::InternalError(
+                        "Invalid MPT node: unexpected item count".into(),
+                    ))
+                }
             }
         }
 
@@ -93,11 +126,13 @@ impl MptVerifier {
     }
 
     fn decode_path(encoded: &[u8]) -> (Vec<u8>, bool) {
-        if encoded.is_empty() { return (vec![], false); }
+        if encoded.is_empty() {
+            return (vec![], false);
+        }
         let prefix = encoded[0] >> 4;
         let is_leaf = (prefix & 2) != 0;
         let has_odd_len = (prefix & 1) != 0;
-        
+
         let mut nibbles = Vec::new();
         if has_odd_len {
             nibbles.push(encoded[0] & 0x0F);

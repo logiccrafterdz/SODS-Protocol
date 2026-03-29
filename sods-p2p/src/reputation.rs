@@ -53,7 +53,10 @@ impl ReputationTracker {
         for (peer, last_time) in self.last_validation.iter() {
             if now.duration_since(*last_time) > stale_threshold {
                 if let Some(score) = self.scores.get_mut(peer) {
-                    warn!("Resetting reputation for peer {} due to stale validation (24h+)", peer);
+                    warn!(
+                        "Resetting reputation for peer {} due to stale validation (24h+)",
+                        peer
+                    );
                     *score = INITIAL_SCORE;
                 }
             }
@@ -101,10 +104,7 @@ impl ReputationTracker {
 
     /// Select the best peers by score (weighted probability could be better, but greedy is fine for PoC).
     pub fn select_best_peers(&self, available: &[PeerId], count: usize) -> Vec<PeerId> {
-        let mut peers: Vec<_> = available
-            .iter()
-            .map(|p| (*p, self.get_score(p)))
-            .collect();
+        let mut peers: Vec<_> = available.iter().map(|p| (*p, self.get_score(p))).collect();
 
         // Sort by score descending
         peers.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -135,7 +135,7 @@ impl ReputationTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     fn random_peer() -> PeerId {
         let keypair = libp2p::identity::Keypair::generate_ed25519();
         PeerId::from(keypair.public())
@@ -145,7 +145,7 @@ mod tests {
     fn test_reward_growth() {
         let mut tracker = ReputationTracker::new();
         let peer = random_peer();
-        
+
         // Initial -> Reward
         tracker.reward(&peer);
         let s1 = tracker.get_score(&peer);
@@ -153,7 +153,9 @@ mod tests {
         assert!(s1 <= 1.0);
 
         // Max cap
-        for _ in 0..20 { tracker.reward(&peer); }
+        for _ in 0..20 {
+            tracker.reward(&peer);
+        }
         assert_eq!(tracker.get_score(&peer), 1.0);
     }
 
@@ -161,17 +163,19 @@ mod tests {
     fn test_penalty_drop() {
         let mut tracker = ReputationTracker::new();
         let peer = random_peer();
-        
+
         // Reward first to boost
         tracker.reward(&peer);
         let s1 = tracker.get_score(&peer);
-        
+
         tracker.penalize(&peer);
         let s2 = tracker.get_score(&peer);
         assert!(s2 < s1);
-        
+
         // Min floor
-        for _ in 0..10 { tracker.penalize(&peer); }
+        for _ in 0..10 {
+            tracker.penalize(&peer);
+        }
         assert_eq!(tracker.get_score(&peer), 0.0);
     }
 
@@ -179,14 +183,16 @@ mod tests {
     fn test_pob_scoring_threshold() {
         let mut tracker = ReputationTracker::new();
         let peer = random_peer();
-        
+
         // New peer = 0.0
         assert_eq!(tracker.get_score(&peer), 0.0);
         assert!(!tracker.is_reliable(&peer));
 
         // Solving puzzle (simulated by many rewards)
-        for _ in 0..10 { tracker.reward(&peer); }
-        
+        for _ in 0..10 {
+            tracker.reward(&peer);
+        }
+
         // Should be reliable now
         assert!(tracker.get_score(&peer) >= MIN_RELIABLE_SCORE);
         assert!(tracker.is_reliable(&peer));

@@ -10,7 +10,9 @@ async fn test_listen_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Listen for live behavioral alerts"));
+        .stdout(predicate::str::contains(
+            "Listen for live behavioral alerts",
+        ));
 }
 
 #[tokio::test]

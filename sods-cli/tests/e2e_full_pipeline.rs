@@ -11,11 +11,14 @@ fn test_e2e_full_pipeline() {
     cmd.arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Trustless Behavioral Verification"));
+        .stdout(predicate::str::contains(
+            "Trustless Behavioral Verification",
+        ));
 
     // Check symbols command
     let mut cmd_sym = Command::cargo_bin("sods").unwrap();
-    cmd_sym.arg("symbols")
+    cmd_sym
+        .arg("symbols")
         .assert()
         .success()
         .stdout(predicate::str::contains("Tf"));
@@ -23,12 +26,22 @@ fn test_e2e_full_pipeline() {
     // Run a basic failed validation (invalid block number) to test error bubbling
     // We want to make sure it gracefully exits and prints an error, rather than panicking.
     let mut cmd_verify = Command::cargo_bin("sods").unwrap();
-    
+
     // We expect failure if there is no node provided or invalid configuration
-    cmd_verify.args(&["verify", "Tf", "--block", "999999999", "--node", "http://127.0.0.1:0000"])
+    cmd_verify
+        .args(&[
+            "verify",
+            "Tf",
+            "--block",
+            "999999999",
+            "--node",
+            "http://127.0.0.1:0000",
+        ])
         .assert()
-        .failure()  // Expecting a non-zero exit code due to unreachable RPC
-        .stderr(predicate::str::contains("Error").or(predicate::str::contains("failed to connect")));
-        
+        .failure() // Expecting a non-zero exit code due to unreachable RPC
+        .stderr(
+            predicate::str::contains("Error").or(predicate::str::contains("failed to connect")),
+        );
+
     println!("✅ E2E Full Pipeline CLI behaviors correctly validated");
 }

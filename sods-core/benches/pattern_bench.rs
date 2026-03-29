@@ -28,7 +28,7 @@ fn bench_long_pattern_rejected(c: &mut Criterion) {
         long_pattern.push_str("LongSymbolName -> ");
     }
     long_pattern.push_str("Tf");
-    
+
     c.bench_function("parse_too_long_rejected", |b| {
         b.iter(|| BehavioralPattern::parse(black_box(&long_pattern)))
     });

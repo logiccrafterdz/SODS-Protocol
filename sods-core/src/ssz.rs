@@ -1,8 +1,8 @@
-use ethers_core::types::{H256, Address, Bloom, U256};
+use ethers_core::types::{Address, Bloom, H256, U256};
 use serde::{Deserialize, Serialize};
 
 /// ExecutionPayloadHeader for Post-Dencun blocks.
-/// 
+///
 /// Reference: https://github.com/ethereum/consensus-specs/blob/dev/specs/deneb/beacon-chain.md#executionpayloadheader
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ExecutionPayloadHeader {
@@ -27,8 +27,8 @@ pub struct ExecutionPayloadHeader {
 
 impl ExecutionPayloadHeader {
     /// Compute the SSZ root of the ExecutionPayloadHeader.
-    /// 
-    /// Note: This is a simplified implementation for v1. 
+    ///
+    /// Note: This is a simplified implementation for v1.
     /// Full SSZ Merkleization requires a proper tree hash.
     pub fn ssz_root(&self) -> H256 {
         // Placeholder until proper ssz_rs integration

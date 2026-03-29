@@ -58,7 +58,10 @@ fn test_record_multiple_events_same_agent() {
 
     // Verify ordering is preserved
     for i in 0..events.len() - 1 {
-        assert!(events[i] < events[i + 1], "Events should be causally ordered");
+        assert!(
+            events[i] < events[i + 1],
+            "Events should be causally ordered"
+        );
     }
 }
 

@@ -35,17 +35,17 @@
 
 pub mod error;
 pub mod header_anchor;
+pub mod mempool;
 pub mod query;
 pub mod result;
 pub mod rpc;
 pub mod verifier;
-pub mod mempool;
 
 // Re-export main types for convenience
 pub use error::SodsVerifierError;
-pub use header_anchor::{VerificationMode, BlockHeader, AnchorValidation};
+pub use header_anchor::{AnchorValidation, BlockHeader, VerificationMode};
+pub use mempool::{MempoolMonitor, PendingAlert};
 pub use query::QueryParser;
 pub use result::VerificationResult;
 pub use rpc::RpcClient;
 pub use verifier::BlockVerifier;
-pub use mempool::{MempoolMonitor, PendingAlert};

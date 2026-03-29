@@ -75,10 +75,7 @@ impl CausalEventRecorder {
         self.ensure_causal_ordering(&event)?;
 
         // Store event
-        self.events
-            .entry(event.agent_id)
-            .or_default()
-            .push(event);
+        self.events.entry(event.agent_id).or_default().push(event);
 
         Ok(())
     }

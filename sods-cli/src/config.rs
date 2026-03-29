@@ -18,7 +18,7 @@ pub const CHAINS: &[ChainConfig] = &[
         rpc_urls: &[
             "https://ethereum-sepolia.publicnode.com",
             "https://rpc.sepolia.org",
-            "https://1rpc.io/sepolia"
+            "https://1rpc.io/sepolia",
         ],
         default_ws: Some("wss://ethereum-sepolia-rpc.publicnode.com"),
         description: "Ethereum Sepolia Testnet",
@@ -29,7 +29,7 @@ pub const CHAINS: &[ChainConfig] = &[
         rpc_urls: &[
             "https://eth.llamarpc.com",
             "https://ethereum-rpc.publicnode.com",
-            "https://1rpc.io/eth"
+            "https://1rpc.io/eth",
         ],
         default_ws: Some("wss://ethereum-rpc.publicnode.com"),
         description: "Ethereum Mainnet",
@@ -40,7 +40,7 @@ pub const CHAINS: &[ChainConfig] = &[
         rpc_urls: &[
             "https://base.publicnode.com",
             "https://mainnet.base.org",
-            "https://1rpc.io/base"
+            "https://1rpc.io/base",
         ],
         default_ws: Some("wss://base-rpc.publicnode.com"),
         description: "Base Mainnet (Coinbase L2)",
@@ -51,7 +51,7 @@ pub const CHAINS: &[ChainConfig] = &[
         rpc_urls: &[
             "https://arbitrum.publicnode.com",
             "https://arb1.arbitrum.io/rpc",
-            "https://1rpc.io/arb"
+            "https://1rpc.io/arb",
         ],
         default_ws: Some("wss://arbitrum-one-rpc.publicnode.com"),
         description: "Arbitrum One",
@@ -62,7 +62,7 @@ pub const CHAINS: &[ChainConfig] = &[
         rpc_urls: &[
             "https://optimism.publicnode.com",
             "https://mainnet.optimism.io",
-            "https://1rpc.io/op"
+            "https://1rpc.io/op",
         ],
         default_ws: None,
         description: "Optimism Mainnet",
@@ -73,7 +73,7 @@ pub const CHAINS: &[ChainConfig] = &[
         rpc_urls: &[
             "https://zkevm-rpc.com",
             "https://polygon-zkevm.publicnode.com",
-            "https://1rpc.io/polygon/zkevm"
+            "https://1rpc.io/polygon/zkevm",
         ],
         default_ws: None,
         description: "Polygon zkEVM",
@@ -84,7 +84,7 @@ pub const CHAINS: &[ChainConfig] = &[
         rpc_urls: &[
             "https://rpc.scroll.io",
             "https://scroll-rpc.publicnode.com",
-            "https://1rpc.io/scroll"
+            "https://1rpc.io/scroll",
         ],
         default_ws: None,
         description: "Scroll zkEVM",
@@ -107,7 +107,10 @@ pub const SYMBOLS: &[(&str, &str)] = &[
     ("MintNFT", "ERC721/ERC1155 Mint (Transfer from 0x0)"),
     ("BuyNFT", "NFT Purchase (Seaport OrderFulfilled)"),
     ("ListNFT", "NFT Listing (Blur OrdersMatched)"),
-    ("BridgeIn", "L1→L2 Bridge Deposit (Optimism DepositFinalized)"),
+    (
+        "BridgeIn",
+        "L1→L2 Bridge Deposit (Optimism DepositFinalized)",
+    ),
     ("BridgeOut", "L2→L1 Bridge Withdrawal (Arbitrum/Scroll)"),
     ("Frontrun", "MEV Frontrun Pattern (Tf → Sw)"),
     ("Backrun", "MEV Backrun Pattern (Sw → Tf)"),
@@ -149,6 +152,9 @@ impl UserConfig {
 
     /// Gets a user-overridden RPC URL if it exists in the config for the given chain.
     pub fn get_rpc_override(&self, chain_name: &str) -> Option<String> {
-        self.rpc_overrides.as_ref()?.get(&chain_name.to_lowercase()).cloned()
+        self.rpc_overrides
+            .as_ref()?
+            .get(&chain_name.to_lowercase())
+            .cloned()
     }
 }

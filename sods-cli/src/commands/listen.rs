@@ -1,10 +1,10 @@
+use crate::output;
 use clap::Args;
-use futures_util::{StreamExt, SinkExt};
+use colored::Colorize;
+use futures_util::{SinkExt, StreamExt};
+use serde_json::json;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::protocol::Message;
-use colored::Colorize;
-use crate::output;
-use serde_json::json;
 
 #[derive(Args)]
 pub struct ListenArgs {
@@ -18,7 +18,10 @@ pub struct ListenArgs {
 }
 
 pub async fn run(args: ListenArgs) -> i32 {
-    output::info(&format!("Connecting to WebSocket server: {}...", args.websocket));
+    output::info(&format!(
+        "Connecting to WebSocket server: {}...",
+        args.websocket
+    ));
 
     let (ws_stream, _) = match connect_async(&args.websocket).await {
         Ok(s) => s,
@@ -51,14 +54,18 @@ pub async fn run(args: ListenArgs) -> i32 {
                     println!("\n{}", "🔔 NEW BEHAVIORAL ALERT".yellow().bold());
                     println!("   Chain ID:   {}", alert["chain_id"]);
                     println!("   Block:      {}", alert["block_number"]);
-                    println!("   Pattern:    {}", alert["pattern"].as_str().unwrap_or("unknown").cyan());
+                    println!(
+                        "   Pattern:    {}",
+                        alert["pattern"].as_str().unwrap_or("unknown").cyan()
+                    );
                     println!("   Timestamp:  {}", alert["timestamp"]);
                     println!("   Alert ID:   {}", alert["alert_id"]);
-                    
+
                     if let Some(symbols) = alert["symbols"].as_array() {
                         println!("   Symbols:");
                         for sym in symbols {
-                            println!("     - {} from {} to {} (value: {})", 
+                            println!(
+                                "     - {} from {} to {} (value: {})",
                                 sym["symbol"].as_str().unwrap_or("?").green(),
                                 sym["from"].as_str().unwrap_or("?").dimmed(),
                                 sym["to"].as_str().unwrap_or("?").dimmed(),

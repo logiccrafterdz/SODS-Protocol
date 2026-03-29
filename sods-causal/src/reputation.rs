@@ -3,8 +3,8 @@
 //! This module handles incoming feedback, validates metrics, and
 //! prepares reputation claims for on-chain submission.
 
-use serde::{Deserialize, Serialize};
 use crate::error::{CausalError, Result};
+use serde::{Deserialize, Serialize};
 
 /// Supported reputation tags for SODS causal verifier.
 pub const TAG_ACCURACY: &str = "behavioral_proof_accuracy";
@@ -30,21 +30,32 @@ impl ReputationFeedback {
         match self.tag1.as_str() {
             TAG_ACCURACY => {
                 if self.value > 100 {
-                    return Err(CausalError::InternalError("Accuracy value must be 0-100".to_string()));
+                    return Err(CausalError::InternalError(
+                        "Accuracy value must be 0-100".to_string(),
+                    ));
                 }
             }
             TAG_SPEED => {
                 // Speed is in ms, no hard upper limit but shouldn't be zero for a real request
                 if self.value == 0 {
-                    return Err(CausalError::InternalError("Speed index cannot be zero".to_string()));
+                    return Err(CausalError::InternalError(
+                        "Speed index cannot be zero".to_string(),
+                    ));
                 }
             }
             TAG_RELIABILITY => {
                 if self.value > 100 {
-                    return Err(CausalError::InternalError("Reliability percentage must be 0-100".to_string()));
+                    return Err(CausalError::InternalError(
+                        "Reliability percentage must be 0-100".to_string(),
+                    ));
                 }
             }
-            _ => return Err(CausalError::InternalError(format!("Unsupported reputation tag: {}", self.tag1))),
+            _ => {
+                return Err(CausalError::InternalError(format!(
+                    "Unsupported reputation tag: {}",
+                    self.tag1
+                )))
+            }
         }
         Ok(())
     }

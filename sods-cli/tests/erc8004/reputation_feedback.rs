@@ -7,9 +7,13 @@ const REPUTATION_REGISTRY_ABI: &str = r#"[
 
 #[tokio::test]
 async fn test_reputation_feedback_lifecycle() {
-    let rpc_url = std::env::var("SEPOLIA_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string());
-    let priv_key = std::env::var("CLIENT_PRIVATE_KEY").unwrap_or_else(|_| "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string());
-    let _registry_addr = std::env::var("SEPOLIA_REPUTATION_REGISTRY_ADDR").unwrap_or_else(|_| "0x8004000000000000000000000000000000000002".to_string());
+    let rpc_url =
+        std::env::var("SEPOLIA_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string());
+    let priv_key = std::env::var("CLIENT_PRIVATE_KEY").unwrap_or_else(|_| {
+        "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string()
+    });
+    let _registry_addr = std::env::var("SEPOLIA_REPUTATION_REGISTRY_ADDR")
+        .unwrap_or_else(|_| "0x8004000000000000000000000000000000000002".to_string());
 
     let provider = match Provider::<Http>::try_from(rpc_url) {
         Ok(p) => p,
@@ -27,7 +31,10 @@ async fn test_reputation_feedback_lifecycle() {
     };
     let client = Arc::new(SignerMiddleware::new(provider, wallet));
 
-    println!("Submitting reputation feedback from client {}", client.address());
+    println!(
+        "Submitting reputation feedback from client {}",
+        client.address()
+    );
 
     // Mock feedback data
     let _agent_id = U256::from(1u64);

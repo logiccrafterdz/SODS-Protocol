@@ -3,10 +3,10 @@
 //! This module listens for on-chain validation requests and
 //! triggers the causal verification engine.
 
-use serde::{Deserialize, Serialize};
-use ethers::types::{H256, Address};
 use crate::error::{CausalError, Result};
 use crate::proof::CausalBehavioralProof;
+use ethers::types::{Address, H256};
+use serde::{Deserialize, Serialize};
 
 /// Represents an incoming validation request from the on-chain registry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,12 +38,12 @@ impl ValidationHandler {
     /// Validates a behavioral claim using the causal engine.
     pub fn handle_request(request: ValidationRequest) -> Result<ValidationResponse> {
         // 1. Deserialize the proof
-        let proof: CausalBehavioralProof = serde_json::from_slice(&request.proof_data)
-            .map_err(CausalError::Serialization)?;
+        let proof: CausalBehavioralProof =
+            serde_json::from_slice(&request.proof_data).map_err(CausalError::Serialization)?;
 
         // 2. Perform cryptographic and behavioral verification
         let is_valid = proof.verify(request.timestamp);
-        
+
         // 3. Construct response
         Ok(ValidationResponse {
             request_id: request.request_id,

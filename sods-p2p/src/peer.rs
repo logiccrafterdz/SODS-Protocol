@@ -3,14 +3,14 @@
 use futures::StreamExt;
 use k256::ecdsa::SigningKey;
 use libp2p::{
-    identify,
+    gossipsub, identify,
     identity::Keypair,
-    request_response, gossipsub,
+    request_response,
     swarm::{Swarm, SwarmEvent},
     Multiaddr, PeerId,
 };
-use tracing::{debug, info, warn};
 use tokio::sync::broadcast;
+use tracing::{debug, info, warn};
 
 use sods_core::BehavioralMerkleTree;
 use sods_verifier::BlockVerifier;
@@ -19,8 +19,8 @@ use crate::behavior::{SodsBehaviour, SodsBehaviourEvent};
 use crate::cache::{BlockCache, CachedBlock};
 use crate::error::{Result, SodsP2pError};
 use crate::protocol::{ProofRequest, ProofResponse};
-use crate::threats::{ThreatRule, THREATS_TOPIC};
 use crate::reputation::ReputationTracker;
+use crate::threats::{ThreatRule, THREATS_TOPIC};
 
 /// A SODS peer that serves behavioral proofs to the network.
 pub struct SodsPeer {
@@ -65,10 +65,13 @@ impl SodsPeer {
             .with_behaviour(|_key| SodsBehaviour::new(&keypair))
             .map_err(|e| SodsP2pError::NetworkError(format!("Behaviour error: {}", e)))?
             .build();
-        
+
         // Subscribe to threats topic
         let topic = gossipsub::IdentTopic::new(THREATS_TOPIC);
-        swarm.behaviour_mut().gossipsub.subscribe(&topic)
+        swarm
+            .behaviour_mut()
+            .gossipsub
+            .subscribe(&topic)
             .map_err(|e| SodsP2pError::NetworkError(format!("Subscription error: {:?}", e)))?;
 
         info!("Created SODS peer with ID: {}", local_peer_id);
@@ -94,10 +97,13 @@ impl SodsPeer {
         let topic = gossipsub::IdentTopic::new(THREATS_TOPIC);
         let data = serde_json::to_vec(rule)
             .map_err(|e| SodsP2pError::SerializationError(e.to_string()))?;
-        
-        self.swarm.behaviour_mut().gossipsub.publish(topic, data)
+
+        self.swarm
+            .behaviour_mut()
+            .gossipsub
+            .publish(topic, data)
             .map_err(|e| SodsP2pError::NetworkError(format!("Publish error: {:?}", e)))?;
-        
+
         info!("Published threat rule: {}", rule.id);
         Ok(())
     }
@@ -120,7 +126,10 @@ impl SodsPeer {
         // Logic from behavior/client if needed, but let's assume behaviour.puzzle handles it.
         // Actually, the client uses request_response. SodsPeer also has puzzle behavior.
         let challenge = crate::protocol::PuzzleChallenge::random();
-        self.swarm.behaviour_mut().puzzle.send_request(peer_id, challenge);
+        self.swarm
+            .behaviour_mut()
+            .puzzle
+            .send_request(peer_id, challenge);
     }
 
     /// Subscribe to incoming threat rules.
@@ -187,14 +196,21 @@ impl SodsPeer {
     /// Handle gossipsub events.
     fn handle_gossip_event(&mut self, event: gossipsub::Event) {
         match event {
-            gossipsub::Event::Message { propagation_source, message_id: _, message } => {
+            gossipsub::Event::Message {
+                propagation_source,
+                message_id: _,
+                message,
+            } => {
                 if let Ok(rule) = serde_json::from_slice::<ThreatRule>(&message.data) {
-                    info!("Received threat rule '{}' from {}", rule.id, propagation_source);
-                    
+                    info!(
+                        "Received threat rule '{}' from {}",
+                        rule.id, propagation_source
+                    );
+
                     // Validate rule
                     if rule.verify() {
-                         // Forward to local listeners
-                         let _ = self.threat_tx.send(rule);
+                        // Forward to local listeners
+                        let _ = self.threat_tx.send(rule);
                     } else {
                         warn!("Received INVALID threat rule from {}", propagation_source);
                     }
@@ -303,7 +319,12 @@ impl SodsPeer {
                         })
                         .unwrap_or([0u8; 32]);
 
-                    ProofResponse::success_signed(vec![], root, result.occurrences, &self.signing_key)
+                    ProofResponse::success_signed(
+                        vec![],
+                        root,
+                        result.occurrences,
+                        &self.signing_key,
+                    )
                 } else {
                     ProofResponse::error_signed(
                         result.error.unwrap_or_else(|| "Symbol not found".into()),
@@ -344,7 +365,10 @@ impl SodsPeer {
     /// Handle puzzle-related events.
     async fn handle_puzzle_event(
         &mut self,
-        event: request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>,
+        event: request_response::Event<
+            crate::protocol::PuzzleChallenge,
+            crate::protocol::PuzzleSolution,
+        >,
     ) {
         use request_response::Event;
 
@@ -376,18 +400,19 @@ impl SodsPeer {
     }
 
     /// Solve a Proof-of-Behavior puzzle.
-    async fn solve_puzzle(&mut self, challenge: crate::protocol::PuzzleChallenge) -> crate::protocol::PuzzleSolution {
+    async fn solve_puzzle(
+        &mut self,
+        challenge: crate::protocol::PuzzleChallenge,
+    ) -> crate::protocol::PuzzleSolution {
         match self
             .verifier
             .verify_symbol_in_block(&challenge.symbol, challenge.block_number)
             .await
         {
-            Ok(result) => {
-                crate::protocol::PuzzleSolution {
-                    occurrences: result.occurrences as u32,
-                    success: true,
-                }
-            }
+            Ok(result) => crate::protocol::PuzzleSolution {
+                occurrences: result.occurrences as u32,
+                success: true,
+            },
             Err(_) => crate::protocol::PuzzleSolution {
                 occurrences: 0,
                 success: false,

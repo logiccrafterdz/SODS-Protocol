@@ -8,7 +8,7 @@ use crate::output;
 /// Run the chains command.
 pub fn run() -> i32 {
     output::header("Supported Chains");
-    
+
     println!();
     println!(
         "{:<12} {:<12} {}",
@@ -17,7 +17,7 @@ pub fn run() -> i32 {
         "Description".bold()
     );
     println!("{}", "─".repeat(50).dimmed());
-    
+
     for chain in CHAINS {
         println!(
             "{:<12} {:<12} {}",
@@ -26,10 +26,10 @@ pub fn run() -> i32 {
             chain.description.dimmed()
         );
     }
-    
+
     println!();
     output::hint("Use --chain <NAME> with verify command.");
     output::hint("Use --rpc-url to override default RPC.");
-    
+
     0
 }

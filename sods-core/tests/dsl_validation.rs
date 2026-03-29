@@ -6,7 +6,7 @@ fn test_quantifier_limits() {
     assert!(BehavioralPattern::parse("Tf{1000}").is_ok());
     // Exact quantifier over limit
     assert!(BehavioralPattern::parse("Tf{1001}").is_err());
-    
+
     // Range quantifier at limit
     assert!(BehavioralPattern::parse("Tf{0,1000}").is_ok());
     // Range quantifier min over limit
@@ -35,7 +35,9 @@ fn test_syntax_errors_and_error_messages() {
     assert!(err.contains("Unmatched '}'"), "Error was: {}", err);
 
     // Empty pattern segment
-    let err = BehavioralPattern::parse("Tf -> -> Sw").unwrap_err().to_string();
+    let err = BehavioralPattern::parse("Tf -> -> Sw")
+        .unwrap_err()
+        .to_string();
     assert!(err.contains("Empty pattern segment"), "Error was: {}", err);
 
     // Invalid symbol name
@@ -61,7 +63,11 @@ fn test_pattern_length_limit() {
     }
     long_pattern.push_str("Tf");
     // Ensure it exceeds 500
-    assert!(long_pattern.len() > 500, "Length was: {}", long_pattern.len());
+    assert!(
+        long_pattern.len() > 500,
+        "Length was: {}",
+        long_pattern.len()
+    );
     assert!(BehavioralPattern::parse(&long_pattern).is_err());
 }
 

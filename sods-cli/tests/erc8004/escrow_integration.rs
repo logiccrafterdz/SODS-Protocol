@@ -3,8 +3,11 @@ use std::sync::Arc;
 
 #[tokio::test]
 async fn test_escrow_payment_release_flow() {
-    let rpc_url = std::env::var("SEPOLIA_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string());
-    let priv_key = std::env::var("TEST_PRIVATE_KEY").unwrap_or_else(|_| "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string());
+    let rpc_url =
+        std::env::var("SEPOLIA_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string());
+    let priv_key = std::env::var("TEST_PRIVATE_KEY").unwrap_or_else(|_| {
+        "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string()
+    });
 
     let provider = match Provider::<Http>::try_from(rpc_url) {
         Ok(p) => p,
@@ -22,7 +25,10 @@ async fn test_escrow_payment_release_flow() {
     };
     let client = Arc::new(SignerMiddleware::new(provider, wallet));
 
-    println!("Verifying escrow integration for agent {}", client.address());
+    println!(
+        "Verifying escrow integration for agent {}",
+        client.address()
+    );
 
     // In a full E2E setup:
     // 1. Deploy TestEscrow

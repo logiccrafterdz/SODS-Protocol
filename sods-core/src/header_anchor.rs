@@ -1,8 +1,8 @@
 use ethers_core::types::{TransactionReceipt, H256};
-use ethers_core::utils::rlp::RlpStream;
 use ethers_core::utils::hex;
-use sha3::{Digest, Keccak256};
+use ethers_core::utils::rlp::RlpStream;
 use hash_db::Hasher;
+use sha3::{Digest, Keccak256};
 
 /// Custom KeccakHasher for triehash
 pub struct KeccakHasher;
@@ -19,18 +19,15 @@ pub fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
     // Determine the list size. Standard is 4.
     // L2s might append additional fields.
     let mut list_size = 4;
-    
+
     // Check for L2 specific fields in `other` map that are part of the consensus commitment.
     // Optimism Bedrock: Deposit receipts (type 0x7E/126) include depositNonce and depositReceiptVersion.
     // L1 information fields (l1BlockNumber, l1Fee, etc.) are usually NOT part of the receiptsRoot.
-    let l2_fields: Vec<&serde_json::Value> = [
-        "depositNonce", 
-        "depositReceiptVersion"
-    ]
+    let l2_fields: Vec<&serde_json::Value> = ["depositNonce", "depositReceiptVersion"]
         .iter()
         .filter_map(|key| receipt.other.get(*key))
         .collect();
-    
+
     list_size += l2_fields.len();
 
     let mut stream = RlpStream::new_list(list_size);
@@ -122,7 +119,7 @@ pub fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
             return typed;
         }
     }
-    
+
     rlp_bytes
 }
 
@@ -137,7 +134,7 @@ pub fn compute_receipts_root(receipts: &[TransactionReceipt]) -> H256 {
     }
 
     let encoded_receipts: Vec<Vec<u8>> = receipts.iter().map(rlp_encode_receipt).collect();
-    
+
     // triehash::ordered_trie_root computes the root of a trie where keys are RLP-encoded indices
     triehash::ordered_trie_root::<KeccakHasher, _>(encoded_receipts)
 }
@@ -145,7 +142,7 @@ pub fn compute_receipts_root(receipts: &[TransactionReceipt]) -> H256 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ethers_core::types::{Bloom, TransactionReceipt, H256, U64, U256};
+    use ethers_core::types::{Bloom, TransactionReceipt, H256, U256, U64};
 
     #[test]
     fn test_empty_receipts_root() {
@@ -163,7 +160,7 @@ mod tests {
         receipt.cumulative_gas_used = U256::from(21000);
         receipt.logs_bloom = Bloom::default();
         receipt.logs = vec![];
-        
+
         let root = compute_receipts_root(&[receipt]);
         assert_ne!(root, H256::zero());
     }

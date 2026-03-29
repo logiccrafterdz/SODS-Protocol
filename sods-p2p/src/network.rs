@@ -1,8 +1,8 @@
-use libp2p::{PeerId, Multiaddr, swarm::Swarm};
 use crate::behavior::SodsBehaviour;
 use crate::error::{Result, SodsP2pError};
-use tracing::{info, warn, debug};
+use libp2p::{swarm::Swarm, Multiaddr, PeerId};
 use std::collections::HashSet;
+use tracing::{debug, info, warn};
 
 pub struct MultiPathNetwork {
     pub swarm: Swarm<SodsBehaviour>,
@@ -18,12 +18,19 @@ impl MultiPathNetwork {
     }
 
     /// Try to connect to a peer with multi-path fallbacks.
-    pub async fn connect_with_fallback(&mut self, peer_id: PeerId, addrs: &[(Multiaddr, String)]) -> Result<()> {
+    pub async fn connect_with_fallback(
+        &mut self,
+        peer_id: PeerId,
+        addrs: &[(Multiaddr, String)],
+    ) -> Result<()> {
         let mut last_error = None;
 
         for (addr, protocol) in addrs {
-            info!("Attempting connection to {} via {} ({})", peer_id, addr, protocol);
-            
+            info!(
+                "Attempting connection to {} via {} ({})",
+                peer_id, addr, protocol
+            );
+
             match self.swarm.dial(addr.clone()) {
                 Ok(_) => {
                     debug!("Dial initiated for {} via {}", peer_id, protocol);
@@ -33,7 +40,7 @@ impl MultiPathNetwork {
                         .entry(peer_id)
                         .or_default()
                         .insert(protocol.clone());
-                },
+                }
                 Err(e) => {
                     warn!("Failed to dial {} via {}: {}", peer_id, protocol, e);
                     last_error = Some(SodsP2pError::NetworkError(e.to_string()));

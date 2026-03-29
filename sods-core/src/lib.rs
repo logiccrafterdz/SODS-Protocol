@@ -37,30 +37,30 @@
 //! }
 //! ```
 
-pub mod dictionary;
-pub mod error;
-pub mod proof;
-pub mod symbol;
-pub mod tree;
-pub mod pattern;
 pub mod causal_tree;
 pub mod deployer;
+pub mod dictionary;
+pub mod error;
+pub mod pattern;
+pub mod proof;
 pub mod registry;
+pub mod symbol;
+pub mod tree;
 
 // Re-export main types for convenience
+pub use causal_tree::CausalMerkleTree;
 pub use dictionary::SymbolDictionary;
 pub use error::SodsError;
 pub use proof::Proof;
+pub use registry::ContractRegistry;
 pub use symbol::BehavioralSymbol;
 pub use tree::BehavioralMerkleTree;
-pub use causal_tree::CausalMerkleTree;
-pub use registry::ContractRegistry;
 pub mod shadow;
 pub use shadow::BehavioralShadow;
-pub mod plugins;
-pub mod header_anchor;
-pub mod ssz;
 pub mod commitment;
+pub mod header_anchor;
+pub mod plugins;
+pub mod ssz;
 pub use commitment::BehavioralCommitment;
 pub use plugins::SymbolPlugin;
 pub mod mpt;

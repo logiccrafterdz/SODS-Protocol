@@ -1,4 +1,4 @@
-use ethers_core::types::{H256, EIP1186ProofResponse};
+use ethers_core::types::{EIP1186ProofResponse, H256};
 use ethers_core::utils::rlp::Rlp;
 use sha3::{Digest, Keccak256};
 
@@ -11,10 +11,7 @@ pub struct ProofValidation {
 }
 
 /// Verify an EIP-1186 account and storage proof against a state root.
-pub fn verify_storage_proof(
-    proof: &EIP1186ProofResponse,
-    state_root: H256,
-) -> ProofValidation {
+pub fn verify_storage_proof(proof: &EIP1186ProofResponse, state_root: H256) -> ProofValidation {
     // 1. Verify Account Proof
     let account_valid = verify_mpt_proof(
         state_root,
@@ -26,12 +23,16 @@ pub fn verify_storage_proof(
     let mut storage_valid = Vec::with_capacity(proof.storage_proof.len());
     if account_valid {
         // Extract storage root from account data
-        if let Some(account_rlp) = get_leaf_value(state_root, &Keccak256::digest(proof.address.as_bytes()).to_vec(), &proof.account_proof) {
+        if let Some(account_rlp) = get_leaf_value(
+            state_root,
+            &Keccak256::digest(proof.address.as_bytes()).to_vec(),
+            &proof.account_proof,
+        ) {
             let rlp = Rlp::new(&account_rlp);
             // Account RLP is [nonce, balance, storageRoot, codeHash]
             if rlp.item_count().unwrap_or(0) >= 3 {
                 let storage_root: H256 = rlp.at(2).unwrap().as_val().unwrap();
-                
+
                 for sp in &proof.storage_proof {
                     let mut key_bytes = [0u8; 32];
                     sp.key.to_big_endian(&mut key_bytes);
@@ -57,14 +58,18 @@ pub fn verify_storage_proof(
 }
 
 /// Verify a Merkle-Patricia Trie proof.
-/// 
+///
 /// This is a simplified verification that handles the proof path provided by eth_getProof.
 pub fn verify_mpt_proof(root: H256, key_hash: &[u8], proof: &[ethers_core::types::Bytes]) -> bool {
     get_leaf_value(root, key_hash, proof).is_some()
 }
 
 /// Traverses the MPT proof to extract the leaf value.
-fn get_leaf_value(root: H256, key_hash: &[u8], proof: &[ethers_core::types::Bytes]) -> Option<Vec<u8>> {
+fn get_leaf_value(
+    root: H256,
+    key_hash: &[u8],
+    proof: &[ethers_core::types::Bytes],
+) -> Option<Vec<u8>> {
     let mut expected_hash = root;
     let key_bits = to_nibbles(key_hash);
     let mut key_offset = 0;
@@ -81,7 +86,7 @@ fn get_leaf_value(root: H256, key_hash: &[u8], proof: &[ethers_core::types::Byte
                 // Extension or Leaf node
                 let encoded_path = rlp.at(0).ok()?.data().ok()?.to_vec();
                 let (is_leaf, path) = decode_path(&encoded_path);
-                
+
                 // Compare path with key bits
                 if key_bits[key_offset..key_offset + path.len()] != path {
                     return None;
@@ -126,7 +131,7 @@ fn decode_path(encoded: &[u8]) -> (bool, Vec<u8>) {
     let first = encoded[0];
     let is_leaf = (first & 0x20) != 0;
     let has_odd_len = (first & 0x10) != 0;
-    
+
     let mut nibbles = Vec::new();
     if has_odd_len {
         nibbles.push(first & 0x0F);

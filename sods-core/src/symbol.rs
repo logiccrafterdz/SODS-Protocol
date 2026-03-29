@@ -3,7 +3,7 @@
 //! This module defines the `BehavioralSymbol` struct which represents
 //! a parsed behavioral event extracted from EVM logs.
 
-use ethers_core::types::{Address, U256, H256};
+use ethers_core::types::{Address, H256, U256};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
@@ -68,7 +68,7 @@ pub struct BehavioralSymbol {
 
     /// Transaction Hash (Causality)
     pub tx_hash: H256,
-    
+
     /// Nonce of the sender (Causality - EOA)
     pub nonce: u64,
 
@@ -112,11 +112,11 @@ impl BehavioralSymbol {
 
     /// Set contextual metadata (Builder pattern).
     pub fn with_context(
-        mut self, 
-        from: Address, 
-        to: Address, 
-        value: U256, 
-        token_id: Option<U256>
+        mut self,
+        from: Address,
+        to: Address,
+        value: U256,
+        token_id: Option<U256>,
     ) -> Self {
         self.from = from;
         self.to = to;
@@ -187,9 +187,9 @@ impl BehavioralSymbol {
 
         // Include causality fields if non-zero (to affect hash)
         if self.tx_hash != H256::zero() {
-             hasher.update(self.tx_hash.as_bytes());
-             hasher.update(self.nonce.to_be_bytes());
-             hasher.update(self.call_sequence.to_be_bytes());
+            hasher.update(self.tx_hash.as_bytes());
+            hasher.update(self.nonce.to_be_bytes());
+            hasher.update(self.call_sequence.to_be_bytes());
         }
 
         hasher.finalize().into()
@@ -204,7 +204,7 @@ impl BehavioralSymbol {
         let mut hasher = Keccak::v256();
         hasher.update(self.symbol.as_bytes());
         hasher.update(&self.log_index.to_be_bytes());
-        
+
         let mut output = [0u8; 32];
         hasher.finalize(&mut output);
         output
@@ -234,9 +234,13 @@ mod tests {
 
     #[test]
     fn test_symbol_creation() {
-        let sym = BehavioralSymbol::new("Tf", 42)
-            .with_context(Address::zero(), Address::zero(), U256::from(100), None);
-            
+        let sym = BehavioralSymbol::new("Tf", 42).with_context(
+            Address::zero(),
+            Address::zero(),
+            U256::from(100),
+            None,
+        );
+
         assert_eq!(sym.symbol(), "Tf");
         assert_eq!(sym.log_index(), 42);
         assert_eq!(sym.value, U256::from(100));

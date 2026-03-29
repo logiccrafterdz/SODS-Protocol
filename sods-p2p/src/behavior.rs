@@ -1,10 +1,6 @@
 //! Libp2p network behavior combining identify and request-response.
 
-use libp2p::{
-    identify, request_response, gossipsub,
-    swarm::NetworkBehaviour,
-    StreamProtocol,
-};
+use libp2p::{gossipsub, identify, request_response, swarm::NetworkBehaviour, StreamProtocol};
 
 use crate::protocol::{ProofRequest, ProofResponse};
 
@@ -27,7 +23,10 @@ pub struct SodsBehaviour {
     /// Request-response for proof exchange
     pub request_response: request_response::cbor::Behaviour<ProofRequest, ProofResponse>,
     /// Request-response for puzzles
-    pub puzzle: request_response::cbor::Behaviour<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>,
+    pub puzzle: request_response::cbor::Behaviour<
+        crate::protocol::PuzzleChallenge,
+        crate::protocol::PuzzleSolution,
+    >,
     /// Gossipsub for threat intelligence
     pub gossipsub: gossipsub::Behaviour,
 }
@@ -40,7 +39,9 @@ pub enum SodsBehaviourEvent {
     /// Request-response event
     RequestResponse(request_response::Event<ProofRequest, ProofResponse>),
     /// Puzzle event
-    Puzzle(request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>),
+    Puzzle(
+        request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>,
+    ),
     /// Gossipsub event
     Gossipsub(gossipsub::Event),
 }
@@ -57,8 +58,16 @@ impl From<request_response::Event<ProofRequest, ProofResponse>> for SodsBehaviou
     }
 }
 
-impl From<request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>> for SodsBehaviourEvent {
-    fn from(event: request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>) -> Self {
+impl
+    From<request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>>
+    for SodsBehaviourEvent
+{
+    fn from(
+        event: request_response::Event<
+            crate::protocol::PuzzleChallenge,
+            crate::protocol::PuzzleSolution,
+        >,
+    ) -> Self {
         SodsBehaviourEvent::Puzzle(event)
     }
 }
@@ -74,11 +83,8 @@ impl SodsBehaviour {
     pub fn new(keypair: &libp2p::identity::Keypair) -> Self {
         // Identify config
         let identify = identify::Behaviour::new(
-            identify::Config::new(
-                "/sods/1.0.0".to_string(),
-                keypair.public(),
-            )
-            .with_agent_version("sods/0.2.0".to_string()),
+            identify::Config::new("/sods/1.0.0".to_string(), keypair.public())
+                .with_agent_version("sods/0.2.0".to_string()),
         );
 
         // Request-response config using CBOR codec

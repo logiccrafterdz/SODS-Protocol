@@ -5,11 +5,10 @@
 //! causal order within the same context (EOA or Contract Trace), rather than just appearing
 //! in the block in that order.
 
-
 use sha2::{Digest, Sha256};
 
-use crate::symbol::BehavioralSymbol;
 use crate::proof::Proof;
+use crate::symbol::BehavioralSymbol;
 
 /// A Merkle tree that proves causal relationships between events.
 #[derive(Debug, Clone)]
@@ -28,14 +27,19 @@ impl CausalMerkleTree {
         // Sort by causality: From Address -> Nonce -> Call Sequence
         // This groups all events from the same actor together in chronological order.
         symbols.sort_by(|a, b| {
-            a.from.cmp(&b.from)
+            a.from
+                .cmp(&b.from)
                 .then(a.nonce.cmp(&b.nonce))
                 .then(a.call_sequence.cmp(&b.call_sequence))
         });
 
         if symbols.is_empty() {
-             let root = Sha256::digest([]).into();
-            return Self { symbols, layers: vec![], root };
+            let root = Sha256::digest([]).into();
+            return Self {
+                symbols,
+                layers: vec![],
+                root,
+            };
         }
 
         // Compute leaf hashes
@@ -51,7 +55,7 @@ impl CausalMerkleTree {
         }
     }
 
-   /// Build the Merkle tree layers from leaves to root.
+    /// Build the Merkle tree layers from leaves to root.
     fn build_tree(leaves: Vec<[u8; 32]>) -> (Vec<Vec<[u8; 32]>>, [u8; 32]) {
         if leaves.is_empty() {
             return (vec![], Sha256::digest([]).into());
@@ -74,7 +78,11 @@ impl CausalMerkleTree {
 
             for i in (0..current.len()).step_by(2) {
                 let left = current[i];
-                let right = if i + 1 < current.len() { current[i + 1] } else { left };
+                let right = if i + 1 < current.len() {
+                    current[i + 1]
+                } else {
+                    left
+                };
 
                 let mut hasher = Sha256::new();
                 hasher.update(left);
@@ -97,9 +105,10 @@ impl CausalMerkleTree {
     pub fn generate_proof(&self, symbol: &str, log_index: u32) -> Option<Proof> {
         // Find by simple match - in CMT, log_index isn't the primary sort key anymore,
         // but it is still unique per block.
-        let leaf_index = self.symbols.iter().position(|s| {
-            s.symbol() == symbol && s.log_index() == log_index
-        })?;
+        let leaf_index = self
+            .symbols
+            .iter()
+            .position(|s| s.symbol() == symbol && s.log_index() == log_index)?;
 
         self.generate_proof_by_index(leaf_index)
     }
@@ -119,7 +128,11 @@ impl CausalMerkleTree {
         for layer in self.layers.iter().take(self.layers.len().saturating_sub(1)) {
             if idx % 2 == 0 {
                 let sibling_idx = idx + 1;
-                path.push(if sibling_idx < layer.len() { layer[sibling_idx] } else { layer[idx] });
+                path.push(if sibling_idx < layer.len() {
+                    layer[sibling_idx]
+                } else {
+                    layer[idx]
+                });
                 directions.push(true);
             } else {
                 let sibling_idx = idx - 1;
@@ -137,59 +150,61 @@ impl CausalMerkleTree {
             directions,
         })
     }
-    
+
     /// Find a sequence of symbols causal-ordered.
     pub fn find_causal_sequence(&self, target_symbols: &[&str]) -> Option<Vec<&BehavioralSymbol>> {
         // Naive search for simplified PoC
         // Real implementation would look for contiguous blocks in `self.symbols`
         // which match the sequence and have same origin + sequential nonce.
-        
+
         let mut current_idx = 0;
         let mut potential_match = Vec::new();
-        
+
         // This is O(N*M) but N is small (block symbols)
         while current_idx < self.symbols.len() {
             let start_sym = &self.symbols[current_idx];
-            
-             // Check if start symbol matches first target
+
+            // Check if start symbol matches first target
             if start_sym.symbol() == target_symbols[0] {
                 potential_match.clear();
                 potential_match.push(start_sym);
-                
+
                 let mut match_ptr = 1;
                 let mut search_ptr = current_idx + 1;
-                
+
                 while match_ptr < target_symbols.len() && search_ptr < self.symbols.len() {
                     let next_sym = &self.symbols[search_ptr];
-                    
+
                     // MUST have same origin
                     if next_sym.from != start_sym.from {
                         break;
                     }
-                    
+
                     // MUST match target symbol
                     if next_sym.symbol() == target_symbols[match_ptr] {
                         // MUST be (nonce + 1) OR (same nonce && sequence + 1)
-                        let is_next_nonce = next_sym.nonce == potential_match.last().unwrap().nonce + 1;
-                        let is_next_seq = next_sym.nonce == potential_match.last().unwrap().nonce 
-                                          && next_sym.call_sequence > potential_match.last().unwrap().call_sequence;
-                                          
+                        let is_next_nonce =
+                            next_sym.nonce == potential_match.last().unwrap().nonce + 1;
+                        let is_next_seq = next_sym.nonce == potential_match.last().unwrap().nonce
+                            && next_sym.call_sequence
+                                > potential_match.last().unwrap().call_sequence;
+
                         if is_next_nonce || is_next_seq {
                             potential_match.push(next_sym);
                             match_ptr += 1;
                         }
                     }
-                    
+
                     search_ptr += 1;
                 }
-                
+
                 if potential_match.len() == target_symbols.len() {
                     return Some(potential_match);
                 }
             }
             current_idx += 1;
         }
-        
+
         None
     }
 }
@@ -201,7 +216,12 @@ mod tests {
 
     fn mock_sym(symbol: &str, from: u64, nonce: u64, log_index: u32) -> BehavioralSymbol {
         BehavioralSymbol::new(symbol, log_index)
-            .with_context(Address::from_low_u64_be(from), Address::zero(), 0.into(), None)
+            .with_context(
+                Address::from_low_u64_be(from),
+                Address::zero(),
+                0.into(),
+                None,
+            )
             .with_causality(H256::random(), nonce, 0)
     }
 
@@ -209,15 +229,15 @@ mod tests {
     fn test_causal_sorting() {
         let sym1 = mock_sym("Tf", 1, 10, 0);
         let sym2 = mock_sym("Dep", 1, 5, 1); // Scrambled order
-        let sym3 = mock_sym("Sw", 2, 1, 2);  // Different actor
+        let sym3 = mock_sym("Sw", 2, 1, 2); // Different actor
 
         let tree = CausalMerkleTree::new(vec![sym1.clone(), sym2.clone(), sym3.clone()]);
-        
+
         // Should be sorted by Origin -> Nonce
         // Origin 1, Nonce 5 (Dep)
         // Origin 1, Nonce 10 (Tf)
         // Origin 2, Nonce 1 (Sw)
-        
+
         assert_eq!(tree.symbols[0].symbol(), "Dep");
         assert_eq!(tree.symbols[1].symbol(), "Tf");
         assert_eq!(tree.symbols[2].symbol(), "Sw");
@@ -227,12 +247,12 @@ mod tests {
     fn test_causal_proof_sandwich() {
         // Victim (Actor 1) - Just noise
         let v1 = mock_sym("Tf", 1, 100, 0);
-        
+
         // Attacker (Actor 2) - Executing Sandwich
         let a1 = mock_sym("Tf", 2, 50, 1); // Frontrun
         let a2 = mock_sym("Sw", 2, 51, 2); // Swap
         let a3 = mock_sym("Tf", 2, 52, 3); // Backrun
-        
+
         // Noise (Actor 2) - Later
         let a4 = mock_sym("Wdw", 2, 99, 4);
 
@@ -244,7 +264,7 @@ mod tests {
         let sequence = vec![a1, a2, a3];
         let mut proofs = Vec::new();
         for sym in &sequence {
-             proofs.push(tree.generate_proof(sym.symbol(), sym.log_index()).unwrap());
+            proofs.push(tree.generate_proof(sym.symbol(), sym.log_index()).unwrap());
         }
 
         let proof = crate::proof::CausalProof {
@@ -261,19 +281,19 @@ mod tests {
     fn test_causal_proof_rejects_gap() {
         let a1 = mock_sym("Tf", 2, 50, 0);
         let a2 = mock_sym("Sw", 2, 52, 1); // Gap! Nonce 51 missing
-        
+
         let tree = CausalMerkleTree::new(vec![a1.clone(), a2.clone()]);
         let root = tree.root();
-        
+
         let proof = crate::proof::CausalProof {
             root,
             symbols: vec![a1.clone(), a2.clone()],
             proofs: vec![
                 tree.generate_proof("Tf", 0).unwrap(),
-                tree.generate_proof("Sw", 1).unwrap()
+                tree.generate_proof("Sw", 1).unwrap(),
             ],
         };
-        
+
         assert!(!proof.verify(&root));
     }
 }

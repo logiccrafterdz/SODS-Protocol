@@ -20,9 +20,7 @@ pub enum SymbolsCmd {
     /// List supported symbols (default)
     List,
     /// Load a symbol plugin from a URL (JSON)
-    Load {
-        url: String,
-    },
+    Load { url: String },
 }
 
 /// Run the symbols command.
@@ -35,55 +33,55 @@ pub async fn run(args: SymbolsArgs) -> i32 {
 
 fn list_symbols() -> i32 {
     output::header("Supported Behavioral Symbols");
-    
+
     println!();
-    println!(
-        "{:<8} {}",
-        "Symbol".bold(),
-        "Meaning".bold()
-    );
+    println!("{:<8} {}", "Symbol".bold(), "Meaning".bold());
     println!("{}", "─".repeat(40).dimmed());
-    
+
     // Built-ins
     for (symbol, meaning) in SYMBOLS {
-        println!(
-            "{:<8} {}",
-            symbol.green().bold(),
-            meaning
-        );
+        println!("{:<8} {}", symbol.green().bold(), meaning);
     }
 
     // Loaded Plugins
     if let Ok(plugins) = load_local_plugins() {
         if !plugins.is_empty() {
-             println!("{}", "─".repeat(40).dimmed());
-             for p in plugins {
-                 println!(
-                    "{:<8} {} (Plugin)",
-                    p.symbol.green().bold(),
-                    p.name
-                );
-             }
+            println!("{}", "─".repeat(40).dimmed());
+            for p in plugins {
+                println!("{:<8} {} (Plugin)", p.symbol.green().bold(), p.name);
+            }
         }
     }
-    
+
     println!();
     println!();
     output::info("Estos símbolos representan eventos de comportamiento en cadena.");
     output::hint("You can verify single symbols: sods verify <SYMBOL> --block <BLOCK>");
-    
+
     // ... existing DSL hints ...
     println!();
     output::header("Behavioral Patterns DSL");
     output::info("You can also verify complex behavioral sequences:");
-    println!("  {:<20} {}", "Sequence", "Use '->' (e.g., 'LP+ -> Sw -> LP-')");
-    println!("  {:<20} {}", "Exact Count", "Use '{n}' (e.g., 'Sw{3}' for 3 Swaps)");
-    println!("  {:<20} {}", "Context Filter", "Use 'where from == deployer'");
-    println!("  {:<20} {}", "Value Filter", "Use 'where value > 10 ether' (or gwei)");
-    
+    println!(
+        "  {:<20} {}",
+        "Sequence", "Use '->' (e.g., 'LP+ -> Sw -> LP-')"
+    );
+    println!(
+        "  {:<20} {}",
+        "Exact Count", "Use '{n}' (e.g., 'Sw{3}' for 3 Swaps)"
+    );
+    println!(
+        "  {:<20} {}",
+        "Context Filter", "Use 'where from == deployer'"
+    );
+    println!(
+        "  {:<20} {}",
+        "Value Filter", "Use 'where value > 10 ether' (or gwei)"
+    );
+
     println!();
     output::hint("Load new symbols: sods symbols load <URL>");
-    
+
     0
 }
 
@@ -146,7 +144,7 @@ fn save_plugin(plugin: &SymbolPlugin, json_content: &str) -> std::io::Result<()>
 pub fn load_local_plugins() -> std::io::Result<Vec<SymbolPlugin>> {
     let dir = get_plugins_dir();
     let mut plugins = Vec::new();
-    
+
     if dir.exists() {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;

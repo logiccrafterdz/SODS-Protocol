@@ -99,9 +99,9 @@ mod tests {
     fn test_cache_insert_get() {
         let mut cache = BlockCache::new();
         let block = CachedBlock::new([0xAB; 32], vec![]);
-        
+
         cache.insert(12345, block);
-        
+
         assert!(cache.contains(12345));
         assert!(cache.get(12345).is_some());
     }
@@ -109,11 +109,11 @@ mod tests {
     #[test]
     fn test_cache_lru_eviction() {
         let mut cache = BlockCache::with_capacity(2);
-        
+
         cache.insert(1, CachedBlock::new([1; 32], vec![]));
         cache.insert(2, CachedBlock::new([2; 32], vec![]));
         cache.insert(3, CachedBlock::new([3; 32], vec![]));
-        
+
         // Block 1 should be evicted
         assert!(!cache.contains(1));
         assert!(cache.contains(2));
@@ -127,7 +127,7 @@ mod tests {
             BehavioralSymbol::new("Dep", 1),
         ];
         let block = CachedBlock::new([0; 32], symbols);
-        
+
         assert!(block.has_symbol("Tf"));
         assert!(block.has_symbol("Dep"));
         assert!(!block.has_symbol("Wdw"));

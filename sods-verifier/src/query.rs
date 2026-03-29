@@ -6,8 +6,17 @@ use crate::error::{Result, SodsVerifierError};
 
 /// Supported symbols in the SODS core registry.
 const SUPPORTED_SYMBOLS: &[&str] = &[
-    "Tf", "Dep", "Wdw", "Sw", "LP+", "LP-", 
-    "MintNFT", "BuyNFT", "ListNFT", "BridgeIn", "BridgeOut"
+    "Tf",
+    "Dep",
+    "Wdw",
+    "Sw",
+    "LP+",
+    "LP-",
+    "MintNFT",
+    "BuyNFT",
+    "ListNFT",
+    "BridgeIn",
+    "BridgeOut",
 ];
 
 /// Query parser for validating symbol queries.
@@ -68,7 +77,7 @@ mod tests {
     #[test]
     fn test_valid_symbols() {
         let parser = QueryParser::new();
-        
+
         for symbol in SUPPORTED_SYMBOLS {
             assert!(parser.validate_symbol(symbol).is_ok());
             assert!(parser.is_supported(symbol));
@@ -78,7 +87,7 @@ mod tests {
     #[test]
     fn test_invalid_symbol() {
         let parser = QueryParser::new();
-        
+
         assert!(parser.validate_symbol("Unknown").is_err());
         assert!(parser.validate_symbol("").is_err());
         assert!(parser.validate_symbol("tf").is_err()); // Case sensitive
@@ -89,7 +98,7 @@ mod tests {
     fn test_supported_symbols_list() {
         let parser = QueryParser::new();
         let symbols = parser.supported_symbols();
-        
+
         assert_eq!(symbols.len(), 11);
         assert!(symbols.contains(&"Tf"));
         assert!(symbols.contains(&"LP+"));

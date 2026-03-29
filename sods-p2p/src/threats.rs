@@ -98,9 +98,13 @@ impl RegistryUpdate {
         if self.signature.len() != 64 || self.author_pubkey.is_empty() {
             return false;
         }
-        let Ok(sig) = Signature::from_slice(&self.signature) else { return false; };
-        let Ok(pubkey) = VerifyingKey::from_sec1_bytes(&self.author_pubkey) else { return false; };
-        
+        let Ok(sig) = Signature::from_slice(&self.signature) else {
+            return false;
+        };
+        let Ok(pubkey) = VerifyingKey::from_sec1_bytes(&self.author_pubkey) else {
+            return false;
+        };
+
         let hash = self.compute_hash();
         pubkey.verify(&hash, &sig).is_ok()
     }
@@ -109,9 +113,17 @@ impl RegistryUpdate {
 mod serde_bytes {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     pub fn serialize<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer { bytes.serialize(serializer) }
+    where
+        S: Serializer,
+    {
+        bytes.serialize(serializer)
+    }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
-    where D: Deserializer<'de> { Vec::<u8>::deserialize(deserializer) }
+    where
+        D: Deserializer<'de>,
+    {
+        Vec::<u8>::deserialize(deserializer)
+    }
 }
 
 impl ThreatRule {
@@ -122,7 +134,7 @@ impl ThreatRule {
         pattern: &str,
         chain: &str,
         severity: &str,
-        signing_key: &SigningKey
+        signing_key: &SigningKey,
     ) -> Self {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -173,9 +185,13 @@ impl ThreatRule {
         if self.signature.len() != 64 || self.author_pubkey.is_empty() {
             return false;
         }
-        let Ok(sig) = Signature::from_slice(&self.signature) else { return false; };
-        let Ok(pubkey) = VerifyingKey::from_sec1_bytes(&self.author_pubkey) else { return false; };
-        
+        let Ok(sig) = Signature::from_slice(&self.signature) else {
+            return false;
+        };
+        let Ok(pubkey) = VerifyingKey::from_sec1_bytes(&self.author_pubkey) else {
+            return false;
+        };
+
         let hash = self.compute_hash();
         pubkey.verify(&hash, &sig).is_ok()
     }
@@ -225,7 +241,8 @@ impl ThreatRegistry {
             return false;
         }
         for entry in update.contracts {
-            self.contract_registry.add(entry.address, entry.deployer, entry.block, None);
+            self.contract_registry
+                .add(entry.address, entry.deployer, entry.block, None);
         }
         let _ = self.contract_registry.save_local();
         true
@@ -254,7 +271,7 @@ mod tests {
             "Tf",
             "base",
             "high",
-            &signing_key
+            &signing_key,
         );
 
         assert!(rule.verify());
@@ -271,7 +288,7 @@ mod tests {
             "Tf",
             "base",
             "high",
-            &signing_key
+            &signing_key,
         );
 
         // Tamper with severity
@@ -290,12 +307,12 @@ mod tests {
             "InvalidPattern{", // Syntax error
             "base",
             "high",
-            &signing_key
+            &signing_key,
         );
 
-        // Verification checks both syntax and signature. 
+        // Verification checks both syntax and signature.
         // Signature might be valid (signed invalid pattern), but verify() checks parse().
-        
+
         assert!(!rule.verify());
     }
 }

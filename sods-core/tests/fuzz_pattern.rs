@@ -13,10 +13,10 @@ proptest! {
         } else {
             &input
         };
-        
+
         // The parser should safely return a Result.
         let _result = BehavioralPattern::parse(bounded_input);
-        // We only assert that it didn't panic, which is natively guaranteed 
+        // We only assert that it didn't panic, which is natively guaranteed
         // if this test reaches the end of the closure.
     }
 

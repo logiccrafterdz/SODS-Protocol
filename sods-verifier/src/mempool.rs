@@ -6,12 +6,12 @@
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use ethers_providers::{Middleware, Provider, Ws, StreamExt};
+use ethers_providers::{Middleware, Provider, StreamExt, Ws};
 // use ethers_core::types::{Transaction, TransactionReceipt};
 
-use sods_core::BehavioralSymbol;
-use sods_core::pattern::BehavioralPattern;
 use crate::error::{Result, SodsVerifierError};
+use sods_core::pattern::BehavioralPattern;
+use sods_core::BehavioralSymbol;
 
 /// Alert generated when a pattern is matched in the mempool.
 #[derive(Debug, Clone)]
@@ -32,9 +32,10 @@ pub struct MempoolMonitor {
 impl MempoolMonitor {
     /// Connect to a WebSocket endpoint.
     pub async fn connect(ws_url: &str) -> Result<Self> {
-        let provider = Provider::<Ws>::connect(ws_url).await
+        let provider = Provider::<Ws>::connect(ws_url)
+            .await
             .map_err(|e| SodsVerifierError::RpcError(e.to_string()))?;
-        
+
         Ok(Self {
             provider: Arc::new(provider),
             // dictionary: SymbolDictionary::default(), // Unused
@@ -76,14 +77,14 @@ impl MempoolMonitor {
                 // simple transfers from the tx data or use eth_call if it's a contract interaction.
                 // For this PoC, we will extract symbols directly from the tx data (input decoding)
                 // OR simplistic simulation if feasible.
-                // Actually, `eth_call` returns the return value, not logs, unless we use `debug_traceCall` 
+                // Actually, `eth_call` returns the return value, not logs, unless we use `debug_traceCall`
                 // or specific RPC extensions. Standard `eth_call` usually doesn't give logs.
-                // 
+                //
                 // ALTERNATIVE: Use `debug_traceTransaction` if available? Rare on public RPCs.
-                // 
+                //
                 // FALLBACK STRATEGY for Standard RPCs:
                 // 1. Is it a direct transfer? -> 'Tf' checking 'to' and 'value'.
-                // 2. Is it a known contract interaction? 
+                // 2. Is it a known contract interaction?
                 //    We can try to decode the input data if we have the ABI, but we are generic.
                 //
                 // WAIT. The prompt said: "Simulate logs via eth_call ... Extract logs from simulated result".
@@ -95,10 +96,10 @@ impl MempoolMonitor {
                 // If it calls `transfer(address,uint256)` (selector a9059cbb), we mock a "Tf" symbol.
                 // If it calls `deposit()` (d0e30db0), mock "Dep".
                 // If it calls `withdraw(uint)` (2e1a7d4d), mock "Wdw".
-                // 
-                // This is a heuristic simulation because we can't reliably get logs without execution traces 
+                //
+                // This is a heuristic simulation because we can't reliably get logs without execution traces
                 // on basic public RPCs.
-                
+
                 let mut symbols = Vec::new();
                 let from = tx_data.from;
                 let to = tx_data.to.unwrap_or_default();
@@ -114,37 +115,38 @@ impl MempoolMonitor {
 
                 // 2. WETH Deposit: deposit() -> d0e30db0
                 if input.starts_with(&hex::decode("d0e30db0").unwrap()) {
-                    symbols.push(BehavioralSymbol::new("Dep", 0)
-                        .with_context(from, to, value, None));
+                    symbols
+                        .push(BehavioralSymbol::new("Dep", 0).with_context(from, to, value, None));
                 }
 
                 // 3. WETH Withdrawal: withdraw(uint) -> 2e1a7d4d
                 if input.starts_with(&hex::decode("2e1a7d4d").unwrap()) {
-                    symbols.push(BehavioralSymbol::new("Wdw", 0)
-                        .with_context(from, to, value, None));
+                    symbols
+                        .push(BehavioralSymbol::new("Wdw", 0).with_context(from, to, value, None));
                 }
 
                 // 4. ERC20 Transfer: transfer(address,uint256) -> a9059cbb
                 if input.starts_with(&hex::decode("a9059cbb").unwrap()) {
-                     // Decode args if possible, or just mark as Transfer
-                     symbols.push(BehavioralSymbol::new("Tf", 0)
-                        .with_context(from, to, value, None));
+                    // Decode args if possible, or just mark as Transfer
+                    symbols
+                        .push(BehavioralSymbol::new("Tf", 0).with_context(from, to, value, None));
                 }
-                
+
                 // 5. Uniswap Swap (heuristic: selector check)
                 // swapExactTokensForTokens -> 38ed1739
                 // swapTokensForExactTokens -> 8803dbee
                 // exactInput -> b858183f
-                if input.starts_with(&hex::decode("38ed1739").unwrap()) || 
-                   input.starts_with(&hex::decode("b858183f").unwrap()) {
-                    symbols.push(BehavioralSymbol::new("Sw", 1)
-                        .with_context(from, to, value, None));
+                if input.starts_with(&hex::decode("38ed1739").unwrap())
+                    || input.starts_with(&hex::decode("b858183f").unwrap())
+                {
+                    symbols
+                        .push(BehavioralSymbol::new("Sw", 1).with_context(from, to, value, None));
                 }
-                
+
                 // Check Pattern
                 if let Some(matched) = pattern.matches(&symbols, None) {
                     let seq_str: Vec<String> = matched.iter().map(|s| s.symbol.clone()).collect();
-                    
+
                     let alert = PendingAlert {
                         tx_hash: format!("{:?}", tx_hash),
                         pattern_name: pattern_name.clone(),
@@ -152,7 +154,7 @@ impl MempoolMonitor {
                         estimated_inclusion: "next block".into(),
                         matched_sequence: seq_str.join(" -> "),
                     };
-                    
+
                     if tx.send(alert).await.is_err() {
                         break;
                     }

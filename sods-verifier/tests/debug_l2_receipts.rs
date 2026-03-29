@@ -1,9 +1,9 @@
-use sods_verifier::BlockVerifier;
-use ethers_core::types::{H256, TransactionReceipt};
+use ethers_core::types::{TransactionReceipt, H256};
 use ethers_core::utils::rlp::RlpStream;
-use sha3::{Digest, Keccak256};
-use std::env;
 use hash_db::Hasher;
+use sha3::{Digest, Keccak256};
+use sods_verifier::BlockVerifier;
+use std::env;
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct KeccakHasher;
@@ -18,17 +18,18 @@ impl Hasher for KeccakHasher {
 
 fn local_rlp_encode(receipt: &TransactionReceipt, l2_fields: &[&str]) -> Vec<u8> {
     let mut list_size = 4;
-    let found_fields: Vec<(&str, &serde_json::Value)> = l2_fields.iter()
+    let found_fields: Vec<(&str, &serde_json::Value)> = l2_fields
+        .iter()
         .filter_map(|&k| receipt.other.get(k).map(|v| (k, v)))
         .collect();
-    
+
     list_size += found_fields.len();
     let mut stream = RlpStream::new_list(list_size);
-    
+
     stream.append(&receipt.status.map(|s| s.as_u64()).unwrap_or(1));
     stream.append(&receipt.cumulative_gas_used);
     stream.append(&receipt.logs_bloom.as_bytes().to_vec());
-    
+
     stream.begin_list(receipt.logs.len());
     for log in &receipt.logs {
         stream.begin_list(3);
@@ -45,7 +46,11 @@ fn local_rlp_encode(receipt: &TransactionReceipt, l2_fields: &[&str]) -> Vec<u8>
             stream.append(&n);
         } else if let Some(s) = value.as_str() {
             let hex_str = if s.starts_with("0x") {
-                if s.len() % 2 != 0 { format!("0{}", &s[2..]) } else { s[2..].to_string() }
+                if s.len() % 2 != 0 {
+                    format!("0{}", &s[2..])
+                } else {
+                    s[2..].to_string()
+                }
             } else {
                 s.to_string()
             };
@@ -85,21 +90,37 @@ async fn debug_l2_receipts_root() {
     ];
 
     for (name, default_rpc, block_num) in chains {
-        let env_key = if name.contains("Arb") { "ARB_RPC_URL" } else { "OP_RPC_URL" };
+        let env_key = if name.contains("Arb") {
+            "ARB_RPC_URL"
+        } else {
+            "OP_RPC_URL"
+        };
         let rpc_url = env::var(env_key).unwrap_or_else(|_| default_rpc.to_string());
         let verifier = BlockVerifier::new(&[rpc_url]).unwrap();
 
         println!("--- Testing {} block {} ---", name, block_num);
-        let header = verifier.rpc_client().fetch_block_header(block_num).await.unwrap();
-        let receipts = verifier.rpc_client().fetch_block_receipts(block_num).await.unwrap();
-        
+        let header = verifier
+            .rpc_client()
+            .fetch_block_header(block_num)
+            .await
+            .unwrap();
+        let receipts = verifier
+            .rpc_client()
+            .fetch_block_receipts(block_num)
+            .await
+            .unwrap();
+
         println!("  Header ReceiptsRoot: {:?}", header.receipts_root);
 
         for perm in &field_perms {
-            let encoded: Vec<Vec<u8>> = receipts.iter().map(|r| local_rlp_encode(r, perm)).collect();
+            let encoded: Vec<Vec<u8>> =
+                receipts.iter().map(|r| local_rlp_encode(r, perm)).collect();
             let root = triehash::ordered_trie_root::<KeccakHasher, _>(encoded);
             if root == header.receipts_root {
-                println!("  [MATCH!] Permutation {:?} produced the correct root!", perm);
+                println!(
+                    "  [MATCH!] Permutation {:?} produced the correct root!",
+                    perm
+                );
             } else {
                 println!("  [Fail] Perm {:?} -> {:?}", perm, root);
             }

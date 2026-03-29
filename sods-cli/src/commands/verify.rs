@@ -115,7 +115,11 @@ pub async fn run(args: VerifyArgs) -> i32 {
             output::error(&format!("Symbol '{}' not supported.", args.symbol));
             output::hint(&format!(
                 "Supported symbols: {}",
-                SYMBOLS.iter().map(|(s, _)| *s).collect::<Vec<_>>().join(", ")
+                SYMBOLS
+                    .iter()
+                    .map(|(s, _)| *s)
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
             output::info("Run `sods symbols` for full list with descriptions.");
         }
@@ -136,7 +140,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     occurrences: 0,
                     proof_size_bytes: 0,
                     time_ms: 0,
-                method: "none".into(),
+                    method: "none".into(),
                     verification_mode: "n/a".into(),
                     error: Some(format!("Unknown chain: '{}'", args.chain)),
                     matched_sequence: None,
@@ -158,7 +162,11 @@ pub async fn run(args: VerifyArgs) -> i32 {
         if let Some(overridden_rpc) = user_config.get_rpc_override(&chain_config.name) {
             vec![overridden_rpc]
         } else {
-            chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+            chain_config
+                .rpc_urls
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
         }
     };
 
@@ -179,7 +187,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
 
     // Create verifier and run
     let start = std::time::Instant::now();
-    
+
     // Determine if header proof (Trustless Mode) is required
     let _require_header = match args.mode {
         Mode::Trustless => true,
@@ -221,19 +229,20 @@ pub async fn run(args: VerifyArgs) -> i32 {
             output::hint("Check your network connection or RPC endpoints.");
         }
         e
-    }).unwrap();
+    })
+    .unwrap();
 
     let verifier = verifier.with_backoff_profile(profile);
 
     // Pre-flight health check
     if !verifier.health_check().await {
-         if !args.json { 
-             output::error("All primary and fallback RPC endpoints failed health check.");
-         }
-         // But we try to proceed anyway or fail early? 
-         // For verify, we might want to try once more or fail.
-         // Let's fail if all are dead.
-         return 1;
+        if !args.json {
+            output::error("All primary and fallback RPC endpoints failed health check.");
+        }
+        // But we try to proceed anyway or fail early?
+        // For verify, we might want to try once more or fail.
+        // Let's fail if all are dead.
+        return 1;
     }
 
     // Beacon Support Warning
@@ -246,10 +255,13 @@ pub async fn run(args: VerifyArgs) -> i32 {
         }
     }
 
-    match verifier.verify_symbol_in_block(&args.symbol, args.block).await {
+    match verifier
+        .verify_symbol_in_block(&args.symbol, args.block)
+        .await
+    {
         Ok(result) => {
             let elapsed = start.elapsed().as_millis() as u64;
-            
+
             if args.json {
                 let output = JsonOutput {
                     success: true,
@@ -274,7 +286,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     elapsed,
                     result.occurrences,
                 );
-                
+
                 if !result.is_verified {
                     output::hint(&format!(
                         "Symbol '{}' may not exist in block {}.",
@@ -282,8 +294,12 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     ));
                 }
             }
-            
-            if result.is_verified { 0 } else { 1 }
+
+            if result.is_verified {
+                0
+            } else {
+                1
+            }
         }
         Err(e) => {
             if args.json {
@@ -298,7 +314,11 @@ pub async fn run(args: VerifyArgs) -> i32 {
                     proof_size_bytes: 0,
                     time_ms: start.elapsed().as_millis() as u64,
                     method: "rpc".into(),
-                    verification_mode: if args.no_header_proof { "rpc_only".into() } else { "trustless".into() },
+                    verification_mode: if args.no_header_proof {
+                        "rpc_only".into()
+                    } else {
+                        "trustless".into()
+                    },
                     error: Some(error_string),
                     matched_sequence: None,
                 };
@@ -321,7 +341,7 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
     let _pattern = match BehavioralPattern::parse(&args.symbol) {
         Ok(p) => p,
         Err(e) => {
-             if args.json {
+            if args.json {
                 // Return simple error json
                 // We're reusing JsonOutput, though semantic match is loose
                 let output = JsonOutput {
@@ -339,10 +359,10 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
                     matched_sequence: None,
                 };
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
-             } else {
-                 output::error(&format!("Invalid pattern: {}", e));
-             }
-             return 1;
+            } else {
+                output::error(&format!("Invalid pattern: {}", e));
+            }
+            return 1;
         }
     };
 
@@ -350,18 +370,21 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
     let chain_config = match get_chain(&args.chain) {
         Some(c) => c,
         None => {
-             if args.json {
-                 // ... json error ...
-                 println!("{{ \"error\": \"Unknown chain\" }}"); // simplify
-             } else {
-                 output::error(&format!("Chain '{}' not supported.", args.chain));
-             }
-             return 1;
+            if args.json {
+                // ... json error ...
+                println!("{{ \"error\": \"Unknown chain\" }}"); // simplify
+            } else {
+                output::error(&format!("Chain '{}' not supported.", args.chain));
+            }
+            return 1;
         }
     };
 
     if !args.json {
-        output::info(&format!("🔍 Verifying pattern '{}' in block {} ({})...", args.symbol, args.block, chain_config.description));
+        output::info(&format!(
+            "🔍 Verifying pattern '{}' in block {} ({})...",
+            args.symbol, args.block, chain_config.description
+        ));
     }
 
     let user_config = crate::config::UserConfig::load();
@@ -370,7 +393,11 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
     } else if let Some(overridden_rpc) = user_config.get_rpc_override(&chain_config.name) {
         vec![overridden_rpc]
     } else {
-        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+        chain_config
+            .rpc_urls
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
     };
     let is_l2 = chain_config.name != "ethereum" && chain_config.name != "sepolia";
     let profile = if is_l2 {
@@ -382,7 +409,9 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
     let verifier = match sods_verifier::BlockVerifier::new(&rpc_urls) {
         Ok(v) => v.with_backoff_profile(profile),
         Err(e) => {
-            if !args.json { output::error(&format!("Failed to connect to RPC: {}", e)); }
+            if !args.json {
+                output::error(&format!("Failed to connect to RPC: {}", e));
+            }
             return 1;
         }
     };
@@ -398,12 +427,15 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
     }
 
     // 3. Verify Pattern using Optimized Pipeline (Filtering + Incremental BMT)
-    match verifier.verify_pattern_in_block(&args.symbol, args.block).await {
+    match verifier
+        .verify_pattern_in_block(&args.symbol, args.block)
+        .await
+    {
         Ok(result) => {
             let elapsed = start.elapsed().as_millis() as u64;
-            
+
             if args.json {
-                 let output = JsonOutput {
+                let output = JsonOutput {
                     success: true,
                     symbol: args.symbol.clone(),
                     block: args.block,
@@ -422,7 +454,10 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
                 if result.is_verified {
                     println!("✅ Pattern Verified (Optimized Path)!");
                     println!("   Occurrences: {}", result.occurrences);
-                    println!("   Root:        0x{}", hex::encode(result.merkle_root.as_deref().unwrap_or(&[0u8; 32])));
+                    println!(
+                        "   Root:        0x{}",
+                        hex::encode(result.merkle_root.as_deref().unwrap_or(&[0u8; 32]))
+                    );
                     println!("   Time:        {} ms", elapsed);
                     println!("   Mode:        Incremental / Filtered");
                 } else {
@@ -433,9 +468,9 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
         }
         Err(e) => {
             if args.json {
-                 // ... json error ...
+                // ... json error ...
             } else {
-                 output::error(&format!("Pattern verification failed: {}", e));
+                output::error(&format!("Pattern verification failed: {}", e));
             }
             return 1;
         }

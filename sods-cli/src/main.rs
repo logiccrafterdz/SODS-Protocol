@@ -1,9 +1,9 @@
-use sods_cli::{commands, logging};
 use clap::{Parser, Subcommand};
 #[cfg(feature = "api")]
 use sods_cli::api;
 #[cfg(feature = "metrics")]
 use sods_cli::monitoring;
+use sods_cli::{commands, logging};
 
 #[derive(Parser)]
 #[command(name = "sods")]
@@ -20,10 +20,10 @@ struct Cli {
 enum Commands {
     /// Verify behavioral patterns using Behavioral Merkle Trees (BMT). Causal Merkle Trees (CMT) coming in v8.0.
     Verify(commands::verify::VerifyArgs),
-    
+
     /// List supported blockchain chains
     Chains,
-    
+
     /// List supported behavioral symbols and load plugins
     Symbols(commands::symbols::SymbolsArgs),
 
@@ -51,7 +51,7 @@ enum Commands {
     /// Generate a Zero-Knowledge proof of behavior
     #[cfg(feature = "zk")]
     ZkProve(commands::zk_prove::ZkProveArgs),
-    
+
     /// Manage the contract deployer registry
     Registry(commands::registry::RegistryArgs),
 

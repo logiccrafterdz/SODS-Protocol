@@ -10,9 +10,13 @@ const IDENTITY_REGISTRY_ABI: &str = r#"[
 
 #[tokio::test]
 async fn test_sods_agent_registration_flow() {
-    let rpc_url = std::env::var("SEPOLIA_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string());
-    let priv_key = std::env::var("TEST_PRIVATE_KEY").unwrap_or_else(|_| "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string());
-    let registry_addr = std::env::var("SEPOLIA_IDENTITY_REGISTRY_ADDR").unwrap_or_else(|_| "0x8004000000000000000000000000000000000001".to_string());
+    let rpc_url =
+        std::env::var("SEPOLIA_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string());
+    let priv_key = std::env::var("TEST_PRIVATE_KEY").unwrap_or_else(|_| {
+        "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string()
+    });
+    let registry_addr = std::env::var("SEPOLIA_IDENTITY_REGISTRY_ADDR")
+        .unwrap_or_else(|_| "0x8004000000000000000000000000000000000001".to_string());
 
     let provider = match Provider::<Http>::try_from(rpc_url) {
         Ok(p) => p.interval(Duration::from_millis(10u64)),
@@ -41,12 +45,12 @@ async fn test_sods_agent_registration_flow() {
     // 2. Register (Skip real TX if on real network without balance, but this is for CI/Anvil)
     // If it's a real Sepolia run, this proceeds. If it's an anvil fork, it works.
     println!("Registering agent on registry at {}", registry_addr);
-    
+
     // In a real E2E integration test, we would send the transaction:
     // let call = contract.method::<_, U256>("register", (metadata_uri.to_string(), services)).unwrap();
     // let pending_tx = call.send().await.expect("Failed to send registration TX");
     // let receipt = pending_tx.await.expect("TX failed to mine");
-    
+
     // For this demonstration/test structure, we ensure the infrastructure is reachable
     // Skip if no RPC available (e.g., in CI without secrets)
     match client.get_chainid().await {

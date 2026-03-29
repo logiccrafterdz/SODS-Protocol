@@ -81,10 +81,10 @@ fn test_canonical_ordering_rfc_compliant() {
     // log_index is primary, symbol is tie-breaker
 
     let symbols = vec![
-        BehavioralSymbol::new("Wdw", 5),  // Will be last (highest log_index)
-        BehavioralSymbol::new("Tf", 2),   // Will be at index 2
-        BehavioralSymbol::new("Dep", 2),  // Will be at index 1 (Dep < Tf)
-        BehavioralSymbol::new("Tf", 0),   // Will be first (lowest log_index)
+        BehavioralSymbol::new("Wdw", 5), // Will be last (highest log_index)
+        BehavioralSymbol::new("Tf", 2),  // Will be at index 2
+        BehavioralSymbol::new("Dep", 2), // Will be at index 1 (Dep < Tf)
+        BehavioralSymbol::new("Tf", 0),  // Will be first (lowest log_index)
     ];
 
     let bmt = BehavioralMerkleTree::new(symbols);
@@ -145,9 +145,7 @@ fn test_proof_verification_performance() {
     use std::time::Instant;
 
     // Create a reasonably sized tree
-    let symbols: Vec<_> = (0..100)
-        .map(|i| BehavioralSymbol::new("Tf", i))
-        .collect();
+    let symbols: Vec<_> = (0..100).map(|i| BehavioralSymbol::new("Tf", i)).collect();
 
     let bmt = BehavioralMerkleTree::new(symbols);
     let root = bmt.root();
@@ -189,9 +187,7 @@ fn test_empty_tree_root_matches_sha256_empty() {
 /// Test proof serialization produces compact output.
 #[test]
 fn test_proof_serialization_compact() {
-    let symbols: Vec<_> = (0..32)
-        .map(|i| BehavioralSymbol::new("Tf", i))
-        .collect();
+    let symbols: Vec<_> = (0..32).map(|i| BehavioralSymbol::new("Tf", i)).collect();
 
     let bmt = BehavioralMerkleTree::new(symbols);
     let proof = bmt.generate_proof("Tf", 15).unwrap();

@@ -62,7 +62,9 @@ fn parse_duration(input: &str) -> Result<Duration, String> {
         Ok(Duration::from_secs(mins * 60))
     } else {
         // Default to seconds if valid number, else error
-        let secs = input.parse::<u64>().map_err(|_| "Invalid duration format. Use '30s' or '1m'.")?;
+        let secs = input
+            .parse::<u64>()
+            .map_err(|_| "Invalid duration format. Use '30s' or '1m'.")?;
         Ok(Duration::from_secs(secs))
     }
 }
@@ -95,11 +97,11 @@ pub async fn run(args: MonitorArgs) -> i32 {
     }
 
     // --- BLOCK MODE (Legacy) ---
-    
+
     // 3. Parse Duration
     let interval = match parse_duration(&args.interval) {
         Ok(d) => {
-             if d.as_secs() < 10 {
+            if d.as_secs() < 10 {
                 output::warning("Minimum interval is 10s. Adjusting to 10s.");
                 Duration::from_secs(10)
             } else if d.as_secs() > 300 {
@@ -108,10 +110,10 @@ pub async fn run(args: MonitorArgs) -> i32 {
             } else {
                 d
             }
-        },
+        }
         Err(e) => {
-             output::error(&format!("Invalid interval: {}", e));
-             return 1;
+            output::error(&format!("Invalid interval: {}", e));
+            return 1;
         }
     };
 
@@ -125,7 +127,11 @@ pub async fn run(args: MonitorArgs) -> i32 {
     let rpc_urls: Vec<String> = if let Some(url) = args.rpc_url {
         vec![url]
     } else {
-        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+        chain_config
+            .rpc_urls
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
     };
 
     let is_l2 = chain_config.name != "ethereum" && chain_config.name != "sepolia";
@@ -164,28 +170,29 @@ pub async fn run(args: MonitorArgs) -> i32 {
         Ok(b) => {
             println!("   Start:    Head Block #{}\n", b);
             b
-        },
+        }
         Err(e) => {
             output::error(&format!("Failed to fetch initial block: {}", e));
             return 1;
         }
     };
-    
+
     // Shadow State
     let mut active_shadows: Vec<sods_core::BehavioralShadow> = Vec::new();
-    
+
     println!("{}", "Waiting for new blocks... (Ctrl+C to stop)".dimmed());
 
     // 6. Polling Loop
     loop {
         sleep(interval).await;
-        
+
         // Auto-Adapt Logic
         if args.auto_adapt {
             let rpc_delay = verifier.current_rpc_delay();
-            if rpc_delay > 500 { // If RPC is adding more than 500ms delay
+            if rpc_delay > 500 {
+                // If RPC is adding more than 500ms delay
                 // Add proportional delay to the loop to let it cool off
-                 sleep(Duration::from_millis(rpc_delay)).await;
+                sleep(Duration::from_millis(rpc_delay)).await;
             }
         }
 
@@ -200,8 +207,11 @@ pub async fn run(args: MonitorArgs) -> i32 {
         if current_head > last_scanned_block {
             let new_blocks_count = current_head - last_scanned_block;
             if new_blocks_count > 50 {
-                 println!("   ⚠️ Missed {} blocks. Skipping to head #{}", new_blocks_count, current_head);
-                 last_scanned_block = current_head - 1; 
+                println!(
+                    "   ⚠️ Missed {} blocks. Skipping to head #{}",
+                    new_blocks_count, current_head
+                );
+                last_scanned_block = current_head - 1;
             }
 
             for block_num in (last_scanned_block + 1)..=current_head {
@@ -215,7 +225,12 @@ pub async fn run(args: MonitorArgs) -> i32 {
                         if let Some(matched_seq) = pattern.matches(&symbols, None) {
                             let timestamp = chrono::Utc::now().to_rfc3339();
                             println!();
-                            println!("🚨 {} Block #{} on {}", "PATTERN DETECTED!".red().bold(), block_num, args.chain);
+                            println!(
+                                "🚨 {} Block #{} on {}",
+                                "PATTERN DETECTED!".red().bold(),
+                                block_num,
+                                args.chain
+                            );
                             println!("   Time:    {}", timestamp);
                             println!("   Pattern: {}", args.pattern.yellow());
                             println!("   Matched: {} events", matched_seq.len());
@@ -227,29 +242,36 @@ pub async fn run(args: MonitorArgs) -> i32 {
                             // 1. Update Active Shadows
                             let mut resolved_indices = Vec::new();
                             let mut expired_indices = Vec::new();
-                            
+
                             for (i, shadow) in active_shadows.iter_mut().enumerate() {
                                 let status = shadow.check_block(block_num, &symbols);
                                 match status {
                                     sods_core::shadow::ShadowStatus::Resolved => {
-                                        println!("✅ Shadow Resolved: Actor {:?} completed pattern.", shadow.actor);
+                                        println!(
+                                            "✅ Shadow Resolved: Actor {:?} completed pattern.",
+                                            shadow.actor
+                                        );
                                         resolved_indices.push(i);
-                                    },
+                                    }
                                     sods_core::shadow::ShadowStatus::Deviation(reason) => {
-                                        println!("⚠️  {} Deviation detected for actor {:?}", "PREDICTIVE ALERT:".magenta().bold(), shadow.actor);
+                                        println!(
+                                            "⚠️  {} Deviation detected for actor {:?}",
+                                            "PREDICTIVE ALERT:".magenta().bold(),
+                                            shadow.actor
+                                        );
                                         println!("    Reason: {}", reason);
                                         resolved_indices.push(i);
-                                    },
+                                    }
                                     sods_core::shadow::ShadowStatus::Expired => {
                                         // Silent expiration or debug log
                                         expired_indices.push(i);
-                                    },
+                                    }
                                     sods_core::shadow::ShadowStatus::Active => {
                                         // Still waiting
                                     }
                                 }
                             }
-                            
+
                             // Cleanup
                             let mut to_remove = [resolved_indices, expired_indices].concat();
                             to_remove.sort();
@@ -257,21 +279,24 @@ pub async fn run(args: MonitorArgs) -> i32 {
                             for i in to_remove.iter().rev() {
                                 active_shadows.remove(*i);
                             }
-                            
+
                             // 2. Spawn New Shadows
                             // Spawn if we see the FIRST step of the pattern
                             if let Some(first_step) = pattern.steps().first() {
-                                if let sods_core::pattern::PatternStep::Exact(target, _) = first_step {
+                                if let sods_core::pattern::PatternStep::Exact(target, _) =
+                                    first_step
+                                {
                                     for sym in &symbols {
                                         if sym.symbol == *target {
                                             if !active_shadows.iter().any(|s| s.actor == sym.from) {
-                                                println!("🕵️  Spawning Shadow for actor {:?} (saw {})", sym.from, sym.symbol);
-                                                let mut shadow = sods_core::BehavioralShadow::from_pattern(
-                                                    &pattern, 
-                                                    sym.from, 
-                                                    sym.nonce,
-                                                    block_num
+                                                println!(
+                                                    "🕵️  Spawning Shadow for actor {:?} (saw {})",
+                                                    sym.from, sym.symbol
                                                 );
+                                                let mut shadow =
+                                                    sods_core::BehavioralShadow::from_pattern(
+                                                        &pattern, sym.from, sym.nonce, block_num,
+                                                    );
                                                 shadow.current_step_index = 1; // Advance past first step
                                                 active_shadows.push(shadow);
                                             }
@@ -279,14 +304,14 @@ pub async fn run(args: MonitorArgs) -> i32 {
                                     }
                                 }
                             }
-                            
+
                             if !active_shadows.is_empty() {
                                 println!("   Active Shadows: {}", active_shadows.len());
                             }
                         }
-                    },
+                    }
                     Err(e) => {
-                         eprintln!("   ⚠️ Failed to scan block #{}: {}", block_num, e);
+                        eprintln!("   ⚠️ Failed to scan block #{}: {}", block_num, e);
                     }
                 }
             }
@@ -296,9 +321,9 @@ pub async fn run(args: MonitorArgs) -> i32 {
 }
 
 async fn run_pending_monitor(
-    args: MonitorArgs, 
+    args: MonitorArgs,
     chain_config: &crate::config::ChainConfig,
-    pattern: BehavioralPattern
+    pattern: BehavioralPattern,
 ) -> i32 {
     // use futures_util::StreamExt; // Actually mempool monitor returns a Receiver
 
@@ -309,8 +334,8 @@ async fn run_pending_monitor(
         if url.starts_with("wss://") || url.starts_with("ws://") {
             url.as_str()
         } else {
-             output::error("Custom RPC URL must be WebSocket (wss://) for pending mode.");
-             return 1;
+            output::error("Custom RPC URL must be WebSocket (wss://) for pending mode.");
+            return 1;
         }
     } else {
         match chain_config.default_ws {
@@ -341,12 +366,19 @@ async fn run_pending_monitor(
         }
     };
 
-    println!("{}", "Listening for pending transactions... (Ctrl+C to stop)".dimmed());
+    println!(
+        "{}",
+        "Listening for pending transactions... (Ctrl+C to stop)".dimmed()
+    );
 
     while let Some(alert) = rx.recv().await {
         let timestamp = chrono::Utc::now().to_rfc3339();
         println!();
-        println!("⚠️  {} Pending Tx on {}", "PENDING ALERT:".yellow().bold(), args.chain);
+        println!(
+            "⚠️  {} Pending Tx on {}",
+            "PENDING ALERT:".yellow().bold(),
+            args.chain
+        );
         println!("   Tx Hash:  {}", alert.tx_hash);
         println!("   Pattern:  {}", alert.pattern_name.cyan());
         println!("   Seq:      {}", alert.matched_sequence);

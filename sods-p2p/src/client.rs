@@ -16,7 +16,7 @@ use tracing::{debug, info, warn};
 use sods_verifier::BlockVerifier;
 
 use crate::behavior::{SodsBehaviour, SodsBehaviourEvent};
-use crate::consensus::{evaluate_consensus, DEFAULT_THRESHOLD, required_quorum};
+use crate::consensus::{evaluate_consensus, required_quorum, DEFAULT_THRESHOLD};
 use crate::error::{Result, SodsP2pError};
 use crate::protocol::{ProofRequest, ProofResponse};
 use crate::reputation::ReputationTracker;
@@ -127,7 +127,13 @@ impl SodsClient {
         // Wait for peer discovery
         let discovery = timeout(DISCOVERY_TIMEOUT, async {
             // We want to wait for reliable peers, not just any peers
-            while self.known_peers.iter().filter(|p| self.reputation.is_reliable(p)).count() < QUERY_PEER_COUNT {
+            while self
+                .known_peers
+                .iter()
+                .filter(|p| self.reputation.is_reliable(p))
+                .count()
+                < QUERY_PEER_COUNT
+            {
                 match self.swarm.select_next_some().await {
                     SwarmEvent::Behaviour(SodsBehaviourEvent::Identify(event)) => {
                         self.handle_identify_event(event);
@@ -148,9 +154,13 @@ impl SodsClient {
 
         let _ = discovery.await;
 
-        info!("Discovered {} peers ({} reliable)", 
-            self.known_peers.len(), 
-            self.known_peers.iter().filter(|p| self.reputation.is_reliable(p)).count()
+        info!(
+            "Discovered {} peers ({} reliable)",
+            self.known_peers.len(),
+            self.known_peers
+                .iter()
+                .filter(|p| self.reputation.is_reliable(p))
+                .count()
         );
         Ok(())
     }
@@ -161,7 +171,9 @@ impl SodsClient {
             identify::Event::Received { peer_id, info, .. } => {
                 if peer_id != self.local_peer_id {
                     debug!("Identified peer: {} ({})", peer_id, info.agent_version);
-                    if !self.known_peers.contains(&peer_id) && !self.slashed_peers.contains(&peer_id) {
+                    if !self.known_peers.contains(&peer_id)
+                        && !self.slashed_peers.contains(&peer_id)
+                    {
                         self.known_peers.insert(peer_id);
                         self.issue_challenge(&peer_id);
                     }
@@ -177,17 +189,19 @@ impl SodsClient {
     /// Issue a Proof-of-Behavior challenge to a new peer.
     fn issue_challenge(&mut self, peer_id: &PeerId) {
         info!("Issuing PoB challenge to {}", peer_id);
-        
+
         // Randomize challenge block to prevent pre-computation attacks
         let mut block_number = 10002800; // Fallback for PoC
-        
+
         if let Some(_verifier) = &self.fallback_verifier {
             // In a production environment, we'd fetch the latest block and pick one from the last 100.
             // For now, we use a simple pseudo-random offset if we have a verifier.
             let seed = self.local_peer_id.to_bytes();
             let mut sum: u64 = 0;
-            for b in seed { sum += b as u64; }
-            
+            for b in seed {
+                sum += b as u64;
+            }
+
             // Try to get a block within the last 1000 blocks relative to a base
             block_number = 10002000 + (sum % 1000);
         }
@@ -198,30 +212,48 @@ impl SodsClient {
             symbol: "Tf".to_string(),
         };
 
-        let request_id = self.swarm.behaviour_mut().puzzle.send_request(peer_id, challenge.clone());
-        self.pending_challenges.insert(request_id, (*peer_id, crate::protocol::BehavioralPuzzle::new(challenge)));
+        let request_id = self
+            .swarm
+            .behaviour_mut()
+            .puzzle
+            .send_request(peer_id, challenge.clone());
+        self.pending_challenges.insert(
+            request_id,
+            (*peer_id, crate::protocol::BehavioralPuzzle::new(challenge)),
+        );
     }
 
     /// Handle puzzle solution events.
-    async fn handle_puzzle_event(&mut self, event: request_response::Event<crate::protocol::PuzzleChallenge, crate::protocol::PuzzleSolution>) {
+    async fn handle_puzzle_event(
+        &mut self,
+        event: request_response::Event<
+            crate::protocol::PuzzleChallenge,
+            crate::protocol::PuzzleSolution,
+        >,
+    ) {
         if let request_response::Event::Message { peer, message } = event {
-            if let request_response::Message::Response { response, request_id, .. } = message {
-                 if let Some((pid, challenge)) = self.pending_challenges.remove(&request_id) {
+            if let request_response::Message::Response {
+                response,
+                request_id,
+                ..
+            } = message
+            {
+                if let Some((pid, challenge)) = self.pending_challenges.remove(&request_id) {
                     if pid == peer {
                         info!("Received PoB solution from {}", peer);
                         self.verify_solution(peer, challenge, response).await;
                     }
-                 }
+                }
             }
         }
     }
 
     /// Verify the puzzle solution using local RPC.
     async fn verify_solution(
-        &mut self, 
-        peer_id: PeerId, 
-        puzzle: crate::protocol::BehavioralPuzzle, 
-        solution: crate::protocol::PuzzleSolution
+        &mut self,
+        peer_id: PeerId,
+        puzzle: crate::protocol::BehavioralPuzzle,
+        solution: crate::protocol::PuzzleSolution,
     ) {
         if puzzle.is_expired() {
             warn!("Puzzle solution received after expiration from {}", peer_id);
@@ -235,27 +267,38 @@ impl SodsClient {
             return;
         };
 
-        match verifier.verify_symbol_in_block(&challenge.symbol, challenge.block_number).await {
+        match verifier
+            .verify_symbol_in_block(&challenge.symbol, challenge.block_number)
+            .await
+        {
             Ok(result) => {
                 if result.occurrences as u32 == solution.occurrences {
-                    info!("✅ Peer {} SOLVED Proof-of-Behavior puzzle. Granting reliability.", peer_id);
+                    info!(
+                        "✅ Peer {} SOLVED Proof-of-Behavior puzzle. Granting reliability.",
+                        peer_id
+                    );
                     // Initial Reward to hit MIN_RELIABLE_SCORE (0.4)
                     // score = min(0.0 * 1.1 + 0.5 = 0.5, 1.0)
                     let score = self.reputation.get_score(&peer_id); // 0.0
                     if score < 0.4 {
                         self.reputation.reward(&peer_id);
                         self.reputation.reward(&peer_id); // Boost to be sure (0.0 -> 0.05 -> 0.1 ? No, rewarding starts from 0.0)
-                        // Actually, Reward logic in reputation.rs: *score = (*score * 1.1 + 0.05).min(1.0);
-                        // 0.0 -> 0.05 -> 0.105 -> 0.165 ... 
-                        // I might need to adjust reputation.rs reward to handle PoB better or call it more times.
-                        // Let's call it enough times to hit 0.4.
-                        for _ in 0..10 { self.reputation.reward(&peer_id); }
+                                                          // Actually, Reward logic in reputation.rs: *score = (*score * 1.1 + 0.05).min(1.0);
+                                                          // 0.0 -> 0.05 -> 0.105 -> 0.165 ...
+                                                          // I might need to adjust reputation.rs reward to handle PoB better or call it more times.
+                                                          // Let's call it enough times to hit 0.4.
+                        for _ in 0..10 {
+                            self.reputation.reward(&peer_id);
+                        }
                     }
                 } else {
-                    warn!("❌ Peer {} FAILED Proof-of-Behavior puzzle. Rejected.", peer_id);
+                    warn!(
+                        "❌ Peer {} FAILED Proof-of-Behavior puzzle. Rejected.",
+                        peer_id
+                    );
                     self.reputation.penalize(&peer_id);
                 }
-            },
+            }
             Err(e) => warn!("Failed to verify PoB solution due to RPC error: {}", e),
         }
     }
@@ -271,7 +314,10 @@ impl SodsClient {
         if let Some(verifier) = &self.fallback_verifier {
             if let Ok(result) = verifier.verify_symbol_in_block(symbol, block_number).await {
                 if result.is_verified {
-                    info!("Local verification succeeded. Bypassing P2P consensus for symbol '{}'", symbol);
+                    info!(
+                        "Local verification succeeded. Bypassing P2P consensus for symbol '{}'",
+                        symbol
+                    );
                     let bmt_root = result.merkle_root.map(|v| {
                         let mut arr = [0u8; 32];
                         arr.copy_from_slice(&v);
@@ -346,18 +392,19 @@ impl SodsClient {
 
         // Evaluate consensus using Adaptive Quorum
         let _quorum_threshold = required_quorum(valid_responses.len());
-        let consensus = evaluate_consensus(valid_responses.clone(), &self.reputation, DEFAULT_THRESHOLD);
+        let consensus =
+            evaluate_consensus(valid_responses.clone(), &self.reputation, DEFAULT_THRESHOLD);
 
         // Update reputation and perform slashing
         for (peer_id, resp) in &valid_responses {
             if consensus.conflicting_peers.contains(peer_id) {
                 // Check if this peer's response actually contradicts a successful consensus
                 if consensus.is_verified && resp.success {
-                     warn!("❌ Peer {} provided conflicting root! SLASHING.", peer_id);
-                     self.slashed_peers.insert(*peer_id);
-                     self.known_peers.remove(peer_id);
-                     // Note: We don't disconnect immediately here to avoid blocking, 
-                     // but they are erased from the reliable set.
+                    warn!("❌ Peer {} provided conflicting root! SLASHING.", peer_id);
+                    self.slashed_peers.insert(*peer_id);
+                    self.known_peers.remove(peer_id);
+                    // Note: We don't disconnect immediately here to avoid blocking,
+                    // but they are erased from the reliable set.
                 }
                 self.reputation.penalize(peer_id);
             } else {
@@ -424,7 +471,7 @@ impl SodsClient {
                         }
                     }
                 }
-                
+
                 if responses.len() >= expected_count {
                     break;
                 }
@@ -448,7 +495,9 @@ impl SodsClient {
 
         info!("Using RPC fallback for verification");
 
-        let result = verifier.verify_symbol_in_block(symbol, block_number).await?;
+        let result = verifier
+            .verify_symbol_in_block(symbol, block_number)
+            .await?;
 
         let bmt_root = result.merkle_root.map(|v| {
             let mut arr = [0u8; 32];
@@ -480,7 +529,8 @@ impl SodsClient {
     /// Cleanup expired behavioral puzzles to prevent memory leaks.
     pub fn cleanup_expired_challenges(&mut self) {
         let before = self.pending_challenges.len();
-        self.pending_challenges.retain(|_, (_, puzzle)| !puzzle.is_expired());
+        self.pending_challenges
+            .retain(|_, (_, puzzle)| !puzzle.is_expired());
         let saved = before - self.pending_challenges.len();
         if saved > 0 {
             debug!("Cleaned up {} expired behavioral puzzles", saved);

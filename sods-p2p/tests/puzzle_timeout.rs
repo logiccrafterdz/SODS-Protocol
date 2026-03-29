@@ -5,14 +5,14 @@ use std::time::{Duration, SystemTime};
 fn test_puzzle_expiration_logic() {
     let challenge = PuzzleChallenge::random();
     let mut puzzle = BehavioralPuzzle::new(challenge);
-    
+
     // 1. Initially not expired
     assert!(!puzzle.is_expired());
-    
+
     // 2. Not expired after 10s
     puzzle.issued_at = SystemTime::now() - Duration::from_secs(10);
     assert!(!puzzle.is_expired());
-    
+
     // 3. Expired after 31s
     puzzle.issued_at = SystemTime::now() - Duration::from_secs(31);
     assert!(puzzle.is_expired());

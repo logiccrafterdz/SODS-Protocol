@@ -1,5 +1,5 @@
 use ethers::types::Address;
-use sods_causal::{CausalEvent, CausalMerkleTree, AgentBehaviorPattern, generate_behavioral_proof};
+use sods_causal::{generate_behavioral_proof, AgentBehaviorPattern, CausalEvent, CausalMerkleTree};
 
 fn create_event(nonce: u64, seq: u32, result: &str, timestamp: u64) -> CausalEvent {
     CausalEvent::builder()
@@ -23,7 +23,7 @@ fn test_generate_and_verify_success_pattern() {
     ];
 
     let tree = CausalMerkleTree::new(events).unwrap();
-    
+
     let pattern = AgentBehaviorPattern {
         event_type: "task_executed".to_string(),
         result_filter: "success".to_string(),
@@ -53,7 +53,7 @@ fn test_tampered_event_in_proof_fails() {
     };
 
     let mut proof = generate_behavioral_proof(&tree, &pattern, 500).unwrap();
-    
+
     // Tamper with one of the matched events
     proof.matched_events[0].result = "failure".to_string();
 

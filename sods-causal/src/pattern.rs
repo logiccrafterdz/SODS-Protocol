@@ -4,29 +4,29 @@
 //! history for specific behaviors (e.g., "success{5}") and producing
 //! verifiable proofs for those claims.
 
-use std::time::Duration;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
-use crate::event::CausalEvent;
-use crate::tree::CausalMerkleTree;
-use crate::proof::CausalBehavioralProof;
 use crate::error::{CausalError, Result};
+use crate::event::CausalEvent;
+use crate::proof::CausalBehavioralProof;
+use crate::tree::CausalMerkleTree;
 
 /// Defines a behavioral pattern to match against an agent's history.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentBehaviorPattern {
     /// Semantic event type (e.g., "task_executed").
     pub event_type: String,
-    
+
     /// Result filter (e.g., "success", "failure").
     pub result_filter: String,
-    
+
     /// Minimum required occurrences.
     pub min_count: u32,
-    
+
     /// Optional maximum occurrences.
     pub max_count: Option<u32>,
-    
+
     /// Optional time window for consideration.
     pub time_window: Option<Duration>,
 }
@@ -36,7 +36,8 @@ impl AgentBehaviorPattern {
     ///
     /// Returns the subset of events that matched the pattern.
     pub fn matches(&self, events: &[CausalEvent], now: u64) -> Vec<CausalEvent> {
-        let mut filtered: Vec<CausalEvent> = events.iter()
+        let mut filtered: Vec<CausalEvent> = events
+            .iter()
             .filter(|e| e.event_type == self.event_type && e.result == self.result_filter)
             .filter(|e| {
                 if let Some(window) = self.time_window {
@@ -88,9 +89,11 @@ pub fn generate_behavioral_proof(
 
     for matched in &matched_events {
         // Find index in original tree
-        let index = events.iter().position(|e| e == matched)
+        let index = events
+            .iter()
+            .position(|e| e == matched)
             .ok_or_else(|| CausalError::InternalError("Event sync error".to_string()))?;
-        
+
         event_proofs.push(tree.generate_proof(index));
     }
 

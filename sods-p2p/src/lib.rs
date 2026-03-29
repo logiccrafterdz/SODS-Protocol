@@ -38,16 +38,16 @@
 //! ```
 
 pub mod behavior;
+pub mod bootstrappers;
 pub mod cache;
 pub mod client;
 pub mod consensus;
 pub mod error;
+pub mod network;
 pub mod peer;
 pub mod protocol;
 pub mod reputation;
 pub mod threats;
-pub mod bootstrappers;
-pub mod network;
 
 // Re-export main types
 pub use client::{P2pVerificationResult, SodsClient};
@@ -55,4 +55,4 @@ pub use error::SodsP2pError;
 pub use peer::SodsPeer;
 pub use protocol::{ProofRequest, ProofResponse};
 pub use reputation::ReputationTracker;
-pub use threats::{ThreatRule, ThreatRegistry};
+pub use threats::{ThreatRegistry, ThreatRule};

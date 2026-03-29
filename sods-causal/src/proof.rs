@@ -3,10 +3,10 @@
 //! This module provides the `CausalProof` which represents a cryptographic proof
 //! that a specific event exists in a `CausalMerkleTree`.
 
+use crate::event::CausalEvent;
 use ethers::types::H256;
 use serde::{Deserialize, Serialize};
 use tiny_keccak::{Hasher, Keccak};
-use crate::event::CausalEvent;
 
 /// A Merkle inclusion proof for a causal event.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -38,7 +38,7 @@ impl CausalProof {
         // Step 2: Traverse path up to root
         for (i, sibling_hash) in self.merkle_path.iter().enumerate() {
             let mut hasher = Keccak::v256();
-            
+
             if self.is_left_path[i] {
                 // Sibling is on the left
                 hasher.update(sibling_hash.as_bytes());
@@ -101,10 +101,11 @@ impl CausalBehavioralProof {
 
         // Apply pattern matching logic to the RECONSTRUCTED events
         let matches = self.pattern.matches(&self.matched_events, now);
-        
+
         // The claim is that matched_events satisfy the pattern.
         // If we apply the pattern to matched_events and get back the SAME list, then it's valid.
         // Also check count constraints.
-        matches.len() == self.matched_events.len() && matches.len() >= self.pattern.min_count as usize
+        matches.len() == self.matched_events.len()
+            && matches.len() >= self.pattern.min_count as usize
     }
 }

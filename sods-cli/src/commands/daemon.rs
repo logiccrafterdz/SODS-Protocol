@@ -1,31 +1,31 @@
-use clap::{Args, Subcommand};
-use colored::Colorize;
-use std::sync::Arc;
-use std::collections::HashMap;
-use tokio::sync::{RwLock, mpsc::unbounded_channel, mpsc::UnboundedSender};
-use tokio_tungstenite::tungstenite::protocol::Message;
-use tokio::net::{TcpListener, TcpStream};
-use uuid::Uuid;
-use serde::{Deserialize, Serialize};
-use futures_util::{StreamExt, SinkExt};
-use tracing::{info, warn, debug, error};
 #[cfg(feature = "metrics")]
 use crate::monitoring::metrics::AgentMetrics;
+use clap::{Args, Subcommand};
+use colored::Colorize;
+use futures_util::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::{mpsc::unbounded_channel, mpsc::UnboundedSender, RwLock};
+use tokio_tungstenite::tungstenite::protocol::Message;
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 #[cfg(not(feature = "metrics"))]
 type AgentMetrics = ();
 
+use dirs;
 use std::fs;
 use std::path::{Path, PathBuf};
-use sysinfo::{System, Pid};
-use dirs;
+use sysinfo::{Pid, System};
 
 #[cfg(unix)]
 use daemonize::Daemonize;
 #[cfg(unix)]
 use std::fs::File;
 
-use serde_json::json;
 use crate::output;
+use serde_json::json;
 use sods_p2p::{SodsPeer, ThreatRule};
 
 /// Arguments for the daemon command.
@@ -62,7 +62,7 @@ pub enum DaemonCommands {
         /// Forward alerts to a secure HTTPS webhook (e.g., ntfy.sh)
         #[arg(long)]
         webhook_url: Option<String>,
-        
+
         /// Load behavioral threat patterns from a public feed (optional)
         #[arg(long)]
         threat_feed: Option<String>,
@@ -126,7 +126,8 @@ struct Subscription {
 
 pub struct WebSocketServer {
     port: u16,
-    subscribers: Arc<RwLock<HashMap<String, (UnboundedSender<Message>, Arc<RwLock<Subscription>>)>>>,
+    subscribers:
+        Arc<RwLock<HashMap<String, (UnboundedSender<Message>, Arc<RwLock<Subscription>>)>>>,
 }
 
 impl WebSocketServer {
@@ -157,7 +158,9 @@ impl WebSocketServer {
 
     async fn handle_connection(
         stream: TcpStream,
-        subscribers: Arc<RwLock<HashMap<String, (UnboundedSender<Message>, Arc<RwLock<Subscription>>)>>>,
+        subscribers: Arc<
+            RwLock<HashMap<String, (UnboundedSender<Message>, Arc<RwLock<Subscription>>)>>,
+        >,
     ) {
         let ws_stream = match tokio_tungstenite::accept_async(stream).await {
             Ok(s) => s,
@@ -170,7 +173,10 @@ impl WebSocketServer {
         let subscription = Arc::new(RwLock::new(Subscription::default()));
 
         // Register client
-        subscribers.write().await.insert(client_id.clone(), (tx, subscription.clone()));
+        subscribers
+            .write()
+            .await
+            .insert(client_id.clone(), (tx, subscription.clone()));
 
         // Writer task
         let subscribers_inner = subscribers.clone();
@@ -192,7 +198,10 @@ impl WebSocketServer {
                     if val["type"] == "subscribe" {
                         let mut sub = subscription.write().await;
                         if let Some(patterns) = val["patterns"].as_array() {
-                            sub.patterns = patterns.iter().filter_map(|p| p.as_str().map(|s| s.to_string())).collect();
+                            sub.patterns = patterns
+                                .iter()
+                                .filter_map(|p| p.as_str().map(|s| s.to_string()))
+                                .collect();
                         }
                         if let Some(chains) = val["chains"].as_array() {
                             sub.chains = chains.iter().filter_map(|c| c.as_u64()).collect();
@@ -214,7 +223,7 @@ impl WebSocketServer {
         let subs = self.subscribers.read().await;
         for (tx, sub_lock) in subs.values() {
             let sub = sub_lock.read().await;
-            
+
             // Filtering logic
             let chain_matches = sub.chains.is_empty() || sub.chains.contains(&alert.chain_id);
             let pattern_matches = sub.patterns.is_empty() || sub.patterns.contains(&alert.pattern);
@@ -291,11 +300,11 @@ pub(crate) fn parse_duration(s: &str) -> std::time::Duration {
 
 #[cfg(unix)]
 fn start_daemon(
-    pattern: Option<String>, 
-    chain: String, 
-    interval: String, 
-    rpc_url: Option<String>, 
-    autostart: bool, 
+    pattern: Option<String>,
+    chain: String,
+    interval: String,
+    rpc_url: Option<String>,
+    autostart: bool,
     webhook_url: Option<String>,
     threat_feed: Option<String>,
     p2p_threat_network: bool,
@@ -312,9 +321,13 @@ fn start_daemon(
     // _metrics Server Setup
     let _metrics: Option<Arc<AgentMetrics>> = metrics_port.and_then(|_port| {
         #[cfg(feature = "metrics")]
-        { AgentMetrics::new().ok().map(|m| Arc::new(m)) }
+        {
+            AgentMetrics::new().ok().map(|m| Arc::new(m))
+        }
         #[cfg(not(feature = "metrics"))]
-        { None }
+        {
+            None
+        }
     });
 
     // WebSocket Server Setup
@@ -329,14 +342,17 @@ fn start_daemon(
     if autostart {
         println!("Genering systemd service file...");
         println!("Save the following to ~/.config/systemd/user/sods.service:");
-        println!("[Unit]\nDescription=SODS Monitor\n[Service]\nExecStart={}", std::env::current_exe().unwrap().display());
+        println!(
+            "[Unit]\nDescription=SODS Monitor\n[Service]\nExecStart={}",
+            std::env::current_exe().unwrap().display()
+        );
         println!("Restart=always\n[Install]\nWantedBy=default.target");
         return 0;
     }
 
     // --- Prepare Initial Targets ---
     let mut targets = Vec::new();
-    
+
     // 1. Manual Pattern
     if let Some(p) = pattern {
         match sods_core::pattern::BehavioralPattern::parse(&p) {
@@ -349,7 +365,7 @@ fn start_daemon(
                     chain: chain.clone(),
                     expires_at,
                 });
-            },
+            }
             Err(e) => {
                 output::error(&format!("Invalid manual pattern: {}", e));
                 return 1;
@@ -370,8 +386,16 @@ fn start_daemon(
     println!("Logs: {}", log_file.display());
     println!("PID:  {}", pid_file.display());
 
-    let stdout = std::fs::OpenOptions::new().create(true).append(true).open(&log_file).unwrap();
-    let stderr = std::fs::OpenOptions::new().create(true).append(true).open(&log_file).unwrap();
+    let stdout = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_file)
+        .unwrap();
+    let stderr = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_file)
+        .unwrap();
 
     let daemonize = Daemonize::new()
         .pid_file(&pid_file)
@@ -383,7 +407,7 @@ fn start_daemon(
     match daemonize.start() {
         Ok(_) => {
             let rt = tokio::runtime::Runtime::new().unwrap();
-            
+
             // Start _metrics server if enabled
             #[cfg(feature = "metrics")]
             if let Some(ref m) = _metrics {
@@ -399,8 +423,19 @@ fn start_daemon(
                 rt.spawn(ws_clone.start());
             }
 
-            rt.block_on(run_daemon_loop(targets.clone(), chain.clone(), interval.clone(), rpc_url.clone(), webhook_url.clone(), Some(threat_feed.clone()), p2p_threat_network, expire_after_str.clone(), ws_server.clone(), _metrics.clone()));
-            0 
+            rt.block_on(run_daemon_loop(
+                targets.clone(),
+                chain.clone(),
+                interval.clone(),
+                rpc_url.clone(),
+                webhook_url.clone(),
+                Some(threat_feed.clone()),
+                p2p_threat_network,
+                expire_after_str.clone(),
+                ws_server.clone(),
+                _metrics.clone(),
+            ));
+            0
         }
         Err(e) => {
             eprintln!("Error, {}", e);
@@ -414,16 +449,26 @@ async fn fetch_threat_feed(url: &str) -> Result<Vec<ThreatFeedItem>, String> {
         return Err("URL must be HTTPS".to_string());
     }
     let client = reqwest::Client::new();
-    let res = client.get(url).timeout(std::time::Duration::from_secs(10)).send().await.map_err(|e| e.to_string())?;
-    if !res.status().is_success() { return Err(format!("HTTP {}", res.status())); }
-    let items: Vec<ThreatFeedItem> = res.json().await.map_err(|e| format!("Invalid JSON: {}", e))?;
+    let res = client
+        .get(url)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("HTTP {}", res.status()));
+    }
+    let items: Vec<ThreatFeedItem> = res
+        .json()
+        .await
+        .map_err(|e| format!("Invalid JSON: {}", e))?;
     Ok(items)
 }
 
 async fn run_daemon_loop(
-    mut targets: Vec<MonitoringTarget>, 
-    chain: String, 
-    interval_str: String, 
+    mut targets: Vec<MonitoringTarget>,
+    chain: String,
+    interval_str: String,
     rpc_url_opt: Option<String>,
     webhook_url: Option<String>,
     threat_feed: Option<Option<String>>,
@@ -432,23 +477,32 @@ async fn run_daemon_loop(
     ws_server: Option<Arc<WebSocketServer>>,
     _metrics: Option<Arc<AgentMetrics>>,
 ) {
-    use sods_verifier::BlockVerifier;
     use crate::config::get_chain;
-    use std::time::Duration;
     use notify_rust::Notification;
+    use sods_verifier::BlockVerifier;
+    use std::time::Duration;
 
     let interval_secs = if interval_str.ends_with("s") {
-        interval_str.trim_end_matches("s").parse::<u64>().unwrap_or(30)
-    } else { 30 };
+        interval_str
+            .trim_end_matches("s")
+            .parse::<u64>()
+            .unwrap_or(30)
+    } else {
+        30
+    };
     let interval = Duration::from_secs(interval_secs);
-    
+
     let chain_config = get_chain(&chain).unwrap();
     let rpc_urls: Vec<String> = if let Some(url) = rpc_url_opt {
         vec![url]
     } else {
-        chain_config.rpc_urls.iter().map(|s| s.to_string()).collect()
+        chain_config
+            .rpc_urls
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
     };
-    
+
     // --- P2P Setup ---
     let mut threat_rx = if p2p_enabled {
         match SodsPeer::new(&rpc_urls[0]) {
@@ -461,7 +515,7 @@ async fn run_daemon_loop(
                     }
                 });
                 Some(rx)
-            },
+            }
             Err(e) => {
                 eprintln!("Failed to initialize P2P node: {}", e);
                 None
@@ -485,8 +539,8 @@ async fn run_daemon_loop(
                 if let Some(p) = pid {
                     sys.refresh_process(p);
                     if let Some(proc) = sys.process(p) {
-                         let mb = proc.memory() / 1024 / 1024;
-                         m_clone.memory_usage_mb.set(mb as i64);
+                        let mb = proc.memory() / 1024 / 1024;
+                        m_clone.memory_usage_mb.set(mb as i64);
                     }
                 }
                 tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
@@ -501,22 +555,24 @@ async fn run_daemon_loop(
             Ok(items) => {
                 println!("Loaded {} patterns from threat feed.", items.len());
                 for item in items {
-                     if item.chain != chain { continue; }
-                     match sods_core::pattern::BehavioralPattern::parse(&item.pattern) {
-                         Ok(parsed) => {
-                             targets.push(MonitoringTarget {
-                                 pattern: parsed,
-                                 name: item.name,
-                                 severity: item.severity,
-                                 pattern_str: item.pattern,
-                                 chain: item.chain,
-                                 expires_at: std::time::SystemTime::now() + expire_duration,
-                             });
-                         },
-                         Err(e) => eprintln!("⚠️ Skipping invalid pattern '{}': {}", item.name, e),
-                     }
+                    if item.chain != chain {
+                        continue;
+                    }
+                    match sods_core::pattern::BehavioralPattern::parse(&item.pattern) {
+                        Ok(parsed) => {
+                            targets.push(MonitoringTarget {
+                                pattern: parsed,
+                                name: item.name,
+                                severity: item.severity,
+                                pattern_str: item.pattern,
+                                chain: item.chain,
+                                expires_at: std::time::SystemTime::now() + expire_duration,
+                            });
+                        }
+                        Err(e) => eprintln!("⚠️ Skipping invalid pattern '{}': {}", item.name, e),
+                    }
                 }
-            },
+            }
             Err(e) => eprintln!("Failed to fetch threat feed: {}", e),
         }
     }
@@ -526,29 +582,35 @@ async fn run_daemon_loop(
         let rules_file = get_threat_rules_file();
         if rules_file.exists() {
             if let Ok(content) = fs::read_to_string(&rules_file) {
-                 if let Ok(rules) = serde_json::from_str::<Vec<ThreatRule>>(&content) {
-                     println!("Loaded {} persisted threat rules.", rules.len());
-                     for rule in rules {
-                         if rule.chain == chain {
-                             if let Ok(p) = sods_core::pattern::BehavioralPattern::parse(&rule.pattern) {
-                                 targets.push(MonitoringTarget {
-                                     pattern: p,
-                                     name: rule.name.clone(),
-                                     severity: rule.severity.clone(),
-                                     pattern_str: rule.pattern.clone(),
-                                     chain: rule.chain.clone(),
-                                     expires_at: std::time::SystemTime::now() + expire_duration,
-                                 });
-                             }
-                         }
-                     }
-                 }
+                if let Ok(rules) = serde_json::from_str::<Vec<ThreatRule>>(&content) {
+                    println!("Loaded {} persisted threat rules.", rules.len());
+                    for rule in rules {
+                        if rule.chain == chain {
+                            if let Ok(p) =
+                                sods_core::pattern::BehavioralPattern::parse(&rule.pattern)
+                            {
+                                targets.push(MonitoringTarget {
+                                    pattern: p,
+                                    name: rule.name.clone(),
+                                    severity: rule.severity.clone(),
+                                    pattern_str: rule.pattern.clone(),
+                                    chain: rule.chain.clone(),
+                                    expires_at: std::time::SystemTime::now() + expire_duration,
+                                });
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
-    println!("Daemon loop active. Monitoring {} targets on {}", targets.len(), chain);
-    
+    println!(
+        "Daemon loop active. Monitoring {} targets on {}",
+        targets.len(),
+        chain
+    );
+
     let is_l2 = chain != "ethereum" && chain != "sepolia";
     let profile = if is_l2 {
         sods_verifier::rpc::BackoffProfile::L2
@@ -565,12 +627,14 @@ async fn run_daemon_loop(
     };
 
     if !verifier.health_check().await {
-        eprintln!("⚠️ Warning: Initial health check failed for all RPCs. Continuing in hope of recovery.");
+        eprintln!(
+            "⚠️ Warning: Initial health check failed for all RPCs. Continuing in hope of recovery."
+        );
     }
 
     let mut last_scanned_block = verifier.get_latest_block().await.unwrap_or(0);
     if last_scanned_block == 0 {
-       println!("Warning: Could not fetch initial block. Will retry in loop.");
+        println!("Warning: Could not fetch initial block. Will retry in loop.");
     }
 
     let mut timer = tokio::time::interval(interval);
@@ -602,14 +666,14 @@ async fn run_daemon_loop(
                   #[cfg(feature = "metrics")]
                   if let Some(ref m) = _metrics { m.p2p_messages_total.inc(); }
                   println!("Received P2P Threat Rule: {}", rule.name);
-                  
+
                   let rules_file = get_threat_rules_file();
                   let mut current_rules: Vec<ThreatRule> = if rules_file.exists() {
                       fs::read_to_string(&rules_file).ok()
                          .and_then(|c| serde_json::from_str(&c).ok())
                          .unwrap_or_default()
                   } else { Vec::new() };
-                  
+
                   if !current_rules.iter().any(|r| r.id == rule.id) {
                       current_rules.push(rule.clone());
                       if current_rules.len() > 1000 {
@@ -651,7 +715,7 @@ async fn run_daemon_loop(
                  if let Some(ref m) = _metrics { m.active_rules.set(targets.len() as i64); }
                   #[cfg(feature = "metrics")]
                  let start_v = std::time::Instant::now();
-                 
+
                  match verifier.get_latest_block().await {
                     Ok(current_head) => {
                         #[cfg(feature = "metrics")]
@@ -661,7 +725,7 @@ async fn run_daemon_loop(
                                 last_scanned_block = current_head;
                                 continue;
                             }
-                            
+
                             for block_num in (last_scanned_block + 1)..=current_head {
                                 match verifier.fetch_block_symbols(block_num).await {
                                     Ok(symbols) => {
@@ -740,18 +804,30 @@ async fn run_daemon_loop(
 }
 
 async fn send_webhook(url: String, payload: serde_json::Value) {
-    if !url.starts_with("https://") { return; }
+    if !url.starts_with("https://") {
+        return;
+    }
     let client = reqwest::Client::new();
-    let _ = client.post(&url).json(&payload).timeout(std::time::Duration::from_secs(5)).send().await;
+    let _ = client
+        .post(&url)
+        .json(&payload)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await;
 }
 
 #[cfg(unix)]
 fn stop_daemon() -> i32 {
     let pid_file = get_pid_file();
-    if !pid_file.exists() { output::error("Daemon is not running."); return 1; }
+    if !pid_file.exists() {
+        output::error("Daemon is not running.");
+        return 1;
+    }
     let pid_str = fs::read_to_string(&pid_file).unwrap();
     let pid = pid_str.trim().parse::<i32>().unwrap();
-    let _ = std::process::Command::new("kill").arg(pid.to_string()).output();
+    let _ = std::process::Command::new("kill")
+        .arg(pid.to_string())
+        .output();
     let _ = fs::remove_file(pid_file);
     println!("Daemon stopped.");
     0
@@ -760,14 +836,16 @@ fn stop_daemon() -> i32 {
 #[cfg(unix)]
 fn check_status() -> bool {
     let pid_file = get_pid_file();
-    if !pid_file.exists() { return false; }
+    if !pid_file.exists() {
+        return false;
+    }
     let pid_str = match fs::read_to_string(&pid_file) {
         Ok(s) => s,
         Err(_) => return false,
     };
     let pid_val = match pid_str.trim().parse::<usize>() {
-         Ok(p) => p,
-         Err(_) => return false,
+        Ok(p) => p,
+        Err(_) => return false,
     };
     System::new_all().process(Pid::from(pid_val)).is_some()
 }
@@ -778,11 +856,11 @@ fn check_status() -> bool {
 
 #[cfg(not(unix))]
 fn start_daemon(
-    pattern: Option<String>, 
-    chain: String, 
-    interval: String, 
-    rpc_url: Option<String>, 
-    autostart: bool, 
+    pattern: Option<String>,
+    chain: String,
+    interval: String,
+    rpc_url: Option<String>,
+    autostart: bool,
     webhook_url: Option<String>,
     threat_feed: Option<String>,
     p2p_threat_network: bool,
@@ -799,9 +877,13 @@ fn start_daemon(
     // _metrics Server Setup
     let _metrics: Option<Arc<AgentMetrics>> = metrics_port.and_then(|_port| {
         #[cfg(feature = "metrics")]
-        { AgentMetrics::new().ok().map(|m| Arc::new(m)) }
+        {
+            AgentMetrics::new().ok().map(|m| Arc::new(m))
+        }
         #[cfg(not(feature = "metrics"))]
-        { None }
+        {
+            None
+        }
     });
 
     // WebSocket Server Setup
@@ -814,7 +896,7 @@ fn start_daemon(
 
     // --- Prepare Initial Targets ---
     let mut targets = Vec::new();
-    
+
     // 1. Manual Pattern
     if let Some(p) = pattern {
         match sods_core::pattern::BehavioralPattern::parse(&p) {
@@ -827,7 +909,7 @@ fn start_daemon(
                     chain: chain.clone(),
                     expires_at,
                 });
-            },
+            }
             Err(e) => {
                 output::error(&format!("Invalid manual pattern: {}", e));
                 return 1;
@@ -845,7 +927,7 @@ fn start_daemon(
     if p2p_threat_network {
         println!("Network:    Connected to P2P Threat Intelligence");
     }
-    
+
     // Start _metrics server if enabled
     #[cfg(feature = "metrics")]
     if let Some(ref m) = _metrics {
@@ -862,8 +944,19 @@ fn start_daemon(
     }
 
     // Run the daemon loop in foreground
-    rt.block_on(run_daemon_loop(targets.clone(), chain.clone(), interval.clone(), rpc_url.clone(), webhook_url.clone(), Some(threat_feed.clone()), p2p_threat_network, expire_after_str.clone(), ws_server.clone(), _metrics.clone()));
-    0 
+    rt.block_on(run_daemon_loop(
+        targets.clone(),
+        chain.clone(),
+        interval.clone(),
+        rpc_url.clone(),
+        webhook_url.clone(),
+        Some(threat_feed.clone()),
+        p2p_threat_network,
+        expire_after_str.clone(),
+        ws_server.clone(),
+        _metrics.clone(),
+    ));
+    0
 }
 
 #[cfg(not(unix))]
@@ -887,15 +980,37 @@ pub async fn run(args: DaemonArgs) -> i32 {
 
 pub fn run_sync(args: DaemonArgs) -> i32 {
     match args.command {
-        DaemonCommands::Start { pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after, websocket_port, metrics_port } => {
-            start_daemon(pattern, chain, interval, rpc_url, autostart, webhook_url, threat_feed, p2p_threat_network, expire_after, websocket_port, metrics_port)
-        },
+        DaemonCommands::Start {
+            pattern,
+            chain,
+            interval,
+            rpc_url,
+            autostart,
+            webhook_url,
+            threat_feed,
+            p2p_threat_network,
+            expire_after,
+            websocket_port,
+            metrics_port,
+        } => start_daemon(
+            pattern,
+            chain,
+            interval,
+            rpc_url,
+            autostart,
+            webhook_url,
+            threat_feed,
+            p2p_threat_network,
+            expire_after,
+            websocket_port,
+            metrics_port,
+        ),
         DaemonCommands::Stop => stop_daemon(),
         DaemonCommands::Status => {
             if check_status() {
                 println!("{}", "✅ SODS daemon is running".green().bold());
             } else {
-                 println!("SODS daemon is not running.");
+                println!("SODS daemon is not running.");
             }
             0
         }
@@ -905,8 +1020,8 @@ pub fn run_sync(args: DaemonArgs) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{Duration, SystemTime};
     use sods_core::pattern::BehavioralPattern;
+    use std::time::{Duration, SystemTime};
 
     #[test]
     fn test_parse_duration() {

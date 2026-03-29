@@ -8,9 +8,13 @@ const VALIDATION_REGISTRY_ABI: &str = r#"[
 
 #[tokio::test]
 async fn test_validation_request_response_cycle() {
-    let rpc_url = std::env::var("SEPOLIA_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string());
-    let priv_key = std::env::var("TEST_PRIVATE_KEY").unwrap_or_else(|_| "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string());
-    let registry_addr = std::env::var("SEPOLIA_VALIDATION_REGISTRY_ADDR").unwrap_or_else(|_| "0x8004000000000000000000000000000000000003".to_string());
+    let rpc_url =
+        std::env::var("SEPOLIA_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string());
+    let priv_key = std::env::var("TEST_PRIVATE_KEY").unwrap_or_else(|_| {
+        "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string()
+    });
+    let registry_addr = std::env::var("SEPOLIA_VALIDATION_REGISTRY_ADDR")
+        .unwrap_or_else(|_| "0x8004000000000000000000000000000000000003".to_string());
 
     let provider = match Provider::<Http>::try_from(rpc_url) {
         Ok(p) => p,
@@ -39,7 +43,10 @@ async fn test_validation_request_response_cycle() {
     let is_valid = true; // Assume proof is valid for E2E flow test
     let score = if is_valid { 100 } else { 0 };
 
-    println!("Submitting validation response for request {:?} with score {}", request_id, score);
+    println!(
+        "Submitting validation response for request {:?} with score {}",
+        request_id, score
+    );
 
     // In a live environment, we would submit:
     // let call = contract.method::<_, ()>("submitValidationResponse", (request_id, score, "ipfs://QmResult".to_string())).unwrap();

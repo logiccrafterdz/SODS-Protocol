@@ -1,6 +1,9 @@
 use assert_cmd::Command;
-use wiremock::{MockServer, Mock, ResponseTemplate, matchers::{method, path}};
 use tempfile::TempDir;
+use wiremock::{
+    matchers::{method, path},
+    Mock, MockServer, ResponseTemplate,
+};
 
 pub struct TestEnv {
     pub server: MockServer,
@@ -26,12 +29,11 @@ impl TestEnv {
     }
 
     pub async fn mock_rpc(&self, method_name: &str, response_json: serde_json::Value) {
-        let response = ResponseTemplate::new(200)
-            .set_body_json(serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": 1,
-                "result": response_json
-            }));
+        let response = ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": response_json
+        }));
 
         Mock::given(method("POST"))
             .and(path("/"))
