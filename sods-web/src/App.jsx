@@ -240,7 +240,7 @@ function App() {
 
       {/* Footer */}
       <footer className="footer">
-        SODS Protocol — Alpha (Research Prototype) · MIT OR Apache-2.0 ·{' '}
+        SODS Protocol — Alpha (Research Prototype) · CC0 1.0 Universal ·{' '}
         <a href="https://github.com/logiccrafterdz/SODS-Protocol" target="_blank" rel="noopener noreferrer">
           GitHub
         </a>
