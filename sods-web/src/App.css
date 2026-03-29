@@ -1,31 +1,33 @@
 /* 
-  SODS-X // Neural Overlay v8.0 
-  Design Vision: 2126 "Iridescent Bismuth"
+  SODS-X // NEURAL OVERLAY v8.0 [EXTREME HUD EDITION]
+  Era: 2126 - Bismuth Crystalline Protocol
 */
 
 :root {
   /* Absolute Void Base */
-  --bg-void: #010101;
-  --bg-panel: rgba(10, 10, 15, 0.7);
+  --bg-void: #000205;
+  --bg-panel: rgba(5, 5, 10, 0.85);
   
-  /* Bismuth Iridescence */
-  --bismuth-violet: #8a2be2;
-  --bismuth-magenta: #ff1493;
-  --bismuth-gold: #ffd700;
-  --bismuth-cyan: #00f0ff;
+  /* Bismuth Iridescence (OKLCH for Maximum Vibrancy) */
+  --bismuth-v: #8a2be2;
+  --bismuth-m: #ff00ff;
+  --bismuth-g: #ffd700;
+  --bismuth-c: #00f0ff;
+  --bismuth-w: #f8f8f8;
   
-  /* Text & Contrast */
-  --text-pearl: #f8f8f8;
-  --text-dim: rgba(248, 248, 248, 0.6);
+  /* Gradation Tokens */
+  --grad-bismuth: linear-gradient(135deg, var(--bismuth-v), var(--bismuth-m), var(--bismuth-g));
+  --grad-shimmer: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
   
   /* Fonts */
   --font-h: 'Orbitron', sans-serif;
   --font-ui: 'Space Grotesk', sans-serif;
   --font-data: 'JetBrains Mono', monospace;
   
-  /* Motion Constants */
-  --transition-neural: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-hud: 0.5s cubic-bezier(0.19, 1, 0.22, 1);
 }
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Grotesk:wght@300;400;700&family=JetBrains+Mono:wght@400;700&display=swap');
 
 * {
   box-sizing: border-box;
@@ -35,324 +37,273 @@
 
 body {
   background: var(--bg-void);
-  color: var(--text-pearl);
+  color: var(--bismuth-w);
   font-family: var(--font-ui);
-  line-height: 1.6;
   overflow-x: hidden;
+  cursor: crosshair;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Neural Backdrop Layout */
+/* --- THE NEURAL VOID --- */
 .app {
   min-height: 100vh;
-  padding: 3rem 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 4rem;
   position: relative;
-  background: radial-gradient(circle at 50% -20%, rgba(138, 43, 226, 0.15), transparent 70%);
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  z-index: 10;
 }
 
-/* Subtle Crystalline Noise */
-.app::before {
-  content: "";
+/* Neural Mesh Background (Inject SVG in JSX) */
+.neural-mesh-container {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: url('https://www.transparenttextures.com/patterns/dark-matter.png');
-  opacity: 0.05;
+  z-index: 1;
+  opacity: 0.3;
   pointer-events: none;
-  z-index: 100;
 }
 
-/* Shimmering Scanline Effect (Modernized) */
-.app::after {
-  content: "";
+/* Bismuth Fog - Atmospheric depth */
+.bismuth-fog {
+  position: fixed;
+  top: -20%; left: -20%; width: 140%; height: 140%;
+  background: radial-gradient(circle at 30% 30%, rgba(138, 43, 226, 0.1), transparent 40%),
+              radial-gradient(circle at 70% 70%, rgba(255, 0, 255, 0.1), transparent 40%),
+              radial-gradient(circle at 50% 50%, rgba(255, 215, 0, 0.05), transparent 60%);
+  filter: blur(80px);
+  z-index: 2;
+  animation: nebula-drift 30s infinite alternate ease-in-out;
+}
+
+/* Global HUD Scanlines */
+.hud-overlay {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
-              linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+              linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
   background-size: 100% 4px, 3px 100%;
+  z-index: 1000;
   pointer-events: none;
-  z-index: 101;
-  opacity: 0.2;
+  opacity: 0.4;
 }
 
-/* Header Redesign */
+/* --- HUD COMPONENTS --- */
+
+/* Header: Disrupted Hologram */
 .header {
-  text-align: center;
-  margin-bottom: 4rem;
   position: relative;
+  margin-bottom: 2rem;
 }
 
 .header__badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
   font-family: var(--font-h);
-  font-size: 0.75rem;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--bismuth-violet);
-  border: 1px solid rgba(138, 43, 226, 0.3);
-  padding: 0.5rem 1.5rem;
-  border-radius: 2px;
-  margin-bottom: 2rem;
-  background: rgba(138, 43, 226, 0.05);
-  box-shadow: 0 0 15px rgba(138, 43, 226, 0.2);
-}
-
-.pulse {
-  width: 6px;
-  height: 6px;
-  background: var(--bismuth-magenta);
-  border-radius: 50%;
-  box-shadow: 0 0 10px var(--bismuth-magenta);
-  animation: pulse-ring 2s infinite;
+  font-size: 0.7rem;
+  letter-spacing: 0.5em;
+  color: var(--bismuth-v);
+  background: rgba(138, 43, 226, 0.1);
+  padding: 0.75rem 2rem;
+  border-left: 3px solid var(--bismuth-v);
+  clip-path: polygon(0 0, 95% 0, 100% 50%, 95% 100%, 0 100%);
+  margin-bottom: 1.5rem;
 }
 
 .header__title {
   font-family: var(--font-h);
-  font-size: 3.5rem;
-  font-weight: 700;
+  font-size: clamp(2rem, 6vw, 5rem);
+  font-weight: 900;
+  line-height: 0.9;
   text-transform: uppercase;
-  background: linear-gradient(90deg, var(--text-pearl), var(--bismuth-magenta), var(--bismuth-violet));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 1rem;
-  letter-spacing: -0.02em;
+  position: relative;
+  color: var(--bismuth-w);
+  text-shadow: 2px 2px 0px var(--bismuth-m), -2px -2px 0px var(--bismuth-c);
+  animation: chromatic-vibrate 0.2s infinite alternate;
 }
 
-.header__subtitle {
-  color: var(--text-dim);
-  font-size: 1rem;
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-/* Faceted Panel / Card Redesign */
+/* Crystalline Faceted Panel */
 .card {
   background: var(--bg-panel);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 2.5rem;
   position: relative;
-  transition: var(--transition-neural);
-  /* The "Faceted" Crystal Look */
+  transition: var(--transition-hud);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  /* The "Extreme Crystalline" Facet */
   clip-path: polygon(
-    0 10px, 10px 0,
-    calc(100% - 10px) 0, 100% 10px,
-    100% calc(100% - 10px), calc(100% - 10px) 100%,
-    10px 100%, 0 calc(100% - 10px)
+    0 20px, 20px 0, 
+    calc(100% - 40px) 0, 100% 20px, 
+    100% calc(100% - 20px), calc(100% - 20px) 100%, 
+    20px 100%, 0 calc(100% - 40px)
   );
 }
 
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(45deg, transparent 40%, rgba(255, 255, 255, 0.05) 50%, transparent 60%);
+  background-size: 200% 200%;
+  transition: 0.6s;
+  pointer-events: none;
+}
+
 .card:hover {
-  transform: translateY(-5px);
-  border-color: rgba(138, 43, 226, 0.4);
-  background: rgba(138, 43, 226, 0.08);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(138, 43, 226, 0.1);
+  transform: scale(1.02) rotateX(2deg) rotateY(-2deg);
+  border-color: var(--bismuth-v);
+  box-shadow: 0 0 40px rgba(138, 43, 226, 0.2);
 }
 
-.card__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
+.card:hover::before {
+  background-position: 100% 100%;
 }
 
-.card__title {
-  font-family: var(--font-h);
-  font-size: 0.85rem;
-  color: var(--text-dim);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+/* Chromatic Aberration Text */
+.chromatic-aberration {
+  position: relative;
 }
 
 .card__value {
   font-family: var(--font-data);
-  font-size: 2.2rem;
+  font-size: 3rem;
   font-weight: 700;
-  color: var(--text-pearl);
-  text-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+  letter-spacing: -0.05em;
+  background: linear-gradient(to bottom, #fff, #aaa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
 }
 
-.card__label {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  margin-top: 0.5rem;
-}
-
-/* Grids */
-.grid {
-  display: grid;
-  gap: 1.5rem;
-}
-
-.grid--4 { grid-template-columns: repeat(4, 1fr); }
-.grid--2 { grid-template-columns: repeat(2, 1fr); }
-
-/* Status Indicators */
+/* Status: Neural Link */
 .status {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   font-family: var(--font-data);
-  font-size: 1.1rem;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .status__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 10px;
+  height: 2px;
+  background: var(--bismuth-c);
+  animation: neural-blink 1s infinite alternate;
 }
 
-.status--ok { color: var(--bismuth-cyan); }
-.status--ok .status__dot { background: var(--bismuth-cyan); box-shadow: 0 0 10px var(--bismuth-cyan); }
-.status--warn { color: var(--bismuth-gold); }
-.status--err { color: var(--bismuth-magenta); }
+.status--ok { color: var(--bismuth-c); border-color: var(--bismuth-c); }
+.status--warn { color: var(--bismuth-g); border-color: var(--bismuth-g); }
+.status--err { color: var(--bismuth-m); border-color: var(--bismuth-m); }
 
-/* Form Elements */
-.verify-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
+/* --- HUD FORMS & TABLES --- */
 .verify-form__input {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text-pearl);
-  padding: 1rem;
+  color: var(--bismuth-w);
+  padding: 1.25rem;
   font-family: var(--font-data);
-  font-size: 0.95rem;
-  transition: var(--transition-neural);
   outline: none;
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 95% 100%, 0 100%);
 }
 
 .verify-form__input:focus {
-  border-color: var(--bismuth-violet);
-  background: rgba(138, 43, 226, 0.1);
-  box-shadow: 0 0 15px rgba(138, 43, 226, 0.2);
+  border-color: var(--bismuth-v);
+  background: rgba(138, 43, 226, 0.05);
 }
 
 .verify-form__btn {
-  background: linear-gradient(90deg, var(--bismuth-violet), var(--bismuth-magenta));
-  color: white;
-  border: none;
-  padding: 1.25rem;
+  background: var(--grad-bismuth);
+  color: #000;
+  font-weight: 900;
+  padding: 1.5rem;
   font-family: var(--font-h);
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.3em;
+  border: none;
   cursor: pointer;
-  transition: var(--transition-neural);
-  position: relative;
-  overflow: hidden;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  transition: 0.3s;
 }
 
 .verify-form__btn:hover {
   filter: brightness(1.2);
-  transform: scale(1.02);
-  box-shadow: 0 0 25px rgba(255, 20, 147, 0.3);
+  transform: scale(1.05);
+  box-shadow: 0 0 30px var(--bismuth-m);
 }
 
-/* Symbols Table */
-.symbols-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 0.5rem;
-  font-family: var(--font-data);
+/* --- ANIMATIONS --- */
+@keyframes nebula-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-5%, -5%) scale(1.1); }
 }
 
-.symbols-table th {
-  text-align: left;
-  padding: 1rem;
-  font-family: var(--font-h);
-  font-size: 0.7rem;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+@keyframes chromatic-vibrate {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(1px, -1px); }
+  50% { transform: translate(-1px, 1px); }
+  75% { transform: translate(1px, 1px); }
+  100% { transform: translate(0, 0); }
 }
 
-.symbols-table td {
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.02);
-  transition: var(--transition-neural);
+@keyframes neural-blink {
+  from { opacity: 0.2; transform: scaleX(0.5); }
+  to { opacity: 1; transform: scaleX(2); }
 }
 
-.symbols-table tr:hover td {
-  background: rgba(138, 43, 226, 0.1);
-  color: var(--bismuth-cyan);
+/* Floating HUD Decoration */
+.hud-corner {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--bismuth-v);
+  opacity: 0.5;
+}
+.hud-corner--tl { top: 0; left: 0; border-right: none; border-bottom: none; }
+.hud-corner--tr { top: 0; right: 0; border-left: none; border-bottom: none; }
+.hud-corner--bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+.hud-corner--br { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+/* Grid Layout Overrides for "Extreme" Asymmetry */
+.grid--4 {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.grid--4 .card { flex: 1; min-width: 300px; }
+.grid--4 .card:nth-child(even) { transform: translateY(20px); }
+
+.grid--2 {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
 }
 
-.symbols-table .sym {
-  color: var(--bismuth-magenta);
-  font-weight: 700;
-}
-
-/* Results Display */
+/* Result Logs */
 .result {
-  margin-top: 1.5rem;
-  padding: 1.5rem;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #000;
+  border: 1px solid var(--bismuth-v);
+  padding: 2rem;
   font-family: var(--font-data);
-  font-size: 0.85rem;
-  white-space: pre-wrap;
-  max-height: 300px;
-  overflow-y: auto;
-  border-left: 4px solid var(--bismuth-violet);
+  font-size: 0.8rem;
+  color: var(--bismuth-c);
+  border-radius: 0;
+  position: relative;
+  overflow: hidden;
 }
 
-.result--success { border-left-color: var(--bismuth-cyan); color: var(--bismuth-cyan); }
-.result--error { border-left-color: var(--bismuth-magenta); color: var(--bismuth-magenta); }
-
-/* Footer */
-.footer {
-  margin-top: 5rem;
-  text-align: center;
-  font-size: 0.75rem;
-  font-family: var(--font-data);
-  color: var(--text-dim);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding-top: 2rem;
+.result::after {
+  content: "ACCESSING_SYMBOLS...";
+  position: absolute;
+  top: 5px; right: 10px;
+  font-size: 10px; opacity: 0.3;
 }
 
-.footer a {
-  color: var(--bismuth-violet);
-  text-decoration: none;
-  font-weight: 700;
-  transition: 0.3s;
-}
-
-.footer a:hover {
-  color: var(--bismuth-magenta);
-}
-
-/* Animations */
-@keyframes pulse-ring {
-  0% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.5); opacity: 0; }
-  100% { transform: scale(1); opacity: 0.8; }
-}
-
-.animate-in {
-  animation: slide-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  opacity: 0;
-}
-
-@keyframes slide-up {
-  from { transform: translateY(30px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-/* Responsiveness */
+/* Responsive Extreme HUD */
 @media (max-width: 1024px) {
-  .grid--4 { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 600px) {
-  .header__title { font-size: 2.2rem; }
-  .grid--4, .grid--2 { grid-template-columns: 1fr; }
-  .app { padding: 2rem 1rem; }
+  .app { padding: 2rem; }
+  .grid--2 { grid-template-columns: 1fr; }
+  .grid--4 .card:nth-child(even) { transform: none; }
 }

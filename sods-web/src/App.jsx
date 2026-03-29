@@ -20,6 +20,35 @@ const SYMBOLS = [
 
 const API_BASE = 'http://localhost:3000'
 
+// --- Neural HUD Components ---
+
+const HUDDecor = () => (
+  <>
+    <div className="hud-corner hud-corner--tl"></div>
+    <div className="hud-corner hud-corner--tr"></div>
+    <div className="hud-corner hud-corner--bl"></div>
+    <div className="hud-corner hud-corner--br"></div>
+  </>
+)
+
+const NeuralMesh = () => (
+  <div className="neural-mesh-container">
+    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <defs>
+        <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+          <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(138, 43, 226, 0.1)" strokeWidth="0.1"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid)" />
+      <path d="M 10 10 L 90 90 M 10 90 L 90 10 M 50 0 L 50 100 M 0 50 L 100 50" 
+            stroke="rgba(0, 240, 255, 0.05)" strokeWidth="0.05" />
+      <circle cx="50" cy="50" r="0.5" fill="var(--bismuth-c)" className="pulse" />
+      <circle cx="10" cy="10" r="0.3" fill="var(--bismuth-v)" />
+      <circle cx="90" cy="90" r="0.3" fill="var(--bismuth-v)" />
+    </svg>
+  </div>
+)
+
 function App() {
   const [health, setHealth] = useState(null)
   const [symbol, setSymbol] = useState('Tf')
@@ -112,159 +141,176 @@ function App() {
   }
 
   return (
-    <div className="app">
-      {/* Header */}
-      <header className="header animate-in">
-        <div className="header__badge">
-          <span className="pulse"></span>
-          SODS-X // NEURAL OVERLAY
-        </div>
-        <h1 className="header__title">Behavioral Verification</h1>
-        <p className="header__subtitle">
-          Real-time on-chain symbol monitoring via biophotonic Merkle Tree verification.
-          Era 2126 - Trustless Protocol.
-        </p>
-      </header>
-
-      {/* Stats Cards */}
-      <section className="grid grid--4 animate-in" style={{ marginBottom: '1.5rem', animationDelay: '0.2s' }}>
-        <div className="card">
-          <div className="card__header">
-            <span className="card__title">Connection Status</span>
-            <span className="card__icon">📡</span>
+    <div style={{ position: 'relative' }}>
+      <div className="hud-overlay"></div>
+      <div className="bismuth-fog"></div>
+      <NeuralMesh />
+      
+      <div className="app">
+        {/* Header */}
+        <header className="header animate-in">
+          <div className="header__badge">
+            <span className="pulse"></span>
+            NEURAL_OVERLAY_SYNC_8.0.2126
           </div>
-          <div className={`status ${statusClass}`}>
-            <span className="status__dot"></span>
-            {statusLabel}
-          </div>
-          <p className="card__label">Latency: 12ms (Neural Hub)</p>
-        </div>
-
-        <div className="card">
-          <div className="card__header">
-            <span className="card__title">Neural Uptime</span>
-            <span className="card__icon">🧬</span>
-          </div>
-          <div className="card__value">{formatUptime(uptime)}</div>
-          <p className="card__label">Synaptic link longevity</p>
-        </div>
-
-        <div className="card">
-          <div className="card__header">
-            <span className="card__title">Pathways</span>
-            <span className="card__icon">⚡</span>
-          </div>
-          <div className="card__value">{SYMBOLS.length}</div>
-          <p className="card__label">Active behavioral nodes</p>
-        </div>
-
-        <div className="card">
-          <div className="card__header">
-            <span className="card__title">Integrity Mode</span>
-            <span className="card__icon">🛡️</span>
-          </div>
-          <div className="card__value" style={{ fontSize: '1.4rem' }}>CRYSTALLINE</div>
-          <p className="card__label">Fault-tolerant storage proof</p>
-        </div>
-      </section>
-
-      {/* Main Content */}
-      <div className="grid grid--2 animate-in" style={{ animationDelay: '0.4s' }}>
-        {/* Verify Card */}
-        <div className="card">
-          <div className="card__header">
-            <span className="card__title">Live Path Verification</span>
-            <span className="card__icon">👁️</span>
-          </div>
-
-          <form className="verify-form" onSubmit={handleVerify}>
-            <select
-              className="verify-form__input"
-              value={symbol}
-              onChange={e => setSymbol(e.target.value)}
-              id="symbol-select"
-            >
-              {SYMBOLS.map(s => (
-                <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
-              ))}
-            </select>
-            <input
-              className="verify-form__input"
-              type="number"
-              placeholder="Target Block Index"
-              value={block}
-              onChange={e => setBlock(e.target.value)}
-              id="block-input"
-            />
-            <select
-              className="verify-form__input"
-              value={chain}
-              onChange={e => setChain(e.target.value)}
-              id="chain-select"
-            >
-              <option value="sepolia">SEPOLIA // ETH_L2</option>
-              <option value="ethereum">ETHEREUM // LAYER_0</option>
-              <option value="base">BASE // OP_STACK</option>
-              <option value="arbitrum">ARBITRUM // ROLLUP</option>
-              <option value="optimism">OPTIMISM // ROLLUP</option>
-            </select>
-            <button
-              className="verify-form__btn"
-              type="submit"
-              disabled={loading || !block}
-              id="verify-btn"
-            >
-              {loading ? 'SYNCING PATH...' : 'VERIFY SYMBOL'}
-            </button>
-          </form>
-
-          {verifyResult && (
-            <div className={`result ${verifyResult.success !== false ? 'result--success' : 'result--error'}`}>
-              <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem', marginBottom: '0.5rem' }}>LOG_LEVEL: SYSTEM_OUTPUT</div>
-              {JSON.stringify(verifyResult, null, 2)}
-            </div>
-          )}
-          <p className="card__label" style={{ marginTop: '1rem' }}>
-            CLI equivalent: <code style={{ fontFamily: 'var(--font-data)', color: 'var(--bismuth-violet)' }}>
-              sods verify {symbol} --block {block || '...'} --chain {chain}
-            </code>
+          <h1 className="header__title">Behavioral<br/>Verification</h1>
+          <p className="header__subtitle" style={{ fontSize: '0.8rem', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            A-Class Causal Intelligence // Trustless Merkle Verification
           </p>
-        </div>
+        </header>
 
-        {/* Symbols Table */}
-        <div className="card">
-          <div className="card__header">
-            <span className="card__title">Symbol Dictionary</span>
-            <span className="card__icon">📖</span>
+        {/* Floating Metrics */}
+        <section className="grid grid--4 animate-in" style={{ animationDelay: '0.2s' }}>
+          <div className="card">
+            <HUDDecor />
+            <div className="card__header">
+              <span className="card__title">Neural Link</span>
+              <span className="card__icon">📡</span>
+            </div>
+            <div className={`status ${statusClass}`}>
+              <span className="status__dot"></span>
+              {statusLabel}
+            </div>
+            <p className="card__label" style={{ opacity: 0.4 }}>Sync Latency: 4ms</p>
           </div>
-          <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
-            <table className="symbols-table">
-              <thead>
-                <tr>
-                  <th>Symbol</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
+
+          <div className="card">
+            <HUDDecor />
+            <div className="card__header">
+              <span className="card__title">Time Since Boot</span>
+              <span className="card__icon">⏱️</span>
+            </div>
+            <div className="card__value" style={{ fontSize: '2.5rem' }}>{formatUptime(uptime)}</div>
+            <p className="card__label" style={{ opacity: 0.4 }}>Persistence: Stable</p>
+          </div>
+
+          <div className="card">
+            <HUDDecor />
+            <div className="card__header">
+              <span className="card__title">Active Pathways</span>
+              <span className="card__icon">🧬</span>
+            </div>
+            <div className="card__value">{SYMBOLS.length}</div>
+            <p className="card__label" style={{ opacity: 0.4 }}>Sub-neural processors active</p>
+          </div>
+
+          <div className="card">
+            <HUDDecor />
+            <div className="card__header">
+              <span className="card__title">Integrity Mode</span>
+              <span className="card__icon">🛡️</span>
+            </div>
+            <div className="card__value" style={{ fontSize: '1.4rem', color: 'var(--bismuth-g)' }}>CRYSTALLINE</div>
+            <p className="card__label" style={{ opacity: 0.4 }}>Secure Storage Proof</p>
+          </div>
+        </section>
+
+        {/* Core HUD Operations */}
+        <div className="grid grid--2 animate-in" style={{ animationDelay: '0.4s' }}>
+          {/* Action Hub */}
+          <div className="card" style={{ gridRow: 'span 2' }}>
+            <HUDDecor />
+            <div className="card__header">
+              <span className="card__title">Path Verification Hub</span>
+              <span className="card__icon">👁️</span>
+            </div>
+
+            <form className="verify-form" onSubmit={handleVerify}>
+              <select
+                className="verify-form__input"
+                value={symbol}
+                onChange={e => setSymbol(e.target.value)}
+                id="symbol-select"
+              >
                 {SYMBOLS.map(s => (
-                  <tr key={s.code}>
-                    <td className="sym">{s.code}</td>
-                    <td>{s.name}</td>
-                  </tr>
+                  <option key={s.code} value={s.code} style={{ background: '#000' }}>{s.code} — {s.name}</option>
                 ))}
-              </tbody>
-            </table>
+              </select>
+              <input
+                className="verify-form__input"
+                type="number"
+                placeholder="Target Block Height"
+                value={block}
+                onChange={e => setBlock(e.target.value)}
+                id="block-input"
+              />
+              <select
+                className="verify-form__input"
+                value={chain}
+                onChange={e => setChain(e.target.value)}
+                id="chain-select"
+              >
+                <option value="sepolia" style={{ background: '#000' }}>SEPOLIA_L2 // DEVNET</option>
+                <option value="ethereum" style={{ background: '#000' }}>ETHEREUM_L1 // MAINNET</option>
+                <option value="base" style={{ background: '#000' }}>BASE // ROLLUP</option>
+                <option value="arbitrum" style={{ background: '#000' }}>ARBITRUM // ROLLUP</option>
+                <option value="optimism" style={{ background: '#000' }}>OPTIMISM // ROLLUP</option>
+              </select>
+              <button
+                className="verify-form__btn"
+                type="submit"
+                disabled={loading || !block}
+                id="verify-btn"
+              >
+                {loading ? 'PATH_SYNCHRONIZING...' : 'EXECUTE VERIFICATION'}
+              </button>
+            </form>
+
+            {verifyResult && (
+              <div className={`result ${verifyResult.success !== false ? 'result--success' : 'result--error'}`}>
+                <div style={{ fontSize: '0.6rem', opacity: 0.5, marginBottom: '1rem' }}>SYSTEM_LOG :: VERIFIED_TRUE</div>
+                {JSON.stringify(verifyResult, null, 2)}
+              </div>
+            )}
+            
+            <p className="card__label" style={{ marginTop: '2rem', fontFamily: 'var(--font-data)', fontSize: '0.65rem' }}>
+              $ sods verify --path {symbol} --anchor {block || '0x0'} --net {chain}
+            </p>
+          </div>
+
+          {/* Dictionary Hub */}
+          <div className="card">
+            <HUDDecor />
+            <div className="card__header">
+              <span className="card__title">Symbol Reference Archive</span>
+              <span className="card__icon">📖</span>
+            </div>
+            <div style={{ maxHeight: '420px', overflowY: 'auto', paddingRight: '1rem' }}>
+              <table className="symbols-table">
+                <thead>
+                  <tr>
+                    <th>SIGIL</th>
+                    <th>DEFINITION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {SYMBOLS.map(s => (
+                    <tr key={s.code}>
+                      <td className="sym">{s.code}</td>
+                      <td style={{ fontSize: '0.8rem', opacity: 0.8 }}>{s.name}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100px' }}>
+            <HUDDecor />
+            <div style={{ textAlign: 'center' }}>
+              <div className="header__badge" style={{ margin: 0 }}>ERA_2126_COMPLIANT</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Footer */}
-      <footer className="footer">
-        SODS Protocol — Alpha (Research Prototype) · CC0 1.0 Universal ·{' '}
-        <a href="https://github.com/logiccrafterdz/SODS-Protocol" target="_blank" rel="noopener noreferrer">
-          GitHub
-        </a>
-      </footer>
+        {/* Footer */}
+        <footer className="footer animate-in" style={{ animationDelay: '0.6s' }}>
+          SODS-X // NEURAL_OVERLAY · CC0 1.0 UNIVERSAL ·{' '}
+          <a href="https://github.com/logiccrafterdz/SODS-Protocol" target="_blank" rel="noopener noreferrer">
+            PROJECT_SOURCE
+          </a>
+        </footer>
+      </div>
     </div>
   )
 }
