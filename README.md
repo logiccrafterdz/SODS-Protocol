@@ -68,13 +68,13 @@ npx sods-cli verify "Sandwich" --block 20000000 --chain ethereum
 
 ## Platform Support
 
-| Platform | CLI | Docker | npm Wrapper |
-|----------|-----|--------|-------------|
-| Linux    | ✅  | ✅     | ✅          |
-| macOS    | ✅  | ✅     | ✅          |
-| Windows  | ✅  | ✅     | ✅ (WSL2)   |
+| Platform | CLI | Web Dashboard | Docker | npm Wrapper |
+|----------|-----|---------------|--------|-------------|
+| Linux    | ✅  | ✅            | ✅     | ✅          |
+| macOS    | ✅  | ✅            | ✅     | ✅          |
+| Windows  | ✅  | ✅            | ✅     | ✅          |
 
-**Note**: npm wrapper requires Docker to be installed.
+> **Note on Windows**: The CLI daemon mode is fully natively supported on Windows following the deprecation of Unix-only `daemonize` modules in favor of pure cross-platform background processes.
 
 ---
 
@@ -106,6 +106,31 @@ We've built a minimal PoC that verifies behavioral patterns in Sepolia blocks �
 | `CoWTrade`| CoW Swap Intent    | 202 bytes  | < 1 ms            |
 
 **[See the full PoC results and code](poc/)**
+
+---
+
+## Graphical Interface: SODS-X Neural Overlay
+**(Vision 2126 Edition)**
+
+While the SODS Protocol is primarily a terminal-first infrastructure, it includes a state-of-the-art Web Dashboard built with React and Vite. Known as the **Neural Overlay**, this dashboard translates raw on-chain behavioral verification into an immersive, volumetric sci-fi visual experience.
+
+### Features of SODS-X
+- **Bismuth Crystalline Aesthetic**: Advanced holographic CSS designs featuring chromatic aberration and multi-layered faceted panels.
+- **Local Proxy Architecture**: Uses a local Node.js `server.js` proxy to securely relay commands to the native Rust `sods-cli` without exposing your system.
+- **Real-Time Verification**: Submit Merkle verification commands directly from the dashboard and view detailed "Synaptic" logs.
+
+### Running the Web Dashboard
+```bash
+# 1. Start the local CLI API daemon 
+cargo run -p sods-cli --bin sods -- daemon start
+
+# 2. Start the Node.js Proxy Server
+cd sods-web
+node server.js
+
+# 3. Start the Vite React Frontend
+npm run dev
+```
 
 ---
 
@@ -415,6 +440,12 @@ sods-protocol/
 │           ├── daemon.rs
 │           ├── export_proof.rs
 │           └── registry.rs
+├── sods-web/           <- Graphical Interface: SODS-X Neural Overlay (React/Vite)
+│   ├── package.json
+│   ├── server.js       <- Local API Proxy to sods-cli
+│   └── src/
+│       ├── App.jsx     <- Extreme HUD Crystalline Components
+│       └── App.css     <- Bismuth Iridescent Styling
 ├── contracts/          <- Smart Contracts (Solidity)
 │   └── SODSVerifier.sol
 └── poc/                <- Python PoC
