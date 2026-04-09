@@ -150,8 +150,8 @@ The symbolic core for Behavioral Merkle Trees. Handles:
 use sods_core::{SymbolDictionary, BehavioralMerkleTree, BehavioralSymbol};
 
 let symbols = vec![
-    BehavioralSymbol::new("Tf", 0, vec![]),
-    BehavioralSymbol::new("Dep", 1, vec![]),
+    BehavioralSymbol::new("Tf", 0),
+    BehavioralSymbol::new("Dep", 1),
 ];
 
 let bmt = BehavioralMerkleTree::new(symbols);
