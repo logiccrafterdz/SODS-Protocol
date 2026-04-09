@@ -1,4 +1,4 @@
-use sha2::{Digest, Sha256};
+use tiny_keccak::Hasher;
 use sods_core::{BehavioralMerkleTree, BehavioralSymbol};
 
 #[test]
@@ -6,8 +6,10 @@ fn test_empty_block_correctness() {
     let symbols: Vec<BehavioralSymbol> = vec![];
     let bmt = BehavioralMerkleTree::new(symbols);
 
-    // Empty tree root MUST be SHA256(b"")
-    let expected: [u8; 32] = Sha256::digest([]).into();
+    // Empty tree root MUST be Keccak256(b"")
+    let hasher = tiny_keccak::Keccak::v256();
+    let mut expected = [0u8; 32];
+    hasher.finalize(&mut expected);
     assert_eq!(bmt.root(), expected);
 }
 

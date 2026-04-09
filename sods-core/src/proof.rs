@@ -4,7 +4,7 @@
 //! proof that a specific symbol exists in a Behavioral Merkle Tree.
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use tiny_keccak::Hasher;
 
 use crate::error::{Result, SodsError};
 
@@ -56,7 +56,7 @@ pub struct Proof {
     /// The log index of the symbol
     pub log_index: u32,
 
-    /// The leaf hash (SHA256 of symbol + metadata)
+    /// The leaf hash (Keccak256 of symbol + log_index)
     pub leaf_hash: [u8; 32],
 
     /// Sibling hashes from leaf to root
@@ -94,19 +94,21 @@ impl Proof {
         let mut current = self.leaf_hash;
 
         for (sibling, is_right) in self.path.iter().zip(self.directions.iter()) {
-            let mut hasher = Sha256::new();
+            let mut hasher = tiny_keccak::Keccak::v256();
 
             if *is_right {
                 // Sibling is on right: H(current || sibling)
-                hasher.update(current);
+                hasher.update(&current);
                 hasher.update(sibling);
             } else {
                 // Sibling is on left: H(sibling || current)
                 hasher.update(sibling);
-                hasher.update(current);
+                hasher.update(&current);
             }
 
-            current = hasher.finalize().into();
+            let mut result = [0u8; 32];
+            hasher.finalize(&mut result);
+            current = result;
         }
 
         current == *expected_root
@@ -267,7 +269,7 @@ impl CausalProof {
             // Case A: EOA (Nonce increases by 1)
             let nonce_ok = sym.nonce == prev_nonce + 1;
 
-            // Case B: Contrcat (Same Nonce, Sequence increases)
+            // Case B: Contract (Same Nonce, Sequence increases)
             let seq_ok = sym.nonce == prev_nonce && sym.call_sequence > prev_seq;
 
             if !nonce_ok && !seq_ok {
@@ -294,7 +296,7 @@ mod tests {
             BehavioralSymbol::new("Tf", 0),
             BehavioralSymbol::new("Sw", 1),
         ];
-        let bmt = BehavioralMerkleTree::new_keccak(syms.clone());
+        let bmt = BehavioralMerkleTree::new(syms.clone());
         let matched = vec![&syms[0], &syms[1]];
 
         let proof = bmt

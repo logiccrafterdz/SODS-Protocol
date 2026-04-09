@@ -8,7 +8,7 @@ fn test_onchain_proof_has_is_left_path() {
         BehavioralSymbol::new("Tf", 0),
         BehavioralSymbol::new("Sw", 1),
     ];
-    let bmt = BehavioralMerkleTree::new_keccak(symbols.clone());
+    let bmt = BehavioralMerkleTree::new(symbols.clone());
     let matched = vec![&symbols[0]];
 
     let proof = bmt
@@ -36,7 +36,7 @@ fn test_directions_match_proof_struct() {
         BehavioralSymbol::new("Dep", 2),
         BehavioralSymbol::new("Wdw", 3),
     ];
-    let bmt = BehavioralMerkleTree::new_keccak(symbols.clone());
+    let bmt = BehavioralMerkleTree::new(symbols.clone());
 
     // Generate on-chain proof
     let matched = vec![&symbols[1]]; // Sw at index 1
@@ -62,7 +62,7 @@ fn test_directions_match_proof_struct() {
 #[test]
 fn test_single_leaf_tree_no_path() {
     let symbols = vec![BehavioralSymbol::new("Tf", 0)];
-    let bmt = BehavioralMerkleTree::new_keccak(symbols.clone());
+    let bmt = BehavioralMerkleTree::new(symbols.clone());
     let matched = vec![&symbols[0]];
 
     let proof = bmt
@@ -81,7 +81,7 @@ fn test_calldata_includes_is_left_path() {
         BehavioralSymbol::new("Sw", 1),
         BehavioralSymbol::new("Dep", 2),
     ];
-    let bmt = BehavioralMerkleTree::new_keccak(syms.clone());
+    let bmt = BehavioralMerkleTree::new(syms.clone());
     let matched = vec![&syms[0]];
 
     let proof = bmt

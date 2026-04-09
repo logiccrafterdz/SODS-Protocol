@@ -13,7 +13,7 @@ fn test_full_vs_incremental_root_parity() {
     let root_full = bmt_full.root();
 
     // Mode 2: Incremental Construction (Filtered set)
-    let bmt_inc = BehavioralMerkleTree::build_incremental(symbols);
+    let bmt_inc = BehavioralMerkleTree::from_filtered(symbols);
     let root_inc = bmt_inc.root();
 
     assert_eq!(

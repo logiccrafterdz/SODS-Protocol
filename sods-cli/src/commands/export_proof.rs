@@ -89,8 +89,8 @@ pub async fn run(args: ExportProofArgs) -> i32 {
     };
 
     if let Some(matched) = pattern.matches(&symbols, None) {
-        // Build Keccak BMT
-        let bmt = BehavioralMerkleTree::new_keccak(symbols.clone());
+        // Build Keccak BMT (new() uses Keccak256 by default)
+        let bmt = BehavioralMerkleTree::new(symbols.clone());
 
         let chain_id = 11155111; // Default to Sepolia
 

@@ -4,6 +4,7 @@
 //! in on-chain blocks using the SODS protocol.
 
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -80,7 +81,7 @@ pub struct BlockVerifier {
     /// Local contract registry for persistent deployer mapping.
     registry: ContractRegistry,
     /// Cache for pattern verification results (block_number, pattern -> result)
-    pattern_cache: Arc<Mutex<HashMap<(u64, String), VerificationResult>>>,
+    pattern_cache: Arc<Mutex<lru::LruCache<(u64, String), VerificationResult>>>,
 }
 
 impl BlockVerifier {
@@ -117,7 +118,7 @@ impl BlockVerifier {
             verification_mode: crate::header_anchor::VerificationMode::Trustless,
             deployer_cache: Arc::new(Mutex::new(HashMap::new())),
             registry: ContractRegistry::load_local().unwrap_or_else(|_| ContractRegistry::new()),
-            pattern_cache: Arc::new(Mutex::new(HashMap::new())),
+            pattern_cache: Arc::new(Mutex::new(lru::LruCache::new(NonZeroUsize::new(500).unwrap()))),
         })
     }
 
@@ -132,7 +133,7 @@ impl BlockVerifier {
             verification_mode: crate::header_anchor::VerificationMode::ZeroRpc,
             deployer_cache: Arc::new(Mutex::new(HashMap::new())),
             registry: ContractRegistry::load_local().unwrap_or_else(|_| ContractRegistry::new()),
-            pattern_cache: Arc::new(Mutex::new(HashMap::new())),
+            pattern_cache: Arc::new(Mutex::new(lru::LruCache::new(NonZeroUsize::new(500).unwrap()))),
         })
     }
 
@@ -147,7 +148,7 @@ impl BlockVerifier {
             verification_mode: crate::header_anchor::VerificationMode::RpcOnly,
             deployer_cache: Arc::new(Mutex::new(HashMap::new())),
             registry: ContractRegistry::load_local().unwrap_or_else(|_| ContractRegistry::new()),
-            pattern_cache: Arc::new(Mutex::new(HashMap::new())),
+            pattern_cache: Arc::new(Mutex::new(lru::LruCache::new(NonZeroUsize::new(500).unwrap()))),
         })
     }
 
@@ -441,7 +442,7 @@ impl BlockVerifier {
 
         // Check cache first
         {
-            let cache = self.pattern_cache.lock().unwrap();
+            let mut cache = self.pattern_cache.lock().unwrap();
             if let Some(cached) = cache.get(&(block_number, pattern_str.to_string())) {
                 return Ok(cached.clone());
             }
@@ -471,7 +472,7 @@ impl BlockVerifier {
         let symbols = self.parse_logs_to_symbols(&logs, &tx_map);
 
         // 4. Build Incremental BMT over filtered symbols
-        let bmt = BehavioralMerkleTree::build_incremental(symbols.clone());
+        let bmt = BehavioralMerkleTree::from_filtered(symbols.clone());
         let root = bmt.root();
 
         // 5. Match Pattern
@@ -512,7 +513,7 @@ impl BlockVerifier {
         // Cache result
         {
             let mut cache = self.pattern_cache.lock().unwrap();
-            cache.insert((block_number, pattern_str.to_string()), result.clone());
+            cache.put((block_number, pattern_str.to_string()), result.clone());
         }
 
         Ok(result)

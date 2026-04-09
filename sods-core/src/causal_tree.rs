@@ -5,7 +5,7 @@
 //! causal order within the same context (EOA or Contract Trace), rather than just appearing
 //! in the block in that order.
 
-use sha2::{Digest, Sha256};
+use tiny_keccak::Hasher;
 
 use crate::proof::Proof;
 use crate::symbol::BehavioralSymbol;
@@ -34,7 +34,12 @@ impl CausalMerkleTree {
         });
 
         if symbols.is_empty() {
-            let root = Sha256::digest([]).into();
+            let root = {
+                let hasher = tiny_keccak::Keccak::v256();
+                let mut result = [0u8; 32];
+                hasher.finalize(&mut result);
+                result
+            };
             return Self {
                 symbols,
                 layers: vec![],
@@ -58,7 +63,12 @@ impl CausalMerkleTree {
     /// Build the Merkle tree layers from leaves to root.
     fn build_tree(leaves: Vec<[u8; 32]>) -> (Vec<Vec<[u8; 32]>>, [u8; 32]) {
         if leaves.is_empty() {
-            return (vec![], Sha256::digest([]).into());
+            return (vec![], {
+                let hasher = tiny_keccak::Keccak::v256();
+                let mut result = [0u8; 32];
+                hasher.finalize(&mut result);
+                result
+            });
         }
 
         if leaves.len() == 1 {
@@ -84,10 +94,12 @@ impl CausalMerkleTree {
                     left
                 };
 
-                let mut hasher = Sha256::new();
-                hasher.update(left);
-                hasher.update(right);
-                next_layer.push(hasher.finalize().into());
+                let mut hasher = tiny_keccak::Keccak::v256();
+                hasher.update(&left);
+                hasher.update(&right);
+                let mut parent = [0u8; 32];
+                hasher.finalize(&mut parent);
+                next_layer.push(parent);
             }
 
             layers.push(next_layer);

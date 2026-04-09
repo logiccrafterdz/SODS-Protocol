@@ -169,36 +169,13 @@ impl BehavioralSymbol {
         &self.metadata
     }
 
-    /// Compute the leaf hash for this symbol.
+    /// Compute the leaf hash for this symbol using Keccak256 (EVM-compatible).
     ///
-    /// In minimal mode: `SHA256(symbol_bytes)`
-    /// In full mode: `SHA256(symbol_bytes || metadata || causality)`
+    /// Formula: `keccak256(abi.encodePacked(symbol, uint32(log_index)))`
+    ///
+    /// This matches the leaf hash computation in `SODSVerifier.sol`, ensuring
+    /// that proofs generated in Rust can be verified on-chain.
     pub fn leaf_hash(&self) -> [u8; 32] {
-        use sha2::{Digest, Sha256};
-
-        let mut hasher = Sha256::new();
-        hasher.update(self.symbol.as_bytes());
-        hasher.update(self.log_index.to_be_bytes());
-
-        // Include metadata if present (full mode)
-        if !self.metadata.is_empty() {
-            hasher.update(&self.metadata);
-        }
-
-        // Include causality fields if non-zero (to affect hash)
-        if self.tx_hash != H256::zero() {
-            hasher.update(self.tx_hash.as_bytes());
-            hasher.update(self.nonce.to_be_bytes());
-            hasher.update(self.call_sequence.to_be_bytes());
-        }
-
-        hasher.finalize().into()
-    }
-
-    /// Compute the leaf hash for this symbol using Keccak256 (EVM compatible).
-    ///
-    /// Formula: `keccak256(abi.encodePacked(symbol, log_index))`
-    pub fn leaf_hash_keccak(&self) -> [u8; 32] {
         use tiny_keccak::{Hasher, Keccak};
 
         let mut hasher = Keccak::v256();

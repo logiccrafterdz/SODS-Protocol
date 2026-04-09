@@ -2,28 +2,36 @@
 //!
 //! This module provides the `BehavioralMerkleTree` which constructs a binary
 //! Merkle tree over sorted behavioral symbols and supports proof generation.
+//!
+//! All hashing uses **Keccak256** for EVM compatibility with `SODSVerifier.sol`.
 
-use sha2::{Digest, Sha256};
 use tiny_keccak::Hasher;
 
 use crate::proof::Proof;
 use crate::symbol::BehavioralSymbol;
 
+/// Compute the Keccak256 hash of empty input.
+fn keccak256_empty() -> [u8; 32] {
+    let hasher = tiny_keccak::Keccak::v256();
+    let mut root = [0u8; 32];
+    hasher.finalize(&mut root);
+    root
+}
+
 /// A binary Merkle tree over behavioral symbols.
 ///
 /// **Note**: This is a Behavioral Merkle Tree (BMT), which sorts symbols by log index.
-/// This is NOT a Causal Merkle Tree (CMT). CMT is planned for v8.0 and will support
-/// actor-based causal ordering.
+/// This is NOT a Causal Merkle Tree (CMT). See `sods-causal` for actor-based ordering.
 ///
 /// The tree is constructed from a sorted list of `BehavioralSymbol` instances.
 /// Symbols are automatically sorted by canonical ordering (log_index, then symbol)
 /// before tree construction.
 ///
-/// # Hashing Rules (per RFC §4.1)
+/// # Hashing Rules
 ///
-/// - **Leaf**: `SHA256(symbol_bytes || metadata)` (minimal mode uses symbol only)
-/// - **Internal node**: `SHA256(left_hash || right_hash)`
-/// - **Empty tree**: `SHA256(b"")` = `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+/// - **Leaf**: `Keccak256(symbol_bytes || BigEndian_u32(log_index))`
+/// - **Internal node**: `Keccak256(left_hash || right_hash)`
+/// - **Empty tree**: `Keccak256(b"")` = `c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470`
 /// - **Odd leaves**: last node is duplicated
 ///
 /// # Example
@@ -55,6 +63,7 @@ pub struct BehavioralMerkleTree {
 impl BehavioralMerkleTree {
     /// Build a new Behavioral Merkle Tree from a list of symbols.
     ///
+    /// Uses Keccak256 hashing for EVM compatibility.
     /// Symbols are sorted by canonical ordering before tree construction.
     ///
     /// # Arguments
@@ -65,8 +74,8 @@ impl BehavioralMerkleTree {
         symbols.sort();
 
         if symbols.is_empty() {
-            // Empty tree: root = SHA256(b"")
-            let root = Sha256::digest([]).into();
+            // Empty tree: root = Keccak256(b"")
+            let root = keccak256_empty();
             return Self {
                 symbols,
                 layers: vec![],
@@ -74,7 +83,7 @@ impl BehavioralMerkleTree {
             };
         }
 
-        // Compute leaf hashes
+        // Compute leaf hashes (Keccak256)
         let leaves: Vec<[u8; 32]> = symbols.iter().map(|s| s.leaf_hash()).collect();
 
         // Build tree
@@ -87,20 +96,19 @@ impl BehavioralMerkleTree {
         }
     }
 
-    /// Build an incremental Behavioral Merkle Tree from a pre-filtered list of symbols.
+    /// Build a Behavioral Merkle Tree from a pre-filtered subset of symbols.
     ///
-    /// This is optimized for pattern matching where only a subset of block logs are fetched.
-    /// The resulting tree is smaller and its root commits ONLY to the provided symbols.
-    pub fn build_incremental(symbols: Vec<BehavioralSymbol>) -> Self {
-        // Since symbols are already filtered, we just use the existing constructor logic.
-        // The term "incremental" here denotes that it builds a partial view of the block's behavior.
+    /// Use this when you have already filtered symbols (e.g., via topic-based
+    /// RPC queries) and want a BMT over just the matched subset.
+    /// The resulting tree root commits ONLY to the provided symbols.
+    pub fn from_filtered(symbols: Vec<BehavioralSymbol>) -> Self {
         Self::new(symbols)
     }
 
-    /// Build the Merkle tree layers from leaves to root.
+    /// Build the Merkle tree layers from leaves to root using Keccak256.
     fn build_tree(leaves: Vec<[u8; 32]>) -> (Vec<Vec<[u8; 32]>>, [u8; 32]) {
         if leaves.is_empty() {
-            return (vec![], Sha256::digest([]).into());
+            return (vec![], keccak256_empty());
         }
 
         if leaves.len() == 1 {
@@ -128,78 +136,7 @@ impl BehavioralMerkleTree {
                     left
                 };
 
-                // Parent = H(left || right)
-                let mut hasher = Sha256::new();
-                hasher.update(left);
-                hasher.update(right);
-                let parent: [u8; 32] = hasher.finalize().into();
-
-                next_layer.push(parent);
-            }
-
-            layers.push(next_layer);
-        }
-
-        let root = layers.last().unwrap()[0];
-        (layers, root)
-    }
-
-    /// Build a new Behavioral Merkle Tree using Keccak256 hashing.
-    pub fn new_keccak(mut symbols: Vec<BehavioralSymbol>) -> Self {
-        symbols.sort();
-
-        if symbols.is_empty() {
-            let hasher = tiny_keccak::Keccak::v256();
-            let mut root = [0u8; 32];
-            hasher.finalize(&mut root);
-            return Self {
-                symbols,
-                layers: vec![],
-                root,
-            };
-        }
-
-        let leaves: Vec<[u8; 32]> = symbols.iter().map(|s| s.leaf_hash_keccak()).collect();
-        let (layers, root) = Self::build_tree_keccak(leaves);
-
-        Self {
-            symbols,
-            layers,
-            root,
-        }
-    }
-
-    /// Build the Merkle tree layers using Keccak256.
-    fn build_tree_keccak(leaves: Vec<[u8; 32]>) -> (Vec<Vec<[u8; 32]>>, [u8; 32]) {
-        if leaves.is_empty() {
-            let hasher = tiny_keccak::Keccak::v256();
-            let mut root = [0u8; 32];
-            hasher.finalize(&mut root);
-            return (vec![], root);
-        }
-
-        if leaves.len() == 1 {
-            return (vec![leaves.clone()], leaves[0]);
-        }
-
-        let mut layers = vec![leaves];
-
-        loop {
-            let current = layers.last().unwrap();
-            if current.len() == 1 {
-                break;
-            }
-
-            let mut next_layer = Vec::with_capacity((current.len() + 1) / 2);
-
-            for i in (0..current.len()).step_by(2) {
-                let left = current[i];
-                let right = if i + 1 < current.len() {
-                    current[i + 1]
-                } else {
-                    left
-                };
-
+                // Parent = Keccak256(left || right)
                 let mut hasher = tiny_keccak::Keccak::v256();
                 hasher.update(&left);
                 hasher.update(&right);
@@ -339,7 +276,7 @@ impl BehavioralMerkleTree {
         for s in matched_symbols {
             symbols.push(s.symbol().to_string());
             log_indices.push(s.log_index());
-            leaf_hashes.push(s.leaf_hash_keccak());
+            leaf_hashes.push(s.leaf_hash());
         }
 
         // For simplicity in the first version, we'll provide the proof for the FIRST symbol
@@ -375,8 +312,8 @@ mod tests {
     fn test_empty_tree() {
         let bmt = BehavioralMerkleTree::new(vec![]);
 
-        // Empty tree root = SHA256(b"")
-        let expected: [u8; 32] = Sha256::digest([]).into();
+        // Empty tree root = Keccak256(b"")
+        let expected = keccak256_empty();
         assert_eq!(bmt.root(), expected);
         assert!(bmt.is_empty());
     }
@@ -400,14 +337,15 @@ mod tests {
         ];
         let bmt = BehavioralMerkleTree::new(symbols);
 
-        // Root = H(leaf0 || leaf1)
+        // Root = Keccak256(leaf0 || leaf1)
         let leaf0 = BehavioralSymbol::new("Tf", 0).leaf_hash();
         let leaf1 = BehavioralSymbol::new("Dep", 1).leaf_hash();
 
-        let mut hasher = Sha256::new();
-        hasher.update(leaf0);
-        hasher.update(leaf1);
-        let expected: [u8; 32] = hasher.finalize().into();
+        let mut hasher = tiny_keccak::Keccak::v256();
+        hasher.update(&leaf0);
+        hasher.update(&leaf1);
+        let mut expected = [0u8; 32];
+        hasher.finalize(&mut expected);
 
         assert_eq!(bmt.root(), expected);
     }
@@ -465,5 +403,37 @@ mod tests {
         assert!(bmt.generate_proof("Tf", 0).unwrap().verify(&bmt.root()));
         assert!(bmt.generate_proof("Dep", 1).unwrap().verify(&bmt.root()));
         assert!(bmt.generate_proof("Wdw", 2).unwrap().verify(&bmt.root()));
+    }
+
+    #[test]
+    fn test_leaf_hash_matches_solidity_abi_encode_packed() {
+        // Verify that our leaf_hash matches keccak256(abi.encodePacked(symbol, logIndex))
+        let sym = BehavioralSymbol::new("Tf", 42);
+        let rust_hash = sym.leaf_hash();
+
+        // Manually compute keccak256(abi.encodePacked("Tf", uint32(42)))
+        let mut input = Vec::new();
+        input.extend_from_slice(b"Tf");
+        input.extend_from_slice(&42u32.to_be_bytes());
+
+        let mut hasher = tiny_keccak::Keccak::v256();
+        hasher.update(&input);
+        let mut expected = [0u8; 32];
+        hasher.finalize(&mut expected);
+
+        assert_eq!(rust_hash, expected, "Leaf hash must match Solidity ABI encoding");
+    }
+
+    #[test]
+    fn test_from_filtered_equals_new() {
+        let symbols = vec![
+            BehavioralSymbol::new("Tf", 0),
+            BehavioralSymbol::new("Dep", 1),
+        ];
+
+        let bmt_new = BehavioralMerkleTree::new(symbols.clone());
+        let bmt_filtered = BehavioralMerkleTree::from_filtered(symbols);
+
+        assert_eq!(bmt_new.root(), bmt_filtered.root());
     }
 }

@@ -53,7 +53,7 @@ fn test_incremental_bmt_root_consistency() {
     ];
 
     let bmt_full = BehavioralMerkleTree::new(symbols.clone());
-    let bmt_inc = BehavioralMerkleTree::build_incremental(symbols);
+    let bmt_inc = BehavioralMerkleTree::from_filtered(symbols);
 
     assert_eq!(bmt_full.root(), bmt_inc.root());
     println!("✅ Incremental Root Consistency Verified.");
