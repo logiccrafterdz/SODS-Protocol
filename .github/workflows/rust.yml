@@ -12,25 +12,36 @@ env:
 jobs:
   build_and_test:
     name: Build, Lint, and Test
-    runs-on: ubuntu-latest
-    
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Rust
       uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy, rustfmt
-        
+
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2
-      
+
     - name: Check Formatting
       run: cargo fmt -- --check
-      
-    - name: Run Clippy
-      # We allow warnings for now, but in the future we can use -D warnings
-      run: cargo clippy --workspace --exclude sods-zk -- -W warnings
-      
-    - name: Run Tests
-      run: cargo test --workspace --exclude sods-zk
+
+    - name: Run Clippy (Zero Tolerance)
+      run: cargo clippy --workspace -- -D warnings
+
+    - name: Run Unit Tests
+      run: cargo test --workspace --lib
+
+    - name: Run Integration Tests
+      run: cargo test --workspace --tests
+
+    - name: Keccak-Solidity Parity Check
+      run: cargo test -p sods-core test_leaf_hash_matches_solidity
+
+    - name: Cross-Layer Consistency Check
+      run: cargo test -p sods-verifier --test consistency
