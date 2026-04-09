@@ -1,6 +1,6 @@
 # SODS Protocol: Trustless Behavioral Verification
 
-[![License: CC0-1.0](https://licensebuttons.net/l/zero/1.0/80x15.png)](http://creativecommons.org/publicdomain/zero/1.0/)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 [![npm version](https://img.shields.io/npm/v/sods-cli.svg)](https://www.npmjs.com/package/sods-cli)
 [![Docker](https://img.shields.io/badge/docker-stable-blue.svg)](https://www.docker.com/)
 
@@ -384,7 +384,7 @@ sods-protocol/
 ├── README.md           <- You are here
 ├── GETTING_STARTED.md  <- Usage guide
 ├── ARCHITECTURE.md     <- Trust model and data flow
-├── LICENSE             <- CC0 1.0
+├── LICENSE             <- MIT OR Apache-2.0
 ├── spec/
 │   └── SODS-RFC-v0.2.md
 ├── sods-core/          <- Layer 0: Symbolic Core (Rust)
@@ -456,12 +456,11 @@ sods-protocol/
 
 ## Disclaimer
 
-This is a research proposal.
-No security guarantees are claimed.
-Do not use in production systems.
+This is pre-production software (v0.2.0-beta).
+No security guarantees are claimed. Not yet audited.
 
 ---
 
 ## License
 
-This project is released into the public domain under the [CC0 1.0 Universal License](LICENSE).
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT License](LICENSE-MIT), at your option.

@@ -74,4 +74,4 @@ cargo doc --open    # View documentation
 
 ## License
 
-[CC0 1.0 Universal](LICENSE) — Public Domain
+Licensed under either of [Apache License, Version 2.0](../LICENSE-APACHE) or [MIT License](../LICENSE-MIT), at your option.
