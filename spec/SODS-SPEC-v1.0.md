@@ -80,21 +80,26 @@ The user interface. Supports:
 ## 5. Formal Specifications
 
 ### 5.1. BMT Hashing Rule
-The BMT uses **SHA-256**. Leaf construction includes causal context.
+The BMT uses **Keccak256** for EVM compatibility with `SODSVerifier.sol`.
+
+> **Breaking Change (v0.2.0)**: Prior versions used SHA-256. All BMT roots
+> generated before v0.2.0 are incompatible with the current implementation.
 
 ```
-LeafHash = SHA256(
+LeafHash = Keccak256(
     Symbol_Code (UTF-8) ||
-    BigEndian_u64(Nonce) ||
-    BigEndian_u32(LogIndex) ||
-    TxHash (32 bytes) ||
-    FromAddress (20 bytes)
+    BigEndian_u32(LogIndex)
 )
 ```
 
 Internal nodes are standard Merkle parents:
 ```
-InternalHash = SHA256(LeftHash || RightHash)
+InternalHash = Keccak256(LeftHash || RightHash)
+```
+
+Empty tree root:
+```
+EmptyRoot = Keccak256(b"") = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
 ```
 
 ### 5.2. Pattern DSL Grammar
