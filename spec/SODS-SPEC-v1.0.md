@@ -172,9 +172,10 @@ graph TD
 
 ## 8. Extensions & Future Work
 
-1.  **zk-Behavioral Proofs**: Wrapping SODS verification in a SNARK to prove behavioral compliance on-chain (L2 validation).
-2.  **Cross-Chain Oracles**: Using P2P consensus to verify behavior on Chain A and report it to Chain B.
-3.  **AI Pattern Discovery**: ML models analyzing BMT structures to find anomaly clusters automatically.
+1.  **Causal Behavioral Proof (Planned)**: Actor-attributed Merkle trees proving event causality within the same origin. Planned for v8.0.
+2.  **zk-Behavioral Proofs**: Wrapping SODS verification in a SNARK to prove behavioral compliance on-chain (L2 validation).
+3.  **Cross-Chain Oracles**: Using P2P consensus to verify behavior on Chain A and report it to Chain B.
+4.  **AI Pattern Discovery**: ML models analyzing BMT structures to find anomaly clusters automatically.
 
 ---
 *End of Specification*

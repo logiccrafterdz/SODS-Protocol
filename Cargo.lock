@@ -6626,7 +6626,7 @@ dependencies = [
 
 [[package]]
 name = "sods-causal"
-version = "0.1.0-alpha"
+version = "0.2.0-beta"
 dependencies = [
  "ethers",
  "serde",
@@ -6639,7 +6639,7 @@ dependencies = [
 
 [[package]]
 name = "sods-cli"
-version = "0.1.0-alpha"
+version = "0.2.0-beta"
 dependencies = [
  "assert_cmd",
  "axum",
@@ -6682,7 +6682,7 @@ dependencies = [
 
 [[package]]
 name = "sods-core"
-version = "0.1.0-alpha"
+version = "0.2.0-beta"
 dependencies = [
  "bincode",
  "criterion",
@@ -6705,7 +6705,7 @@ dependencies = [
 
 [[package]]
 name = "sods-p2p"
-version = "0.1.0-alpha"
+version = "0.2.0-beta"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6734,7 +6734,7 @@ dependencies = [
 
 [[package]]
 name = "sods-verifier"
-version = "0.1.0-alpha"
+version = "0.2.0-beta"
 dependencies = [
  "ethers-core",
  "ethers-providers",

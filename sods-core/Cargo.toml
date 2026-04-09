@@ -1,10 +1,10 @@
 [package]
 name = "sods-core"
-version = "0.1.0-alpha"
+version = "0.2.0-beta"
 edition = "2021"
 rust-version = "1.70"
 authors = ["LogicCrafter <logiccrafterdz@gmail.com>"]
-license = "CC0-1.0"
+license = "MIT OR Apache-2.0"
 description = "SODS Protocol Layer 0: Symbolic Core for Behavioral Merkle Trees"
 repository = "https://github.com/logiccrafterdz/sods-protocol"
 homepage = "https://github.com/logiccrafterdz/SODS-Protocol"

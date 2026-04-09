@@ -60,21 +60,21 @@ SODS (Symbolic On-Demand Verification over Decentralized Summaries) enables trus
 
 ## Data Structures
 
-### 1. **Behavioral Merkle Trees (BMT) — CURRENT IMPLEMENTATION**
+### 1. **BMT — Behavioral Merkle Trees (CURRENT IMPLEMENTATION)**
 Sorted binary Merkle trees containing behavioral symbols.
-- **Leaves**: `H(symbol || metadata)`
+- **Leaves**: `Keccak256(symbol || log_index)` (EVM-compatible)
 - **Sorting**: Canonical ordering by block position (log index).
 - **Goal**: Provide a unique, deterministic commitment to the block's behavior for simple presence verification.
-- **Current Status**: Active in v1.0 - v7.0.
+- **Current Status**: Active in v1.0 - v7.0. Keccak256 unified in v0.2.0-beta.
 
-### 2. **Causal Merkle Trees (CMT) — Implemented in v7.1**
-The `sods-causal` crate provides full Causal Merkle Tree functionality:
+### 2. **CMT — Causal Merkle Trees (PLANNED FOR V8.0)**
+The `sods-causal` crate provides a Proof-of-Concept for Causal Merkle Trees:
 - Actor-attributed event sequencing via `(nonce, sequence_index)` ordering
-- RLP-encoded leaf hashing for EVM compatibility  
+- Keccak256 leaf hashing for EVM compatibility  
 - Behavioral pattern matching with time windows
 - Integration with ERC-8004 as a Trustless Agent
 
-**Status**: Production-ready (v7.1). See [sods-causal/README.md](sods-causal/README.md) for detailed usage.
+**Status**: PoC implemented in `sods-causal`. Full production integration PLANNED FOR V8.0. See [sods-causal/README.md](sods-causal/README.md) for details.
 
 ### 3. **Behavioral Symbols**
 Standardized event representations (e.g., `Tf`, `Sw`) derived from raw logs, enriched with causality metadata (`tx_hash`, `nonce`).

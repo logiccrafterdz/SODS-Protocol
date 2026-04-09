@@ -109,15 +109,13 @@ We've built a minimal PoC that verifies behavioral patterns in Sepolia blocks �
 
 ---
 
-## Graphical Interface: SODS-X Neural Overlay
-**(Vision 2126 Edition)**
+## Web Dashboard: SODS-X
 
-While the SODS Protocol is primarily a terminal-first infrastructure, it includes a state-of-the-art Web Dashboard built with React and Vite. Known as the **Neural Overlay**, this dashboard translates raw on-chain behavioral verification into an immersive, volumetric sci-fi visual experience.
+The SODS Protocol includes a Web Dashboard built with React and Vite. This dashboard provides a visual interface for submitting behavioral verification queries and viewing results.
 
-### Features of SODS-X
-- **Bismuth Crystalline Aesthetic**: Advanced holographic CSS designs featuring chromatic aberration and multi-layered faceted panels.
+### Features
 - **Local Proxy Architecture**: Uses a local Node.js `server.js` proxy to securely relay commands to the native Rust `sods-cli` without exposing your system.
-- **Real-Time Verification**: Submit Merkle verification commands directly from the dashboard and view detailed "Synaptic" logs.
+- **Real-Time Verification**: Submit Merkle verification commands directly from the dashboard and view structured logs.
 
 ### Running the Web Dashboard
 ```bash
@@ -351,15 +349,16 @@ The following is a summary of the key capabilities developed during the Alpha ph
 - **Daemon Mode**: Continuous monitoring with webhooks, Prometheus metrics, and WebSocket feeds
 - **Dynamic Symbol Plugins**: Extend the behavioral dictionary at runtime via JSON definitions
 - **ERC-4337, Permit2, CoW Swap**: Next-generation DeFi event support
+- **Causal Behavioral Proofs (Roadmap)**: Actor-attributed event sequencing via Causal Merkle Trees. Planned for v8.0.
 
 ## Project Status
 
-**Version: 0.1.0-alpha (Research Prototype)**
+**Version: 0.2.0-beta (Pre-Production)**
 
-> ⚠️ This project is NOT production-ready. Do not use in production systems.
-> No security audit has been conducted yet. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+> ⚠️ This project is in beta. It has been tested on Sepolia testnet but has not undergone a formal security audit.
+> See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
-License: CC0 1.0 Universal
+License: MIT OR Apache-2.0
 Documentation: See /docs directory and inline code comments
 
 ## Running Tests
