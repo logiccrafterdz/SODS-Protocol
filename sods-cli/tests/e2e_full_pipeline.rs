@@ -11,9 +11,7 @@ fn test_e2e_full_pipeline() {
     cmd.arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "On-chain behavioral verification",
-        ));
+        .stdout(predicate::str::contains("On-chain behavioral verification"));
 
     // Check symbols command
     let mut cmd_sym = Command::cargo_bin("sods").unwrap();

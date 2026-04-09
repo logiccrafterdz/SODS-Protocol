@@ -45,7 +45,7 @@ Continuously monitor the chain for emerging patterns. Use `--auto-adapt` to auto
 sods monitor --pattern "Sw{3,}" --chain base --interval 10s --auto-adapt
 ```
 
-### Dynamic Symbol Loading (New!)
+### Dynamic Symbol Loading
 Load custom behavioral symbols from external JSON plugins (e.g., from IPFS or GitHub) without updating the binary.
 
 ```bash
@@ -64,7 +64,7 @@ Enable proactive shadowing to detect pattern initiations (e.g., `LP+`) and recei
 sods monitor --pattern "LP+ -> Sw -> LP-" --chain base --enable-shadows
 ```
 
-### Real-Time Mempool Monitoring (New!)
+### Real-Time Mempool Monitoring
 Monitor **pending transactions** in real-time to detect threats before they are even mined:
 
 ```bash
@@ -73,7 +73,7 @@ sods monitor --pattern "Sandwich" --chain base --mode pending
 ```
 
 
-## Privacy-Preserving Alerts (New!)
+## Privacy-Preserving Alerts
 
 Webhook alerts use **pattern hashing** to prevent privacy leaks. Attackers observing your webhook traffic cannot learn which specific behaviors you are monitoring.
 
@@ -95,7 +95,7 @@ Run SODS as a background service with desktop notifications and private webhook 
 sods daemon start --pattern "Tf{2,}" --chain base --webhook-url "https://ntfy.sh/my_alerts"
 ```
 
-### 🛡️ Long-Running Stability (v2.1)
+### Long-Running Stability
 SODS is designed for 24/7 background operation. To prevent unbounded memory growth, especially when connected to high-frequency P2P threat feeds:
 - **Auto-Expiration**: Rules automatically expire after **24 hours** by default.
 - **Garbage Collection**: Every 5 minutes, SODS prunes expired rules from memory.
@@ -108,7 +108,7 @@ SODS is designed for 24/7 background operation. To prevent unbounded memory grow
   sods daemon start --expire-after 30m
   ```
 
-## Real-time Alerts via WebSocket (New!)
+## Real-time Alerts via WebSocket
 
 SODS can now push behavioral alerts in real-time to connected clients. This is ideal for building live dashboards, automated trading triggers, or security monitoring systems.
 
@@ -155,7 +155,7 @@ ws.onmessage = (event) => {
 };
 ```
 
-## Monitoring with Prometheus (New!)
+## Monitoring with Prometheus
 
 SODS exposes standard Prometheus metrics for professional operations and observability.
 
@@ -181,7 +181,7 @@ scrape_configs:
 
 ### 3. Visual Dashboard
 
-Import the provided `sods-grafana-dashboard.json` into your Grafana instance to visualize:
+Import the provided `config/sods-grafana-dashboard.json` into your Grafana instance to visualize:
 - **System Health**: Memory usage & active rules.
 - **Performance**: RPC latency & block verification duration.
 - **Detections**: Alert rates & detection frequency.
@@ -268,7 +268,7 @@ sods verify "Frontrun" --block 20000000 --chain ethereum
 sods verify "Backrun" --block 20000000 --chain ethereum
 ```
 
-### Next-Gen Behavior Monitoring (v2.2)
+### Next-Gen Behavior Monitoring
 Monitor emerging Web3 paradigms like Account Abstraction, Permit2, and CoW Swap:
 
 ```bash
@@ -282,7 +282,7 @@ sods trend --pattern "Permit2" --chain base --window 50
 sods verify "CoWTrade" --block 20000000 --chain ethereum
 ```
 
-### Context-Aware Patterns (New in v1.2)
+### Context-Aware Patterns
 Enhance your detection with contextual conditions like `from == deployer` and `value` comparisons.
 
 ```bash
@@ -295,7 +295,7 @@ sods verify "Tf where value > 50 ether" --block 20000000 --chain ethereum
 # Detect large swaps on Base
 sods verify "Sw where value > 10000 gwei" --block 9000000 --chain base
 ```
-## Reliable Operation on L2s (v1.3)
+## Reliable Operation on L2s
 
 SODS is hardened for unreliable L2 public RPCs (Scroll, Polygon zkEVM, Base, etc.). It automatically ensures uninterrupted operation through:
 
@@ -322,7 +322,7 @@ This mode:
 
 **Note**: Requires RPC provider support for `eth_getProof` (Alchemy, Infura, etc.)
 
-## On-Chain Verification (New in v1.4)
+## On-Chain Verification
 
 Generate behavioral proofs that can be verified inside Ethereum smart contracts:
 
@@ -330,7 +330,7 @@ Generate behavioral proofs that can be verified inside Ethereum smart contracts:
 sods export-proof --pattern "Sandwich" --block 20000000 --chain ethereum --format calldata
 ```
 
-**[Read the On-Chain Verification Guide](ONCHAIN.md)**
+**[Read the On-Chain Verification Guide](docs/ONCHAIN.md)**
 
 ## Network Compatibility
 

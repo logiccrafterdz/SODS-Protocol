@@ -1,6 +1,6 @@
-use risc0_zkvm::{default_prover, ExecutorEnv, Receipt};
-use sods_core::symbol::{BehavioralSymbol, BehavioralProofInput};
 use anyhow::Result;
+use risc0_zkvm::{default_prover, ExecutorEnv, Receipt};
+use sods_core::symbol::{BehavioralProofInput, BehavioralSymbol};
 
 // Include the generated methods.
 include!(concat!(env!("OUT_DIR"), "/methods.rs"));
@@ -20,9 +20,7 @@ pub fn prove_behavior(
     };
 
     // 2. Setup environment for the guest
-    let env = ExecutorEnv::builder()
-        .write(&input)?
-        .build()?;
+    let env = ExecutorEnv::builder().write(&input)?.build()?;
 
     // 3. Run the prover
     let prover = default_prover();

@@ -118,7 +118,9 @@ impl BlockVerifier {
             verification_mode: crate::header_anchor::VerificationMode::Trustless,
             deployer_cache: Arc::new(Mutex::new(HashMap::new())),
             registry: ContractRegistry::load_local().unwrap_or_else(|_| ContractRegistry::new()),
-            pattern_cache: Arc::new(Mutex::new(lru::LruCache::new(NonZeroUsize::new(500).unwrap()))),
+            pattern_cache: Arc::new(Mutex::new(lru::LruCache::new(
+                NonZeroUsize::new(500).unwrap(),
+            ))),
         })
     }
 
@@ -133,7 +135,9 @@ impl BlockVerifier {
             verification_mode: crate::header_anchor::VerificationMode::ZeroRpc,
             deployer_cache: Arc::new(Mutex::new(HashMap::new())),
             registry: ContractRegistry::load_local().unwrap_or_else(|_| ContractRegistry::new()),
-            pattern_cache: Arc::new(Mutex::new(lru::LruCache::new(NonZeroUsize::new(500).unwrap()))),
+            pattern_cache: Arc::new(Mutex::new(lru::LruCache::new(
+                NonZeroUsize::new(500).unwrap(),
+            ))),
         })
     }
 
@@ -148,7 +152,9 @@ impl BlockVerifier {
             verification_mode: crate::header_anchor::VerificationMode::RpcOnly,
             deployer_cache: Arc::new(Mutex::new(HashMap::new())),
             registry: ContractRegistry::load_local().unwrap_or_else(|_| ContractRegistry::new()),
-            pattern_cache: Arc::new(Mutex::new(lru::LruCache::new(NonZeroUsize::new(500).unwrap()))),
+            pattern_cache: Arc::new(Mutex::new(lru::LruCache::new(
+                NonZeroUsize::new(500).unwrap(),
+            ))),
         })
     }
 

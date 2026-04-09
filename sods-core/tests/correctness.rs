@@ -1,5 +1,5 @@
-use tiny_keccak::Hasher;
 use sods_core::{BehavioralMerkleTree, BehavioralSymbol};
+use tiny_keccak::Hasher;
 
 #[test]
 fn test_empty_block_correctness() {

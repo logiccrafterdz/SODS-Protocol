@@ -421,7 +421,10 @@ mod tests {
         let mut expected = [0u8; 32];
         hasher.finalize(&mut expected);
 
-        assert_eq!(rust_hash, expected, "Leaf hash must match Solidity ABI encoding");
+        assert_eq!(
+            rust_hash, expected,
+            "Leaf hash must match Solidity ABI encoding"
+        );
     }
 
     #[test]

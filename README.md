@@ -284,7 +284,7 @@ sods verify Tf --block 9000000 --chain base
 # Discover behavioral hotspots (Find active blocks)
 sods discover --symbol Sw --chain base --last 20
 
-# Detect behavioral trends (New in v1.1)
+# Detect behavioral trends
 sods trend --pattern "LP+ -> Sw" --chain base --window 10
 
 # Autonomous monitoring (Continuous watchdog)
@@ -293,7 +293,7 @@ sods monitor --pattern "Sw{3,}" --chain base --interval 30s
 # Run as background daemon with community threat feed (and webhooks)
 sods daemon start --threat-feed "https://raw.githubusercontent.com/sods/threats/main/base.json" --chain base --webhook-url "https://ntfy.sh/my_alerts" --autostart
 
-# Monitor Next-Gen Activity (New in v2.2)
+# Monitor Next-Gen Activity
 sods verify AAOp --block 20000000 --chain ethereum
 sods trend --pattern "Permit2" --chain base --window 50
 sods verify "CoWTrade" --block 20000000 --chain ethereum
@@ -308,16 +308,16 @@ sods symbols
 # List supported chains
 sods chains
 
-# Generate ZK Behavioral Proof (New in v2.5)
+# Generate ZK Behavioral Proof
 sods zk-prove --pattern "Sandwich" --block 20000000 --chain ethereum
 
-# Start WebSocket Alerting Server (New!)
+# Start WebSocket Alerting Server
 sods daemon start --websocket-port 8080 --chain optimism
 
-# Start Prometheus Metrics Server (New!)
+# Start Prometheus Metrics Server
 sods daemon start --metrics-port 9090 --chain base
 
-# Listen for Live Alerts (New!)
+# Listen for Live Alerts
 sods listen --websocket ws://localhost:8080 --pattern "Sw{3,}"
 
 # JSON output for scripting
