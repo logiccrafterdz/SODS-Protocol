@@ -54,8 +54,8 @@ impl FromRef<Arc<AgentMetrics>> for MonitoringState {
 
 pub async fn health_check(State(state): State<MonitoringState>) -> Json<HealthResponse> {
     let (status, erc8004_status, health_metrics) = if let Some(ref metrics) = state.metrics {
-        let total_requests = metrics.validation_requests_received_total.get() as f64;
-        let successful_responses = metrics.validation_responses_submitted_total.get() as f64;
+        let total_requests = metrics.validation_requests_received_total.get();
+        let successful_responses = metrics.validation_responses_submitted_total.get();
         let success_rate = if total_requests > 0.0 {
             (successful_responses / total_requests) * 100.0
         } else {

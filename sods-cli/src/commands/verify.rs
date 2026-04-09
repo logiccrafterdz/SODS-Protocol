@@ -159,7 +159,7 @@ pub async fn run(args: VerifyArgs) -> i32 {
         vec![url]
     } else {
         let user_config = crate::config::UserConfig::load();
-        if let Some(overridden_rpc) = user_config.get_rpc_override(&chain_config.name) {
+        if let Some(overridden_rpc) = user_config.get_rpc_override(chain_config.name) {
             vec![overridden_rpc]
         } else {
             chain_config
@@ -390,7 +390,7 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
     let user_config = crate::config::UserConfig::load();
     let rpc_urls: Vec<String> = if let Some(url) = args.rpc_url {
         vec![url]
-    } else if let Some(overridden_rpc) = user_config.get_rpc_override(&chain_config.name) {
+    } else if let Some(overridden_rpc) = user_config.get_rpc_override(chain_config.name) {
         vec![overridden_rpc]
     } else {
         chain_config
@@ -450,21 +450,23 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
                     matched_sequence: None, // Simplified for optimized path
                 };
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            } else if result.is_verified {
+                println!("✅ Pattern Verified (Optimized Path)!");
+                println!("   Occurrences: {}", result.occurrences);
+                println!(
+                    "   Root:        0x{}",
+                    hex::encode(result.merkle_root.as_deref().unwrap_or(&[0u8; 32]))
+                );
+                println!("   Time:        {} ms", elapsed);
+                println!("   Mode:        Incremental / Filtered");
             } else {
-                if result.is_verified {
-                    println!("✅ Pattern Verified (Optimized Path)!");
-                    println!("   Occurrences: {}", result.occurrences);
-                    println!(
-                        "   Root:        0x{}",
-                        hex::encode(result.merkle_root.as_deref().unwrap_or(&[0u8; 32]))
-                    );
-                    println!("   Time:        {} ms", elapsed);
-                    println!("   Mode:        Incremental / Filtered");
-                } else {
-                    output::error("Pattern not found in block.");
-                }
+                output::error("Pattern not found in block.");
             }
-            return if result.is_verified { 0 } else { 1 };
+            if result.is_verified {
+                0
+            } else {
+                1
+            }
         }
         Err(e) => {
             if args.json {
@@ -472,7 +474,7 @@ async fn run_pattern_verification(args: VerifyArgs) -> i32 {
             } else {
                 output::error(&format!("Pattern verification failed: {}", e));
             }
-            return 1;
+            1
         }
     }
 }

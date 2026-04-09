@@ -24,11 +24,12 @@ use sha3::{Digest, Keccak256};
 // use crate::error::{Result, SodsVerifierError};
 
 /// Verification mode indicating the trust level of the verification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VerificationMode {
     /// Logs are cryptographically anchored to block header via receipt trie.
     /// This is trustless verification — the RPC cannot fabricate logs.
+    #[default]
     Trustless,
 
     /// Logs are fetched individually and verified via Merkle-Patricia proofs.
@@ -47,12 +48,6 @@ impl std::fmt::Display for VerificationMode {
             Self::ZeroRpc => write!(f, "Zero-RPC — Storage Proof Verified"),
             Self::RpcOnly => write!(f, "RPC Only — Requires Trust in Provider"),
         }
-    }
-}
-
-impl Default for VerificationMode {
-    fn default() -> Self {
-        Self::Trustless
     }
 }
 

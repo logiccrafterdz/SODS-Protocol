@@ -375,7 +375,7 @@ impl RpcClient {
                 None => continue,
             };
 
-            for (_i, tx) in block.transactions.iter().enumerate() {
+            for tx in block.transactions.iter() {
                 if tx.to.is_none() {
                     let mut receipt = None;
                     for _ in 0..self.providers.len() {
@@ -425,8 +425,10 @@ impl RpcClient {
             }
         }
 
-        if block_transactions.is_empty() && last_err.is_some() {
-            return Err(last_err.unwrap());
+        if block_transactions.is_empty() {
+            if let Some(err) = last_err {
+                return Err(err);
+            }
         }
 
         if block_transactions.is_empty() {

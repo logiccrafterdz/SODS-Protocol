@@ -1,3 +1,4 @@
+#![allow(clippy::collapsible_match)]
 //! Monitor command implementation.
 
 use clap::{Args, ValueEnum};
@@ -287,19 +288,19 @@ pub async fn run(args: MonitorArgs) -> i32 {
                                     first_step
                                 {
                                     for sym in &symbols {
-                                        if sym.symbol == *target {
-                                            if !active_shadows.iter().any(|s| s.actor == sym.from) {
-                                                println!(
-                                                    "🕵️  Spawning Shadow for actor {:?} (saw {})",
-                                                    sym.from, sym.symbol
+                                        if sym.symbol == *target
+                                            && !active_shadows.iter().any(|s| s.actor == sym.from)
+                                        {
+                                            println!(
+                                                "🕵️  Spawning Shadow for actor {:?} (saw {})",
+                                                sym.from, sym.symbol
+                                            );
+                                            let mut shadow =
+                                                sods_core::BehavioralShadow::from_pattern(
+                                                    &pattern, sym.from, sym.nonce, block_num,
                                                 );
-                                                let mut shadow =
-                                                    sods_core::BehavioralShadow::from_pattern(
-                                                        &pattern, sym.from, sym.nonce, block_num,
-                                                    );
-                                                shadow.current_step_index = 1; // Advance past first step
-                                                active_shadows.push(shadow);
-                                            }
+                                            shadow.current_step_index = 1; // Advance past first step
+                                            active_shadows.push(shadow);
                                         }
                                     }
                                 }

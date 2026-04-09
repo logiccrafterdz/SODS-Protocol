@@ -1,7 +1,7 @@
 use axum::{extract::State, response::Response, routing::get, Router};
 use http_body_util::Full;
 use prometheus::{
-    Counter, Encoder, Gauge, Histogram, HistogramOpts, IntGauge, Opts, Registry, TextEncoder,
+    Counter, Encoder, Gauge, Histogram, HistogramOpts, IntGauge, Registry, TextEncoder,
 };
 use std::sync::Arc;
 use tokio::net::TcpListener;

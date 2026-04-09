@@ -171,16 +171,20 @@ fn test_proof_verification_performance() {
 
 /// Test empty tree edge case.
 #[test]
-fn test_empty_tree_root_matches_sha256_empty() {
-    use sha2::{Digest, Sha256};
+fn test_empty_tree_root_matches_keccak256_empty() {
+    use tiny_keccak::{Hasher, Keccak};
 
     let bmt = BehavioralMerkleTree::new(vec![]);
-    let expected: [u8; 32] = Sha256::digest([]).into();
+
+    let mut hasher = Keccak::v256();
+    let mut expected = [0u8; 32];
+    hasher.update(&[]);
+    hasher.finalize(&mut expected);
 
     assert_eq!(bmt.root(), expected);
     assert_eq!(
         hex::encode(bmt.root()),
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
     );
 }
 

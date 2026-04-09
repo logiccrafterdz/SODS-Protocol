@@ -1,3 +1,4 @@
+#![allow(dead_code, clippy::type_complexity, clippy::too_many_arguments)]
 #[cfg(feature = "metrics")]
 use crate::monitoring::metrics::AgentMetrics;
 use clap::{Args, Subcommand};
@@ -9,15 +10,14 @@ use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc::unbounded_channel, mpsc::UnboundedSender, RwLock};
 use tokio_tungstenite::tungstenite::protocol::Message;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, warn};
 use uuid::Uuid;
 #[cfg(not(feature = "metrics"))]
 type AgentMetrics = ();
 
 use dirs;
 use std::fs;
-use std::path::{Path, PathBuf};
-use sysinfo::{Pid, System};
+use std::path::PathBuf;
 
 #[cfg(unix)]
 use daemonize::Daemonize;
@@ -878,7 +878,7 @@ fn start_daemon(
     let _metrics: Option<Arc<AgentMetrics>> = metrics_port.and_then(|_port| {
         #[cfg(feature = "metrics")]
         {
-            AgentMetrics::new().ok().map(|m| Arc::new(m))
+            AgentMetrics::new().ok().map(Arc::new)
         }
         #[cfg(not(feature = "metrics"))]
         {

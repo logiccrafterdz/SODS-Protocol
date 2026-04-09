@@ -63,11 +63,11 @@ pub fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
         if let Some(n) = value.as_u64() {
             stream.append(&n);
         } else if let Some(s) = value.as_str() {
-            if s.starts_with("0x") {
-                let hex_str = if s.len() % 2 != 0 {
-                    format!("0{}", &s[2..])
+            if let Some(stripped) = s.strip_prefix("0x") {
+                let hex_str = if stripped.len() % 2 != 0 {
+                    format!("0{}", stripped)
                 } else {
-                    s[2..].to_string()
+                    stripped.to_string()
                 };
                 let bytes = hex::decode(&hex_str).unwrap_or_default();
                 // If the bytes represent a number, we might want to append as a number
@@ -86,11 +86,11 @@ pub fn rlp_encode_receipt(receipt: &TransactionReceipt) -> Vec<u8> {
                 if let Some(n) = item.as_u64() {
                     stream.append(&n);
                 } else if let Some(s) = item.as_str() {
-                    if s.starts_with("0x") {
-                        let hex_str = if s.len() % 2 != 0 {
-                            format!("0{}", &s[2..])
+                    if let Some(stripped) = s.strip_prefix("0x") {
+                        let hex_str = if stripped.len() % 2 != 0 {
+                            format!("0{}", stripped)
                         } else {
-                            s[2..].to_string()
+                            stripped.to_string()
                         };
                         let bytes = hex::decode(&hex_str).unwrap_or_default();
                         stream.append(&bytes);

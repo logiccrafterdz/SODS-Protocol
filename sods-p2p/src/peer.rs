@@ -195,30 +195,28 @@ impl SodsPeer {
 
     /// Handle gossipsub events.
     fn handle_gossip_event(&mut self, event: gossipsub::Event) {
-        match event {
-            gossipsub::Event::Message {
-                propagation_source,
-                message_id: _,
-                message,
-            } => {
-                if let Ok(rule) = serde_json::from_slice::<ThreatRule>(&message.data) {
-                    info!(
-                        "Received threat rule '{}' from {}",
-                        rule.id, propagation_source
-                    );
+        if let gossipsub::Event::Message {
+            propagation_source,
+            message_id: _,
+            message,
+        } = event
+        {
+            if let Ok(rule) = serde_json::from_slice::<ThreatRule>(&message.data) {
+                info!(
+                    "Received threat rule '{}' from {}",
+                    rule.id, propagation_source
+                );
 
-                    // Validate rule
-                    if rule.verify() {
-                        // Forward to local listeners
-                        let _ = self.threat_tx.send(rule);
-                    } else {
-                        warn!("Received INVALID threat rule from {}", propagation_source);
-                    }
+                // Validate rule
+                if rule.verify() {
+                    // Forward to local listeners
+                    let _ = self.threat_tx.send(rule);
                 } else {
-                    warn!("Received malformed gossip message");
+                    warn!("Received INVALID threat rule from {}", propagation_source);
                 }
+            } else {
+                warn!("Received malformed gossip message");
             }
-            _ => {}
         }
     }
 

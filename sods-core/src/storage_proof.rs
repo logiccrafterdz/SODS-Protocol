@@ -15,7 +15,7 @@ pub fn verify_storage_proof(proof: &EIP1186ProofResponse, state_root: H256) -> P
     // 1. Verify Account Proof
     let account_valid = verify_mpt_proof(
         state_root,
-        &Keccak256::digest(proof.address.as_bytes()).to_vec(),
+        &Keccak256::digest(proof.address.as_bytes()),
         &proof.account_proof,
     );
 
@@ -25,7 +25,7 @@ pub fn verify_storage_proof(proof: &EIP1186ProofResponse, state_root: H256) -> P
         // Extract storage root from account data
         if let Some(account_rlp) = get_leaf_value(
             state_root,
-            &Keccak256::digest(proof.address.as_bytes()).to_vec(),
+            &Keccak256::digest(proof.address.as_bytes()),
             &proof.account_proof,
         ) {
             let rlp = Rlp::new(&account_rlp);
@@ -36,7 +36,7 @@ pub fn verify_storage_proof(proof: &EIP1186ProofResponse, state_root: H256) -> P
                 for sp in &proof.storage_proof {
                     let mut key_bytes = [0u8; 32];
                     sp.key.to_big_endian(&mut key_bytes);
-                    let key_hash = Keccak256::digest(&key_bytes).to_vec();
+                    let key_hash = Keccak256::digest(key_bytes).to_vec();
                     let valid = verify_mpt_proof(storage_root, &key_hash, &sp.proof);
                     storage_valid.push(valid);
                 }

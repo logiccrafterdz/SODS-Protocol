@@ -192,12 +192,10 @@ pub async fn run(args: TrendArgs) -> i32 {
                 use std::io::Write;
                 std::io::stdout().flush().unwrap();
             }
-        } else {
-            if !args.json {
-                print!("_"); // No match dot
-                use std::io::Write;
-                std::io::stdout().flush().unwrap();
-            }
+        } else if !args.json {
+            print!("_"); // No match dot
+            use std::io::Write;
+            std::io::stdout().flush().unwrap();
         }
     }
 

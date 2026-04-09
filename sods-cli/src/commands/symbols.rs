@@ -62,21 +62,15 @@ fn list_symbols() -> i32 {
     println!();
     output::header("Behavioral Patterns DSL");
     output::info("You can also verify complex behavioral sequences:");
+    println!("  {:<20} Use '->' (e.g., 'LP+ -> Sw -> LP-')", "Sequence");
     println!(
-        "  {:<20} {}",
-        "Sequence", "Use '->' (e.g., 'LP+ -> Sw -> LP-')"
+        "  {:<20} Use '{{n}}' (e.g., 'Sw{{3}}' for 3 Swaps)",
+        "Exact Count"
     );
+    println!("  {:<20} Use 'where from == deployer'", "Context Filter");
     println!(
-        "  {:<20} {}",
-        "Exact Count", "Use '{n}' (e.g., 'Sw{3}' for 3 Swaps)"
-    );
-    println!(
-        "  {:<20} {}",
-        "Context Filter", "Use 'where from == deployer'"
-    );
-    println!(
-        "  {:<20} {}",
-        "Value Filter", "Use 'where value > 10 ether' (or gwei)"
+        "  {:<20} Use 'where value > 10 ether' (or gwei)",
+        "Value Filter"
     );
 
     println!();

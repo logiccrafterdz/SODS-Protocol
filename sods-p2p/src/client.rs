@@ -1,4 +1,5 @@
 //! SODS Client - requests proofs from the P2P network.
+#![allow(clippy::collapsible_match)]
 
 use futures::StreamExt;
 use libp2p::{
@@ -167,22 +168,17 @@ impl SodsClient {
 
     /// Handle identify events.
     fn handle_identify_event(&mut self, event: identify::Event) {
-        match event {
-            identify::Event::Received { peer_id, info, .. } => {
-                if peer_id != self.local_peer_id {
-                    debug!("Identified peer: {} ({})", peer_id, info.agent_version);
-                    if !self.known_peers.contains(&peer_id)
-                        && !self.slashed_peers.contains(&peer_id)
-                    {
-                        self.known_peers.insert(peer_id);
-                        self.issue_challenge(&peer_id);
-                    }
-                    for addr in info.listen_addrs {
-                        self.swarm.add_peer_address(peer_id, addr);
-                    }
+        if let identify::Event::Received { peer_id, info, .. } = event {
+            if peer_id != self.local_peer_id {
+                debug!("Identified peer: {} ({})", peer_id, info.agent_version);
+                if !self.known_peers.contains(&peer_id) && !self.slashed_peers.contains(&peer_id) {
+                    self.known_peers.insert(peer_id);
+                    self.issue_challenge(&peer_id);
+                }
+                for addr in info.listen_addrs {
+                    self.swarm.add_peer_address(peer_id, addr);
                 }
             }
-            _ => {}
         }
     }
 

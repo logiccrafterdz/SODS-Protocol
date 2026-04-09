@@ -1,8 +1,4 @@
 use clap::{Parser, Subcommand};
-#[cfg(feature = "api")]
-use sods_cli::api;
-#[cfg(feature = "metrics")]
-use sods_cli::monitoring;
 use sods_cli::{commands, logging};
 
 #[derive(Parser)]

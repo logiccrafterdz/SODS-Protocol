@@ -191,22 +191,20 @@ pub async fn run(args: DiscoverArgs) -> i32 {
             error: None,
         };
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else if results.is_empty() {
+        output::info("No events found in the scanned range.");
     } else {
-        if results.is_empty() {
-            output::info("No events found in the scanned range.");
-        } else {
-            for (i, res) in results.iter().take(10).enumerate() {
-                let medal = match i {
-                    0 => "🥇",
-                    1 => "🥈",
-                    2 => "🥉",
-                    _ => "  ",
-                };
-                println!(
-                    "{} Block {}: {} {} events",
-                    medal, res.block, res.count, args.symbol
-                );
-            }
+        for (i, res) in results.iter().take(10).enumerate() {
+            let medal = match i {
+                0 => "🥇",
+                1 => "🥈",
+                2 => "🥉",
+                _ => "  ",
+            };
+            println!(
+                "{} Block {}: {} {} events",
+                medal, res.block, res.count, args.symbol
+            );
         }
     }
 

@@ -82,9 +82,9 @@ impl RegistryUpdate {
         for entry in &self.contracts {
             hasher.update(entry.address.as_bytes());
             hasher.update(entry.deployer.as_bytes());
-            hasher.update(&entry.block.to_le_bytes());
+            hasher.update(entry.block.to_le_bytes());
         }
-        hasher.update(&self.timestamp.to_le_bytes());
+        hasher.update(self.timestamp.to_le_bytes());
         hasher.finalize().into()
     }
 
@@ -163,7 +163,7 @@ impl ThreatRule {
         hasher.update(self.pattern.as_bytes());
         hasher.update(self.chain.as_bytes());
         hasher.update(self.severity.as_bytes());
-        hasher.update(&self.timestamp.to_le_bytes());
+        hasher.update(self.timestamp.to_le_bytes());
         hasher.finalize().into()
     }
 

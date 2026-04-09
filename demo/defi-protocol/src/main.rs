@@ -1,5 +1,4 @@
 use ethers::types::Address;
-use serde::{Deserialize, Serialize};
 use sods_causal::{
     AgentBehaviorPattern, CausalBehavioralProof, CausalEvent, CausalEventRecorder,
     generate_behavioral_proof,
