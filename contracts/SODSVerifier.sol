@@ -2,16 +2,16 @@
 pragma solidity ^0.8.0;
 
 /// @title SODSVerifier
-/// @notice Library for verifying behavioral proofs on-chain.
+/// @notice On-chain verification of SODS behavioral proofs.
+/// @dev v0.2.0-beta: Beacon anchoring is best-effort.
+/// On networks without EIP-4788, verification proceeds without consensus-layer binding.
+/// This is explicitly documented as a known limitation.
 library SODSVerifier {
     address constant BEACON_ROOTS_ADDRESS = 0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02;
 
     interface IBeaconRoots {
         function getBeaconRoot(uint64 timestamp) external view returns (bytes32);
     }
-
-    /// @notice Beacon anchoring events cannot be emitted from a view function.
-    /// This will be handled upstream or via return codes in future versions.
 
     bytes32 private constant DOMAIN_TYPEHASH = keccak256(
         "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
@@ -22,6 +22,12 @@ library SODSVerifier {
     );
 
     /// @notice Verifies a behavioral proof against a BMT root.
+    /// @dev Returns a tuple (proofValid, beaconAnchored) instead of a single bool.
+    ///      - proofValid: true if the Merkle proof and leaf hashes are cryptographically valid.
+    ///      - beaconAnchored: true if the beacon root was verified via EIP-4788.
+    ///      Callers who require full security MUST check both values.
+    ///      Callers on networks without EIP-4788 may accept proofValid alone,
+    ///      understanding that the proof is not consensus-anchored.
     /// @param blockNumber The block number where the behavior occurred.
     /// @param chainId The chain ID where the behavior occurred.
     /// @param symbols Array of symbol codes in the sequence.
@@ -35,7 +41,8 @@ library SODSVerifier {
     /// @param receiptsRoot The root of the transaction receipts trie.
     /// @param signature The ECDSA signature over the commitment.
     /// @param trustedSigner The address authorized to sign BMT commitments.
-    /// @return bool True if the proof is valid, anchored, and signed (if provided).
+    /// @return proofValid True if the Merkle proof is cryptographically valid.
+    /// @return beaconAnchored True if the proof is anchored to the consensus layer via EIP-4788.
     function verifyBehavior(
         uint256 blockNumber,
         uint256 chainId,
@@ -50,10 +57,12 @@ library SODSVerifier {
         bytes32 receiptsRoot,
         bytes calldata signature,
         address trustedSigner
-    ) external view returns (bool) {
+    ) external view returns (bool proofValid, bool beaconAnchored) {
+        proofValid = false;
+        beaconAnchored = false;
+
         // 1. Verify Commitment Signature (if provided)
         if (signature.length == 65 && trustedSigner != address(0)) {
-            // EIP-712 Structured Data Hashing
             bytes32 domainSeparator = keccak256(abi.encode(
                 DOMAIN_TYPEHASH,
                 keccak256(bytes("SODS Protocol")),
@@ -88,51 +97,38 @@ library SODSVerifier {
             if (v < 27) v += 27;
 
             address recovered = ecrecover(digest, v, r, s);
-            if (recovered != trustedSigner) return false;
+            if (recovered != trustedSigner) return (false, false);
         }
 
-        // 2. Anchor to Beacon Chain (EIP-4788)
-        // We verify that the provided beaconRoot is actually part of Ethereum's consensus
+        // 2. Anchor to Beacon Chain (EIP-4788) — best-effort
         if (beaconRoot != bytes32(0)) {
-            bool beaconVerified = false;
             try IBeaconRoots(BEACON_ROOTS_ADDRESS).getBeaconRoot(uint64(timestamp)) returns (bytes32 trustedRoot) {
                 if (trustedRoot == beaconRoot) {
-                    beaconVerified = true;
+                    beaconAnchored = true;
                 }
-            } catch Error(string memory /*reason*/) {
-                // EIP-4788 not supported or contract not deployed
-                // Warning only path - we proceed to verify the BMT proof itself
+                // If trustedRoot != beaconRoot, beaconAnchored stays false
             } catch {
-                // Low-level call failure (e.g., out of gas, no contract)
-                // Warning only path - we proceed to verify the BMT proof itself
+                // EIP-4788 not supported or contract not deployed
+                // beaconAnchored stays false — caller decides how to handle
             }
-            
-            // Require beacon verification OR proceed with warning status (emit already handled)
-            // For v1.7, we allow fallback for broad network compatibility.
-            if (!beaconVerified) {
-                // Warning only path - we proceed to verify the BMT proof itself
-            }
-
-            // 2. Cross-verify BMT root with Block Header (Simulated for v1)
-            // In a full implementation, we would verify a storage proof here:
-            // beaconRoot -> ExecutionPayloadHeader -> receiptsRoot == bmtRoot
-            // For v1, we assume the BMT root is anchored if it matches the trusted setup.
         }
 
+        // 3. Validate input arrays
         if (symbols.length == 0 || symbols.length != logIndices.length || symbols.length != leafHashes.length) {
-            return false;
+            return (false, beaconAnchored);
         }
 
-        // 3. Verify that leaf hashes match symbols and indices
+        // 4. Verify that leaf hashes match symbols and indices
+        // Formula: keccak256(abi.encodePacked(symbol, logIndex))
         for (uint256 i = 0; i < symbols.length; i++) {
             if (keccak256(abi.encodePacked(symbols[i], logIndices[i])) != leafHashes[i]) {
-                return false;
+                return (false, beaconAnchored);
             }
         }
 
-        // 4. Verify Merkle Path with explicit direction flags (v3 ABI)
+        // 5. Verify Merkle Path
         if (merklePath.length != isLeftPath.length) {
-            return false;
+            return (false, beaconAnchored);
         }
 
         bytes32 computedHash = leafHashes[0];
@@ -148,6 +144,7 @@ library SODSVerifier {
             }
         }
 
-        return computedHash == bmtRoot;
+        proofValid = (computedHash == bmtRoot);
+        return (proofValid, beaconAnchored);
     }
 }

@@ -41,20 +41,23 @@ contract BehavioralGuard {
         uint32[] calldata logIndices,
         bytes32[] calldata leafHashes,
         bytes32[] calldata merklePath,
-        bytes32 bmtRoot
-    ) external {
-        bool verified = SODSVerifier.verifyBehavior(
-            blockNumber,
-            chainId,
-            symbols,
-            logIndices,
-            leafHashes,
-            merklePath,
-            bmtRoot
+        bool[] calldata isLeftPath,
+        bytes32 bmtRoot,
+        bytes32 beaconRoot,
+        uint256 timestamp,
+        bytes32 receiptsRoot,
+        bytes calldata signature,
+        address trustedSigner
+    ) external view {
+        (bool proofValid, bool beaconAnchored) = SODSVerifier.verifyBehavior(
+            blockNumber, chainId, symbols, logIndices, leafHashes,
+            merklePath, isLeftPath, bmtRoot, beaconRoot, timestamp,
+            receiptsRoot, signature, trustedSigner
         );
-        require(verified, "Behavior not verified");
+        require(proofValid, "Merkle proof invalid");
+        // Optional: require(beaconAnchored, "Beacon anchor required");
         
-        // React to verified behavior (e.g. pause trading if 'LP-' detected)
+        // React to verified behavior
     }
 }
 ```
@@ -103,14 +106,14 @@ bool valid = SODSVerifier.verifyBehavior(
 
 ## On-Chain Fallback Mode
 
-For networks without EIP-4788 support (pre-Dencun or legacy L2s), the `SODSVerifier` library implements a graceful fallback:
+For networks without EIP-4788 support (pre-Dencun or legacy L2s), `SODSVerifier.verifyBehavior` returns `beaconAnchored = false` while `proofValid` reflects the Merkle proof result.
 
-1. **Attempt Lookup**: The library tries to fetch the beacon root.
-2. **Catch Failure**: If the precompile is missing or reverts, it catches the error.
-3. **Emit Event**: A `BeaconAnchoringSkipped(uint256 blockNumber, string reason)` event is emitted.
-4. **Proceed**: Verification continues using the provided `bmtRoot` and Merkle proof.
+1. **Attempt Lookup**: The library tries to fetch the beacon root via EIP-4788.
+2. **Catch Failure**: If the precompile is missing or reverts, the error is caught silently.
+3. **Return Status**: `beaconAnchored` is set to `false`; the caller decides how to handle it.
+4. **Proceed**: The Merkle proof is still verified independently.
 
-This allows your contract to remain functional across all EVM chains while receiving on-chain notifications about reduced anchoring guarantees.
+This allows your contract to remain functional across all EVM chains. Consumers requiring full security MUST check `beaconAnchored == true`.
 
 ## Signed Behavioral Commitments
 
@@ -182,8 +185,14 @@ function verifyBehavior(
     bytes32 receiptsRoot,
     bytes calldata signature,
     address trustedSigner
-) external view returns (bool);
+) external view returns (bool proofValid, bool beaconAnchored);
 ```
+
+## Known Limitations (v0.2.0-beta)
+
+1. **Beacon Anchoring**: Best-effort only. Returns `beaconAnchored=false` on networks without EIP-4788.
+2. **Single-Symbol Proof**: On-chain Merkle path verification covers the FIRST matched symbol only. Multi-symbol independent proofs are planned for v0.3.0.
+3. **No Storage Proof Chain**: The full chain `beaconRoot -> ExecutionPayloadHeader -> receiptsRoot -> BMT` is not yet implemented. The `receiptsRoot` field is included for future use.
 
 ### Generating v3 Proofs
 
